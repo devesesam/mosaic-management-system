@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, isSameDay, parseISO, differenceInDays } from 'date-fns';
+import { format, isSameDay, parseISO } from 'date-fns';
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
 import DraggableJob from './DraggableJob';
@@ -41,15 +41,22 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
-  const mainJob = jobs[0];
-  const hasMoreJobs = jobs.length > 1;
+  // Sort jobs so most important shows on top
+  const sortedJobs = [...jobs].sort((a, b) => {
+    // Prioritize jobs with both start and end dates
+    const aHasBothDates = !!(a.start_date && a.end_date);
+    const bHasBothDates = !!(b.start_date && b.end_date);
+    
+    if (aHasBothDates && !bHasBothDates) return -1;
+    if (!aHasBothDates && bHasBothDates) return 1;
+    
+    // If both have dates or both don't, sort by created date (newest first)
+    return b.created_at.localeCompare(a.created_at);
+  });
   
-  // Calculate span for multi-day jobs
-  const getJobSpan = (job: Job) => {
-    if (!job.start_date || !job.end_date) return 1;
-    return differenceInDays(parseISO(job.end_date), parseISO(job.start_date)) + 1;
-  };
-  
+  const mainJob = sortedJobs[0];
+  const hasMoreJobs = sortedJobs.length > 1;
+
   return (
     <div
       ref={drop}
@@ -74,7 +81,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               readOnly={readOnly}
               days={days}
               dayIndex={dayIndex}
-              span={getJobSpan(mainJob)}
             />
           </div>
         )}
@@ -84,7 +90,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             onClick={() => onShowMore(day)}
             className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-10"
           >
-            +{jobs.length - 1} more
+            +{sortedJobs.length - 1} more
           </button>
         )}
       </div>
@@ -92,4 +98,4 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   );
 };
 
-export default CalendarCell;
+export default React.memo(CalendarCell);
