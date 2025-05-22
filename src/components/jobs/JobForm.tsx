@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { Job, JobStatus, Worker } from '../../types';
 import { useWorkerStore } from '../../store/workerStore';
 import { X, Trash2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 interface JobFormProps {
   onClose: () => void;
@@ -39,9 +38,6 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     tile_color: '#3b82f6'
   });
 
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-
   // Initialize form with initial job data
   useEffect(() => {
     if (initialJob) {
@@ -49,8 +45,6 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
         ...initialJob,
         secondary_worker_ids: initialJob.secondary_worker_ids || []
       });
-      setStartDate(initialJob.start_date ? new Date(initialJob.start_date) : null);
-      setEndDate(initialJob.end_date ? new Date(initialJob.end_date) : null);
     }
   }, [initialJob]);
 
@@ -62,6 +56,23 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     if (readOnly) return;
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return;
+    const { name, value } = e.target;
+    if (!value) {
+      setFormData(prev => ({ ...prev, [name]: null }));
+      return;
+    }
+    // Set time to 9:00 for start_date and 17:00 for end_date
+    const date = new Date(value);
+    if (name === 'start_date') {
+      date.setHours(9, 0, 0, 0);
+    } else if (name === 'end_date') {
+      date.setHours(17, 0, 0, 0);
+    }
+    setFormData(prev => ({ ...prev, [name]: date.toISOString() }));
   };
 
   const handleSecondaryWorkerToggle = (workerId: string) => {
@@ -85,14 +96,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     
     try {
       setIsSubmitting(true);
-      
-      const updatedJob = {
-        ...formData,
-        start_date: startDate ? new Date(startDate.setHours(9, 0, 0, 0)).toISOString() : null,
-        end_date: endDate ? new Date(endDate.setHours(17, 0, 0, 0)).toISOString() : null
-      } as Omit<Job, 'id' | 'created_at'>;
-      
-      await onSubmit(updatedJob);
+      await onSubmit(formData as Omit<Job, 'id' | 'created_at'>);
       toast.success(initialJob ? 'Job updated successfully' : 'Job created successfully');
       onClose();
     } catch (error) {
@@ -358,19 +362,11 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
               <label className="block text-sm font-medium text-gray-700">
                 Start Date
               </label>
-              <DatePicker
-                selected={startDate}
-                onChange={(date) => {
-                  if (readOnly) return;
-                  setStartDate(date);
-                  if (date && (!endDate || date > endDate)) {
-                    setEndDate(date);
-                  }
-                }}
-                selectsStart
-                startDate={startDate}
-                endDate={endDate}
-                dateFormat="dd/MM/yyyy"
+              <input
+                type="date"
+                name="start_date"
+                value={formData.start_date ? format(new Date(formData.start_date), 'yyyy-MM-dd') : ''}
+                onChange={handleDateChange}
                 className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 disabled={readOnly}
               />
@@ -380,17 +376,12 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
               <label className="block text-sm font-medium text-gray-700">
                 End Date
               </label>
-              <DatePicker
-                selected={endDate}
-                onChange={(date) => {
-                  if (readOnly) return;
-                  setEndDate(date);
-                }}
-                selectsEnd
-                startDate={startDate}
-                endDate={endDate}
-                minDate={startDate}
-                dateFormat="dd/MM/yyyy"
+              <input
+                type="date"
+                name="end_date"
+                value={formData.end_date ? format(new Date(formData.end_date), 'yyyy-MM-dd') : ''}
+                onChange={handleDateChange}
+                min={formData.start_date ? format(new Date(formData.start_date), 'yyyy-MM-dd') : undefined}
                 className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 disabled={readOnly}
               />
