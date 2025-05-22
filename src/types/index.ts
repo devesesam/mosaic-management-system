@@ -41,7 +41,7 @@ export interface Worker {
   created_at: string;
 }
 
-interface User {
+export interface User {
   id: string;
   email: string;
 }
