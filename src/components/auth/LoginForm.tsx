@@ -10,6 +10,8 @@ const LoginForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('LoginForm: Form submitted, attempting', isSignUp ? 'signup' : 'signin');
+    
     if (isSignUp) {
       await signUp(email, password);
     } else {

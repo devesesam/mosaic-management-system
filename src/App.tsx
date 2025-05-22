@@ -12,14 +12,17 @@ import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 
 function App() {
-  const { user, loading, isAdmin, error: authError, currentWorker } = useAuth();
+  const { user, loading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const { addJob, fetchJobs } = useJobStore();
 
   useEffect(() => {
     if (user) {
-      fetchJobs().catch(console.error);
+      console.log('App: User authenticated, fetching jobs');
+      fetchJobs().catch(error => {
+        console.error('App: Error fetching jobs:', error);
+      });
     }
   }, [user, fetchJobs]);
 
@@ -39,6 +42,7 @@ function App() {
   };
 
   if (loading) {
+    console.log('App: Application is loading...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
@@ -47,11 +51,13 @@ function App() {
   }
 
   if (!user) {
+    console.log('App: No authenticated user found, showing login form');
     return <LoginForm />;
   }
 
   // Handle case where user is authenticated but no worker is associated
   if (user && !currentWorker) {
+    console.log('App: User is authenticated but no worker is associated');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
@@ -64,10 +70,7 @@ function App() {
             Please contact the administrator to link your account to a worker profile.
           </p>
           <button
-            onClick={() => {
-              const { signOut } = useAuth();
-              signOut();
-            }}
+            onClick={() => signOut()}
             className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
           >
             Sign Out
@@ -77,6 +80,7 @@ function App() {
     );
   }
 
+  console.log('App: Rendering main application view');
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-gray-100">

@@ -91,7 +91,20 @@ export const deleteWorker = async (id: string) => {
 
 export const getCurrentWorker = async (email: string) => {
   try {
-    console.log('Fetching worker for email:', email);
+    console.log('supabase.ts: Fetching worker for email:', email);
+    
+    // Verify connection to Supabase
+    try {
+      const { error: pingError } = await supabase.from('workers').select('count').limit(1);
+      if (pingError) {
+        console.error('supabase.ts: Failed to connect to Supabase:', pingError);
+        throw new Error(`Supabase connection error: ${pingError.message}`);
+      }
+    } catch (pingError) {
+      console.error('supabase.ts: Supabase ping failed:', pingError);
+      throw new Error('Failed to connect to database');
+    }
+    
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -99,15 +112,15 @@ export const getCurrentWorker = async (email: string) => {
       .maybeSingle();
     
     if (error) {
-      console.error('Error fetching current worker:', error);
+      console.error('supabase.ts: Error fetching current worker:', error);
       throw error;
     }
     
-    console.log('Worker data for email:', email, data);
+    console.log('supabase.ts: Worker data for email:', email, data);
     
     return data;
   } catch (error) {
-    console.error('Error in getCurrentWorker:', error);
+    console.error('supabase.ts: Error in getCurrentWorker:', error);
     throw error;
   }
 };
