@@ -47,7 +47,7 @@ export default defineConfig({
   },
   clearScreen: false,
   server: {
-    port: Number(process.env.PORT) || 5174,
+    port: 5210,
     strictPort: false,
     watch: { 
       usePolling: false,
@@ -67,7 +67,7 @@ export default defineConfig({
     }
   },
   preview: {
-    port: Number(process.env.PORT) || 5174,
+    port: 5210,
     strictPort: false,
     headers: {
       'Access-Control-Allow-Origin': '*',
