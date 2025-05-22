@@ -42,6 +42,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Function to create a worker record for a user if one doesn't exist
+  const createWorkerForUser = async (user: User) => {
+    if (!user.email) {
+      console.error('AuthProvider: Cannot create worker record - user has no email');
+      return null;
+    }
+
+    try {
+      console.log('AuthProvider: Creating worker record for user:', user.email);
+      
+      const { data, error } = await supabase
+        .from('workers')
+        .insert([
+          { 
+            name: user.email.split('@')[0], // Use part of email as name
+            email: user.email,
+            role: 'admin' // Default to admin role
+          }
+        ])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('AuthProvider: Error creating worker record:', error);
+        return null;
+      }
+      
+      console.log('AuthProvider: Worker record created successfully:', data);
+      return data;
+    } catch (err) {
+      console.error('AuthProvider: Error in createWorkerForUser:', err);
+      return null;
+    }
+  };
+
   useEffect(() => {
     console.log('AuthProvider: Initializing auth...');
     const initializeAuth = async () => {
@@ -97,18 +132,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (currentUser.email) {
           try {
             console.log('AuthProvider: Fetching worker for email:', currentUser.email);
-            const worker = await getCurrentWorker(currentUser.email);
+            let worker = await getCurrentWorker(currentUser.email);
             console.log('AuthProvider: Worker found:', !!worker, worker);
             
-            if (worker) {
-              setCurrentWorker(worker);
-            } else {
+            if (!worker) {
               console.warn('AuthProvider: No worker found for email:', currentUser.email);
-              // Instead of auto sign-out, just leave as not associated with a worker
-              // This prevents infinite loading when a user exists but isn't associated
+              // Try to create a worker record for this user
+              worker = await createWorkerForUser(currentUser);
+              if (worker) {
+                console.log('AuthProvider: Created new worker record for user');
+              } else {
+                console.error('AuthProvider: Failed to create worker record for user');
+              }
             }
+            
+            setCurrentWorker(worker);
           } catch (workerErr) {
-            console.error('AuthProvider: Error fetching worker:', workerErr);
+            console.error('AuthProvider: Error fetching/creating worker:', workerErr);
             // Don't sign out on worker fetch error - might be temporary
           }
         }
@@ -140,15 +180,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (session.user.email) {
             try {
               console.log('AuthProvider: Fetching worker after auth state change for email:', session.user.email);
-              const worker = await getCurrentWorker(session.user.email);
+              let worker = await getCurrentWorker(session.user.email);
               console.log('AuthProvider: Worker found after auth state change:', !!worker);
               
-              setCurrentWorker(worker);
               if (!worker) {
                 console.warn('AuthProvider: No worker found for email after auth state change:', session.user.email);
+                // Try to create a worker record for this user
+                worker = await createWorkerForUser(session.user);
+                if (worker) {
+                  console.log('AuthProvider: Created new worker record for user after auth state change');
+                } else {
+                  console.error('AuthProvider: Failed to create worker record for user after auth state change');
+                }
               }
+              
+              setCurrentWorker(worker);
             } catch (workerErr) {
-              console.error('AuthProvider: Error fetching worker after auth state change:', workerErr);
+              console.error('AuthProvider: Error fetching/creating worker after auth state change:', workerErr);
               // Don't set loading to false here as it might interfere with other operations
             }
           }

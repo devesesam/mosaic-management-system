@@ -67,7 +67,7 @@ function App() {
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Account Not Linked</h2>
           <p className="text-gray-600 mb-6">
             Your user account ({user.email}) is not associated with any worker in the system. 
-            Please contact the administrator to link your account to a worker profile.
+            The system is attempting to create a worker profile for you automatically. Please try refreshing the page.
           </p>
           <button
             onClick={() => signOut()}
