@@ -25,13 +25,13 @@ export default defineConfig({
     minify: 'esbuild'
   },
   server: {
-    port: 5210,
-    strictPort: true,
+    port: 3000,
+    strictPort: false,
     host: true
   },
   preview: {
-    port: 5210,
-    strictPort: true,
+    port: 3000,
+    strictPort: false,
     host: true
   },
   optimizeDeps: {
