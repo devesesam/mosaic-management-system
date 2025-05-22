@@ -9,9 +9,10 @@ import MonthView from './components/scheduler/MonthView';
 import JobForm from './components/jobs/JobForm';
 import { useJobStore } from './store/jobStore';
 import { Toaster } from 'react-hot-toast';
+import { AlertTriangle } from 'lucide-react';
 
 function App() {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, isAdmin, error: authError, currentWorker } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const { addJob, fetchJobs } = useJobStore();
@@ -47,6 +48,33 @@ function App() {
 
   if (!user) {
     return <LoginForm />;
+  }
+
+  // Handle case where user is authenticated but no worker is associated
+  if (user && !currentWorker) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+          <div className="flex justify-center text-amber-500 mb-4">
+            <AlertTriangle size={48} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Account Not Linked</h2>
+          <p className="text-gray-600 mb-6">
+            Your user account ({user.email}) is not associated with any worker in the system. 
+            Please contact the administrator to link your account to a worker profile.
+          </p>
+          <button
+            onClick={() => {
+              const { signOut } = useAuth();
+              signOut();
+            }}
+            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -44,10 +44,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        setLoading(true);
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (!currentSession) {
-          await handleSignOut();
+          setLoading(false);
           return;
         }
 
@@ -61,16 +62,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(currentSession);
         setUser(currentUser);
         
-        const worker = await getCurrentWorker(currentUser.email || '');
-        if (!worker) {
-          await handleSignOut();
-          return;
+        if (currentUser.email) {
+          try {
+            const worker = await getCurrentWorker(currentUser.email);
+            if (worker) {
+              setCurrentWorker(worker);
+            } else {
+              console.warn('No worker found for email:', currentUser.email);
+              // Instead of auto sign-out, just leave as not associated with a worker
+              // This prevents infinite loading when a user exists but isn't associated
+            }
+          } catch (workerErr) {
+            console.error('Error fetching worker:', workerErr);
+            // Don't sign out on worker fetch error - might be temporary
+          }
         }
-        
-        setCurrentWorker(worker);
       } catch (err) {
         console.error('Auth initialization error:', err);
-        await handleSignOut();
       } finally {
         setLoading(false);
       }
@@ -86,17 +94,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(session);
           setUser(session.user);
           
-          const worker = await getCurrentWorker(session.user.email || '');
-          if (!worker) {
-            await handleSignOut();
-            return;
+          if (session.user.email) {
+            try {
+              const worker = await getCurrentWorker(session.user.email);
+              setCurrentWorker(worker);
+              if (!worker) {
+                console.warn('No worker found for email:', session.user.email);
+              }
+            } catch (workerErr) {
+              console.error('Error fetching worker:', workerErr);
+            }
           }
-          
-          setCurrentWorker(worker);
           setLoading(false);
         } catch (err) {
           console.error('Auth state change error:', err);
-          await handleSignOut();
+          setLoading(false);
         }
       }
     });
@@ -139,6 +151,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         setError(error.message);
+      } else {
+        setError('Account created. Please sign in.');
       }
     } catch (err) {
       console.error('Error signing up:', err);
@@ -152,7 +166,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await handleSignOut();
   };
 
-  const isAdmin = currentWorker?.role !== 'viewer';
+  // Default to admin if worker exists but role is undefined
+  const isAdmin = currentWorker ? (currentWorker.role !== 'viewer') : false;
 
   const value = {
     session,

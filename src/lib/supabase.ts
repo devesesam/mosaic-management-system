@@ -91,6 +91,7 @@ export const deleteWorker = async (id: string) => {
 
 export const getCurrentWorker = async (email: string) => {
   try {
+    console.log('Fetching worker for email:', email);
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -102,10 +103,7 @@ export const getCurrentWorker = async (email: string) => {
       throw error;
     }
     
-    if (!data) {
-      console.warn('No worker found with email:', email);
-      return null;
-    }
+    console.log('Worker data for email:', email, data);
     
     return data;
   } catch (error) {
@@ -138,8 +136,10 @@ export const getJobs = async () => {
     const jobsWithSecondaryWorkers = jobs.map(job => ({
       ...job,
       secondary_worker_ids: secondaryWorkers
-        .filter(sw => sw.job_id === job.id)
-        .map(sw => sw.worker_id)
+        ? secondaryWorkers
+            .filter(sw => sw.job_id === job.id)
+            .map(sw => sw.worker_id)
+        : []
     }));
     
     return jobsWithSecondaryWorkers || [];
