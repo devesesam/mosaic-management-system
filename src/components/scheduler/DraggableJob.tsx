@@ -39,13 +39,13 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     type: 'JOB',
     item: { job },
     collect: (monitor) => ({
-      isDragging: monitor.isDragging()
+      isDragging: !!monitor.isDragging()
     }),
     canDrag: () => !isResizing && canEdit
   });
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    if (!onResize || !isScheduled || !ref.current?.parentElement || !canEdit) return;
+    if (!onResize || !isScheduled || !canEdit || !ref.current?.parentElement) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -66,7 +66,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     const initialDays = Math.max(1, Math.round(originalWidth / cellWidth));
     
     const handleMouseMove = (e: MouseEvent) => {
-      if (!ref.current?.parentElement) return;
+      if (!parentElement) return;
       
       const currentX = e.clientX;
       const diff = currentX - startX;
@@ -80,7 +80,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     };
 
     const handleMouseUp = () => {
-      if (!ref.current?.parentElement) return;
+      if (!parentElement) return;
 
       setIsResizing(false);
       
