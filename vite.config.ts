@@ -6,6 +6,15 @@ export default defineConfig({
   base: './',
   optimizeDeps: {
     exclude: ['lucide-react'],
+    include: [
+      'react',
+      'react-dom',
+      'react-dnd',
+      'react-dnd-html5-backend',
+      'react-datepicker',
+      'date-fns',
+      '@supabase/supabase-js'
+    ],
     force: true,
     esbuildOptions: {
       target: 'es2020',
@@ -32,14 +41,16 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000, // Increase chunk size warning limit
   },
   esbuild: {
-    logOverride: { 'this-is-undefined-in-esm': 'silent' }
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    jsxFactory: 'React.createElement',
+    jsxFragment: 'React.Fragment',
   },
   clearScreen: false,
   server: {
-    port: process.env.PORT || 5174,
+    port: Number(process.env.PORT) || 5174,
     strictPort: false,
     watch: { 
-      usePolling: true,
+      usePolling: false,
       interval: 1000 
     },
     headers: {
@@ -49,17 +60,14 @@ export default defineConfig({
     },
     fs: {
       strict: false,
-      cachedChecks: false,
       allow: ['.']
     },
     hmr: {
       overlay: true,
-    },
-    // Increase memory limit
-    middlewareMode: false
+    }
   },
   preview: {
-    port: process.env.PORT || 5174,
+    port: Number(process.env.PORT) || 5174,
     strictPort: false,
     headers: {
       'Access-Control-Allow-Origin': '*',

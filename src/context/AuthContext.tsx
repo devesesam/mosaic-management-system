@@ -55,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         
         if (!currentUser) {
-          await handleSignOut();
+          setLoading(false);
           return;
         }
 
