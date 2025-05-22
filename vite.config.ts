@@ -8,14 +8,21 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-core': ['react', 'react-dom'],
-          'data-layer': ['@supabase/supabase-js', 'zustand'],
-          'dnd': ['react-dnd', 'react-dnd-html5-backend'],
-          'utils': ['date-fns', 'react-hot-toast']
+          'vendor': [
+            'react', 
+            'react-dom',
+            '@supabase/supabase-js',
+            'zustand',
+            'react-dnd',
+            'react-dnd-html5-backend'
+          ],
+          'utils': ['date-fns', 'react-hot-toast', 'lucide-react']
         }
       }
     },
-    chunkSizeWarningLimit: 600
+    chunkSizeWarningLimit: 600,
+    target: 'esnext',
+    minify: 'esbuild'
   },
   server: {
     port: 5210,
@@ -26,5 +33,18 @@ export default defineConfig({
     port: 5210,
     strictPort: true,
     host: true
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      '@supabase/supabase-js',
+      'zustand',
+      'react-dnd',
+      'react-dnd-html5-backend',
+      'date-fns',
+      'react-hot-toast',
+      'lucide-react'
+    ]
   }
 });
