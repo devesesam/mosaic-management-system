@@ -79,16 +79,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     console.log('AuthProvider: Initializing auth...');
+    let isActive = true; // To prevent setting state after unmount
+    
     const initializeAuth = async () => {
       try {
-        setLoading(true);
-        console.log('AuthProvider: Fetching session...');
-        
         // Check if Supabase URL and key are available
         if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
           console.error('AuthProvider: Missing Supabase credentials in environment variables');
           setError('Application configuration error. Please contact support.');
-          setLoading(false);
+          if (isActive) setLoading(false);
           return;
         }
 
@@ -97,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (sessionError) {
           console.error('AuthProvider: Error fetching session:', sessionError);
           setError('Failed to initialize authentication');
-          setLoading(false);
+          if (isActive) setLoading(false);
           return;
         }
         
@@ -105,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (!currentSession) {
           console.log('AuthProvider: No active session found');
-          setLoading(false);
+          if (isActive) setLoading(false);
           return;
         }
 
@@ -114,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (userError) {
           console.error('AuthProvider: Error fetching user:', userError);
           setError('Failed to fetch user information');
-          setLoading(false);
+          if (isActive) setLoading(false);
           return;
         }
         
@@ -122,12 +121,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (!currentUser) {
           console.log('AuthProvider: No user found in session');
-          setLoading(false);
+          if (isActive) setLoading(false);
           return;
         }
 
-        setSession(currentSession);
-        setUser(currentUser);
+        if (isActive) {
+          setSession(currentSession);
+          setUser(currentUser);
+        }
         
         if (currentUser.email) {
           try {
@@ -137,7 +138,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (!worker) {
               console.warn('AuthProvider: No worker found for email:', currentUser.email);
-              // Try to create a worker record for this user
               worker = await createWorkerForUser(currentUser);
               if (worker) {
                 console.log('AuthProvider: Created new worker record for user');
@@ -146,29 +146,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
             
-            setCurrentWorker(worker);
+            if (isActive) setCurrentWorker(worker);
           } catch (workerErr) {
             console.error('AuthProvider: Error fetching/creating worker:', workerErr);
           } finally {
-            // Make sure we set loading to false even if worker fetch fails
-            setLoading(false);
+            if (isActive) setLoading(false);
           }
         } else {
-          // Make sure to set loading to false if no email
-          setLoading(false);
+          if (isActive) setLoading(false);
         }
       } catch (err) {
         console.error('AuthProvider: Auth initialization error:', err);
-        setError('Failed to initialize authentication');
-        setLoading(false);
+        if (isActive) {
+          setError('Failed to initialize authentication');
+          setLoading(false);
+        }
       }
     };
 
-    initializeAuth().catch(err => {
-      console.error('AuthProvider: Unhandled error in initializeAuth:', err);
-      setError('An unexpected error occurred');
-      setLoading(false);
-    });
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
@@ -177,8 +173,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await handleSignOut();
       } else if (session) {
         try {
-          setSession(session);
-          setUser(session.user);
+          if (isActive) {
+            setSession(session);
+            setUser(session.user);
+          }
           
           if (session.user.email) {
             try {
@@ -188,7 +186,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               
               if (!worker) {
                 console.warn('AuthProvider: No worker found for email after auth state change:', session.user.email);
-                // Try to create a worker record for this user
                 worker = await createWorkerForUser(session.user);
                 if (worker) {
                   console.log('AuthProvider: Created new worker record for user after auth state change');
@@ -197,28 +194,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
               }
               
-              setCurrentWorker(worker);
+              if (isActive) setCurrentWorker(worker);
             } catch (workerErr) {
               console.error('AuthProvider: Error fetching/creating worker after auth state change:', workerErr);
             } finally {
-              // Make sure we set loading to false even if worker fetch fails
-              setLoading(false);
+              if (isActive) setLoading(false);
             }
           } else {
-            // Make sure to set loading to false if no email
-            setLoading(false);
+            if (isActive) setLoading(false);
           }
         } catch (err) {
           console.error('AuthProvider: Auth state change error:', err);
-          setLoading(false);
+          if (isActive) setLoading(false);
         }
       } else {
-        // If no session in auth state change, make sure loading is false
-        setLoading(false);
+        if (isActive) setLoading(false);
       }
     });
 
     return () => {
+      isActive = false;
       subscription.unsubscribe();
     };
   }, []);

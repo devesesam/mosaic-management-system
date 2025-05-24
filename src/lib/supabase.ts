@@ -73,7 +73,8 @@ export const getWorkerJobs = async (workerId: string) => {
 
 export const deleteWorker = async (id: string) => {
   try {
-    const { data, error } = await supabase.rpc('delete_worker_with_jobs', {
+    // Using the function we created in the migration
+    const { error } = await supabase.rpc('delete_worker_with_jobs', {
       worker_id: id
     });
 
@@ -82,7 +83,7 @@ export const deleteWorker = async (id: string) => {
       throw error;
     }
 
-    return data;
+    return true;
   } catch (error) {
     console.error('Error in deleteWorker:', error);
     throw error;
