@@ -149,14 +149,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setCurrentWorker(worker);
           } catch (workerErr) {
             console.error('AuthProvider: Error fetching/creating worker:', workerErr);
-            // Don't sign out on worker fetch error - might be temporary
+          } finally {
+            // Make sure we set loading to false even if worker fetch fails
+            setLoading(false);
           }
+        } else {
+          // Make sure to set loading to false if no email
+          setLoading(false);
         }
       } catch (err) {
         console.error('AuthProvider: Auth initialization error:', err);
         setError('Failed to initialize authentication');
-      } finally {
-        console.log('AuthProvider: Auth initialization complete, setting loading to false');
         setLoading(false);
       }
     };
@@ -197,14 +200,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setCurrentWorker(worker);
             } catch (workerErr) {
               console.error('AuthProvider: Error fetching/creating worker after auth state change:', workerErr);
-              // Don't set loading to false here as it might interfere with other operations
+            } finally {
+              // Make sure we set loading to false even if worker fetch fails
+              setLoading(false);
             }
+          } else {
+            // Make sure to set loading to false if no email
+            setLoading(false);
           }
         } catch (err) {
           console.error('AuthProvider: Auth state change error:', err);
-        } finally {
           setLoading(false);
         }
+      } else {
+        // If no session in auth state change, make sure loading is false
+        setLoading(false);
       }
     });
 
@@ -224,13 +234,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (signInError) {
         console.error('AuthProvider: Sign in error:', signInError);
         setError(signInError.message);
+        setLoading(false);
       } else {
         console.log('AuthProvider: Sign in successful');
+        // Loading will be set to false by the auth state change handler
       }
     } catch (err) {
       console.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in');
-    } finally {
       setLoading(false);
     }
   };

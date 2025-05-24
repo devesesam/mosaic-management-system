@@ -16,12 +16,14 @@ function App() {
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const { addJob, fetchJobs } = useJobStore();
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       console.log('App: User authenticated, fetching jobs');
       fetchJobs().catch(error => {
         console.error('App: Error fetching jobs:', error);
+        setFetchError('Failed to load jobs. Please try refreshing the page.');
       });
     }
   }, [user, fetchJobs]);
@@ -74,6 +76,28 @@ function App() {
             className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
           >
             Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+          <div className="flex justify-center text-red-500 mb-4">
+            <AlertTriangle size={48} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Error Loading Data</h2>
+          <p className="text-gray-600 mb-6">
+            {fetchError}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+          >
+            Refresh Page
           </button>
         </div>
       </div>
