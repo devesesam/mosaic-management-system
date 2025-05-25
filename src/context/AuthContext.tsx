@@ -9,7 +9,7 @@ interface AuthContextProps {
   user: User | null;
   currentWorker: Worker | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
@@ -218,7 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
     setLoading(true);
     
@@ -230,14 +230,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('AuthProvider: Sign in error:', signInError);
         setError(signInError.message);
         setLoading(false);
+        return false;
       } else {
         console.log('AuthProvider: Sign in successful');
         // Loading will be set to false by the auth state change handler
+        return true;
       }
     } catch (err) {
       console.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in');
       setLoading(false);
+      return false;
     }
   };
 
