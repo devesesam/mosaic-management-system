@@ -9,12 +9,9 @@ import {
   isSameDay,
   parseISO,
   addDays,
-  differenceInDays,
-  isWithinInterval,
-  isBefore,
-  isAfter
+  differenceInDays
 } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Job, Worker } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
@@ -85,10 +82,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       if (job.end_date) {
         const jobEnd = parseISO(job.end_date);
         
-        // Check if this day is within the job's date range
-        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
-               isSameDay(jobStart, day) || 
-               isSameDay(jobEnd, day);
+        return (jobStart <= day && day <= jobEnd);
       }
       
       // If no end_date, just check if the day matches the start date
@@ -188,7 +182,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       await updateJob(job.id, {
         end_date: newEndDate.toISOString()
       });
-      await fetchJobs(); // Force refresh after update
+      await fetchJobs(); // Refresh jobs after update
       toast.success('Job duration updated');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -230,19 +224,38 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       {/* Warning messages */}
       {workersError && (
         <div className="p-4 bg-red-50 border-b border-red-200">
-          <p className="text-red-800 font-medium">Error: {workersError}</p>
-          <button 
-            onClick={() => fetchWorkers()} 
-            className="mt-2 px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-          >
-            Retry Loading Workers
-          </button>
+          <div className="flex items-center">
+            <AlertTriangle size={20} className="text-red-500 mr-2" />
+            <p className="text-red-800 font-medium">Error: {workersError}</p>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button 
+              onClick={() => fetchWorkers()} 
+              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+            >
+              Retry Loading Workers
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-3 py-1 text-sm border border-red-300 text-red-700 rounded hover:bg-red-50"
+            >
+              Reload Page
+            </button>
+          </div>
         </div>
       )}
       
       {workers.length === 0 && !workersError && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No workers found in database. Add a worker to start scheduling jobs.</p>
+          {canEdit && (
+            <button
+              onClick={() => setIsWorkerFormOpen(true)}
+              className="mt-2 px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200"
+            >
+              Add Worker
+            </button>
+          )}
         </div>
       )}
       

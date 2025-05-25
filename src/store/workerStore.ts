@@ -24,8 +24,18 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     try {
       console.log('Fetching workers from database...');
       const workers = await getWorkers();
-      console.log(`Fetched ${workers.length} workers from database`);
-      set({ workers, loading: false, error: null });
+      
+      // Log worker data for debugging
+      if (workers.length === 0) {
+        console.warn('⚠️ No workers returned from database!');
+        set({ 
+          error: 'No workers found. Please check database connection.', 
+          loading: false 
+        });
+      } else {
+        console.log(`✓ Successfully fetched ${workers.length} workers`);
+        set({ workers, loading: false, error: null });
+      }
     } catch (error) {
       console.error('Error fetching workers:', error);
       set({ 
@@ -33,7 +43,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
         loading: false 
       });
       // Keep existing workers in state to avoid UI flashing empty
-      toast.error('Error loading workers');
+      toast.error('Error loading workers - please try refreshing the page');
     }
   },
   
@@ -49,6 +59,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
         loading: false,
         error: null
       }));
+      toast.success('Worker added successfully');
       return newWorker;
     } catch (error) {
       console.error('Error adding worker:', error);
@@ -56,6 +67,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
         error: 'Failed to add worker', 
         loading: false 
       });
+      toast.error('Failed to add worker');
       throw error;
     }
   },
@@ -75,6 +87,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
         error: null
       }));
       console.log('Worker deleted successfully');
+      toast.success('Worker deleted successfully');
     } catch (error) {
       console.error('Error deleting worker:', error);
       // If deletion fails, refresh the workers list to ensure sync
@@ -91,6 +104,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
           loading: false
         });
       }
+      toast.error('Failed to delete worker');
       throw error;
     }
   }
