@@ -10,7 +10,7 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 
 function App() {
   const { user, loading: authLoading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
@@ -18,10 +18,10 @@ function App() {
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
   const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
-    enabled: !!user
+    enabled: !!user && !!currentWorker
   });
   const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
-    enabled: !!user
+    enabled: !!user && !!currentWorker
   });
 
   const handleNewJob = () => {
@@ -42,10 +42,11 @@ function App() {
   // Show loading spinner while authenticating
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342] mb-4"></div>
-          <p className="text-gray-600">Loading application...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+        <div className="text-gray-600">
+          <p className="text-center">Initializing application...</p>
+          <p className="text-sm text-gray-500 mt-2">This may take a few seconds</p>
         </div>
       </div>
     );
@@ -59,8 +60,29 @@ function App() {
   // Show loading spinner while fetching initial data
   if ((user && (isJobsLoading || isWorkersLoading))) {
     return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+        <p className="text-gray-600">Loading calendar data...</p>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+          <div className="flex justify-center text-red-500 mb-4">
+            <AlertTriangle size={48} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Authentication Error</h2>
+          <p className="text-gray-600 mb-6 text-center">{authError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
