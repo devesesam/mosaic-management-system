@@ -39,6 +39,11 @@ function App() {
     }
   };
 
+  const handleRetry = () => {
+    setIsRetrying(true);
+    window.location.reload();
+  };
+
   // Show loading spinner while authenticating
   if (authLoading) {
     return (
@@ -57,16 +62,41 @@ function App() {
     return <LoginForm />;
   }
 
-  // Show loading spinner while fetching initial data
-  if ((user && (isJobsLoading || isWorkersLoading))) {
+  // Show account not linked message if no worker profile
+  if (user && !currentWorker && !authLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
-        <p className="text-gray-600">Loading calendar data...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+          <div className="flex justify-center text-amber-500 mb-4">
+            <AlertTriangle size={48} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Account Not Linked</h2>
+          <p className="text-gray-600 mb-6">
+            Your user account ({user.email}) is not associated with any worker in the system. 
+            The system will attempt to create your profile automatically.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={handleRetry}
+              disabled={isRetrying}
+              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md disabled:opacity-50 flex items-center justify-center"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+              {isRetrying ? 'Retrying...' : 'Retry'}
+            </button>
+            <button
+              onClick={() => signOut()}
+              className="w-full py-2 px-4 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-md"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // Show auth error if present
   if (authError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -87,36 +117,12 @@ function App() {
     );
   }
 
-  // Show account not linked message if no worker profile
-  if (user && !currentWorker) {
+  // Show loading spinner while fetching initial data
+  if ((user && currentWorker && (isJobsLoading || isWorkersLoading))) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-          <div className="flex justify-center text-amber-500 mb-4">
-            <AlertTriangle size={48} />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Account Not Linked</h2>
-          <p className="text-gray-600 mb-6">
-            Your user account ({user.email}) is not associated with any worker in the system. 
-            The system will attempt to create your profile automatically.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => window.location.reload()}
-              disabled={isRetrying}
-              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md disabled:opacity-50 flex items-center justify-center"
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
-              {isRetrying ? 'Retrying...' : 'Retry'}
-            </button>
-            <button
-              onClick={() => signOut()}
-              className="w-full py-2 px-4 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-md"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+        <p className="text-gray-600">Loading calendar data...</p>
       </div>
     );
   }
