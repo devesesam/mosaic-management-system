@@ -10,7 +10,6 @@ import JobForm from './components/jobs/JobForm';
 import { useJobStore } from './store/jobStore';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
-import { useEffect } from 'react';
 
 function App() {
   const { user, loading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
