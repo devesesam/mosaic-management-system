@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Book as Roof } from 'lucide-react';
-import { useEffect } from 'react';
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -13,13 +12,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { signIn, signUp, error, loading, setError } = useAuth();
-
-  useEffect(() => {
-    // Reset submitting state when auth loading changes
-    if (!loading) {
-      setIsSubmitting(false);
-    }
-  }, [loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
