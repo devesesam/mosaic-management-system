@@ -25,7 +25,9 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
+      console.log('jobStore: Fetching jobs from Supabase');
       const jobs = await getJobs();
+      console.log(`jobStore: Fetched ${jobs.length} jobs from Supabase`);
       set({ jobs, loading: false, error: null });
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -62,9 +64,12 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
+      console.log('jobStore: Updating job:', { id, updates });
       const updatedJob = await updateJob(id, updates);
+      console.log('jobStore: Job updated successfully:', updatedJob);
+      
       set((state) => ({
-        jobs: state.jobs.map((job) => (job.id === id ? updatedJob : job)),
+        jobs: state.jobs.map((job) => (job.id === id ? { ...job, ...updatedJob } : job)),
         loading: false,
         error: null
       }));

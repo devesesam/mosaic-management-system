@@ -21,7 +21,9 @@ export const useWorkerStore = create<WorkerState>((set) => ({
     set({ loading: true, error: null });
     
     try {
+      console.log('workerStore: Fetching workers from Supabase');
       const workers = await getWorkers();
+      console.log(`workerStore: Fetched ${workers.length} workers from Supabase`);
       set({ workers, loading: false });
     } catch (error) {
       console.error('Error fetching workers:', error);
@@ -36,7 +38,9 @@ export const useWorkerStore = create<WorkerState>((set) => ({
     set({ loading: true, error: null });
     
     try {
+      console.log('workerStore: Adding worker:', workerData);
       const newWorker = await createWorker(workerData);
+      console.log('workerStore: Worker added successfully:', newWorker);
       set((state) => ({ 
         workers: [...state.workers, newWorker],
         loading: false 
@@ -56,6 +60,7 @@ export const useWorkerStore = create<WorkerState>((set) => ({
     set({ loading: true, error: null });
     
     try {
+      console.log('workerStore: Deleting worker:', id);
       await deleteWorker(id);
       // Update jobs store to unassign jobs
       useJobStore.getState().unassignWorkerJobs(id);
@@ -64,6 +69,7 @@ export const useWorkerStore = create<WorkerState>((set) => ({
         workers: state.workers.filter((worker) => worker.id !== id),
         loading: false
       }));
+      console.log('workerStore: Worker deleted successfully');
     } catch (error) {
       console.error('Error deleting worker:', error);
       // If deletion fails, refresh the workers list to ensure sync

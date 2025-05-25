@@ -36,6 +36,26 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   
   const canEdit = isAdmin && !readOnly;
 
+  // Debug logging for data
+  useEffect(() => {
+    if (workers.length === 0) {
+      console.log('CalendarGrid: No workers available');
+    } else {
+      console.log(`CalendarGrid: ${workers.length} workers available`);
+    }
+
+    // Check if there are any jobs for the first day
+    if (days.length > 0 && workers.length > 0) {
+      const firstDayJobs = workers.flatMap(worker => 
+        getWorkerDayJobs(worker.id, days[0])
+      );
+      console.log(`CalendarGrid: Found ${firstDayJobs.length} jobs for the first day`);
+      
+      const unassignedJobs = getWorkerDayJobs(null, days[0]);
+      console.log(`CalendarGrid: Found ${unassignedJobs.length} unassigned jobs for the first day`);
+    }
+  }, [days, workers, getWorkerDayJobs]);
+  
   const displayedWorkers = selectedWorker === 'all' 
     ? workers 
     : workers.filter(w => w.id === selectedWorker);
@@ -93,6 +113,13 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           </div>
         ))}
       </div>
+
+      {/* No workers message */}
+      {workers.length === 0 && (
+        <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
+          No workers found in the database. Add a worker to start scheduling jobs.
+        </div>
+      )}
 
       {/* Grid content */}
       <div className="flex flex-col">
@@ -207,11 +234,23 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   // Find the most important job for this cell
   const sortedJobs = [...jobs]
-    .filter(job => job.start_date && job.end_date)
     .sort((a, b) => {
-      const aStart = parseISO(a.start_date!);
-      const bStart = parseISO(b.start_date!);
-      return bStart.getTime() - aStart.getTime();
+      // First sort by jobs that have both dates
+      const aHasBothDates = !!(a.start_date && a.end_date);
+      const bHasBothDates = !!(b.start_date && b.end_date);
+      
+      if (aHasBothDates && !bHasBothDates) return -1;
+      if (!aHasBothDates && bHasBothDates) return 1;
+      
+      // Then by start date (newest first)
+      if (a.start_date && b.start_date) {
+        const aDate = new Date(a.start_date);
+        const bDate = new Date(b.start_date);
+        return bDate.getTime() - aDate.getTime();
+      }
+      
+      // Finally by created date
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   
   const mainJob = sortedJobs.length > 0 ? sortedJobs[0] : null;
@@ -238,6 +277,14 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       jobSpan = Math.min(jobDaysRemaining, remainingDays);
     }
   }
+  
+  // Debug jobs (only in dev mode)
+  useEffect(() => {
+    if (jobs.length > 0 && dayIndex === 0) {
+      console.log(`CalendarCell: Worker ${workerId || 'unassigned'} has ${jobs.length} jobs for day ${format(day, 'MM-dd')}:`, 
+        jobs.map(j => ({ id: j.id, address: j.address, start: j.start_date })));
+    }
+  }, [jobs, workerId, day, dayIndex]);
   
   return (
     <div

@@ -16,7 +16,8 @@ import {
   differenceInDays,
   isBefore,
   isAfter,
-  max
+  max,
+  isWithinInterval
 } from 'date-fns';
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
@@ -39,7 +40,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   
-  const { jobs, updateJob, deleteJob } = useJobStore();
+  const { jobs, updateJob, deleteJob, fetchJobs } = useJobStore();
   const { isAdmin } = useAuth();
   
   const canEdit = isAdmin && !readOnly;
@@ -73,28 +74,43 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     }
   });
 
+  // Fetch jobs on component mount
+  useEffect(() => {
+    console.log('MonthView: Fetching jobs...');
+    fetchJobs();
+  }, [fetchJobs]);
+
+  // Debug to check data loading
+  useEffect(() => {
+    console.log('MonthView: Jobs loaded:', jobs.length);
+    if (jobs.length > 0) {
+      console.log('MonthView: Sample job:', jobs[0]);
+    }
+  }, [jobs]);
+
   // Get unscheduled jobs (no date and no worker)
   const unscheduledJobs = jobs.filter(job => !job.start_date && !job.worker_id);
 
-  // Get jobs for a specific day
+  // Get jobs for a specific day - less restrictive to show more jobs
   const getDayJobs = (day: Date) => {
     return jobs.filter(job => {
+      // If job has no start date, it can't be displayed on a specific day
       if (!job.start_date) return false;
       
-      // For single-day jobs (where start_date equals end_date or end_date is null)
-      if (!job.end_date || isSameDay(parseISO(job.start_date), parseISO(job.end_date || job.start_date))) {
-        return isSameDay(parseISO(job.start_date), day);
+      const jobStart = parseISO(job.start_date);
+      
+      // If job has an end date, check if the day falls within the range
+      if (job.end_date) {
+        const jobEnd = parseISO(job.end_date);
+        
+        // Check if this day is within the job's date range
+        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
+               isSameDay(jobStart, day) || 
+               isSameDay(jobEnd, day);
       }
       
-      // For multi-day jobs, check if this day falls within the range
-      const startDate = parseISO(job.start_date);
-      const endDate = parseISO(job.end_date);
-      
-      return (
-        isSameDay(day, startDate) || 
-        isSameDay(day, endDate) || 
-        (isAfter(day, startDate) && isBefore(day, endDate))
-      );
+      // If no end date, just check if the day matches the start date
+      return isSameDay(jobStart, day);
     });
   };
   
@@ -247,6 +263,8 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     if (!canEdit) return;
     
     try {
+      console.log('MonthView: Handling job drop:', { job_id: job.id, date });
+      
       let updates: Partial<Job> = {
         start_date: date.toISOString()
       };
@@ -263,7 +281,9 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
         updates.end_date = date.toISOString();
       }
       
+      console.log('MonthView: Updating job with:', updates);
       await updateJob(job.id, updates);
+      await fetchJobs(); // Refresh jobs after update
       toast.success('Job scheduled');
     } catch (error) {
       toast.error('Failed to schedule job');
@@ -277,6 +297,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     try {
       if (selectedJob) {
         await updateJob(selectedJob.id, jobData);
+        await fetchJobs(); // Refresh jobs after update
         toast.success('Job updated successfully');
       }
       setIsJobFormOpen(false);
@@ -292,6 +313,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     
     try {
       await deleteJob(id);
+      await fetchJobs(); // Refresh jobs after delete
       toast.success('Job deleted successfully');
       setIsJobFormOpen(false);
       setSelectedJob(null);
@@ -306,12 +328,15 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     if (!canEdit) return;
     
     try {
+      console.log('MonthView: Handling job resize:', { job_id: job.id, days });
+      
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
       
       await updateJob(job.id, {
         end_date: newEndDate.toISOString()
       });
+      await fetchJobs(); // Refresh jobs after update
       toast.success('Job duration updated');
     } catch (error) {
       toast.error('Failed to update job duration');
@@ -352,6 +377,13 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             Today
           </button>
         </div>
+        
+        {/* Debug information */}
+        {jobs.length === 0 && (
+          <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+            <p className="text-yellow-800 font-medium">No jobs found in database.</p>
+          </div>
+        )}
         
         <div className="flex-1 grid grid-rows-[auto_1fr] overflow-hidden bg-white">
           {/* Weekday headers */}

@@ -9,7 +9,10 @@ import {
   isSameDay,
   parseISO,
   addDays,
-  differenceInDays
+  differenceInDays,
+  isWithinInterval,
+  isBefore,
+  isAfter
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Job, Worker } from '../../types';
@@ -50,27 +53,54 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
   
-  // Fetch data on component mount
+  // Fetch data on component mount and when dependencies change
   useEffect(() => {
+    console.log('WeekView: Fetching data...');
     fetchJobs();
     fetchWorkers();
   }, [fetchJobs, fetchWorkers]);
   
+  // Debugging output to check data
+  useEffect(() => {
+    console.log('WeekView: Workers loaded:', workers.length);
+    console.log('WeekView: Jobs loaded:', jobs.length);
+    
+    if (jobs.length > 0) {
+      console.log('WeekView: Sample job:', jobs[0]);
+    }
+    
+    if (workers.length > 0) {
+      console.log('WeekView: Sample worker:', workers[0]);
+    }
+  }, [jobs, workers]);
+  
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
   
-  // Get jobs for a worker on a specific day
+  // Get jobs for a worker on a specific day - modified to be less restrictive
   const getWorkerDayJobs = (workerId: string | null, day: Date) => {
-    return jobs
-      .filter(job => {
-        if (job.worker_id !== workerId) return false;
-        if (!job.start_date) return false;
-        return isSameDay(parseISO(job.start_date), day);
-      })
-      .sort((a, b) => {
-        if (!a.start_date || !b.start_date) return 0;
-        return parseISO(b.start_date).getTime() - parseISO(a.start_date).getTime();
-      });
+    return jobs.filter(job => {
+      // First check if the job is assigned to this worker
+      if (job.worker_id !== workerId) return false;
+      
+      // If the job has no start_date, it can't be displayed on a specific day
+      if (!job.start_date) return false;
+      
+      const jobStart = parseISO(job.start_date);
+      
+      // If it has an end_date, check if the day falls within the range
+      if (job.end_date) {
+        const jobEnd = parseISO(job.end_date);
+        
+        // Check if this day is within the job's date range
+        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
+               isSameDay(jobStart, day) || 
+               isSameDay(jobEnd, day);
+      }
+      
+      // If no end_date, just check if the day matches the start date
+      return isSameDay(jobStart, day);
+    });
   };
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
@@ -123,6 +153,8 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     if (!canEdit) return;
     
     try {
+      console.log('WeekView: Handling job drop:', { job_id: job.id, workerId, date });
+      
       let updates: Partial<Job> = {
         worker_id: workerId,
         start_date: date ? date.toISOString() : null
@@ -142,6 +174,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         updates.end_date = null;
       }
       
+      console.log('WeekView: Updating job with:', updates);
       await updateJob(job.id, updates);
       await fetchJobs();
       toast.success('Job updated successfully');
@@ -215,6 +248,19 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
             Today
           </button>
         </div>
+        
+        {/* Debug information */}
+        {workers.length === 0 && (
+          <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+            <p className="text-yellow-800 font-medium">No workers found in database.</p>
+          </div>
+        )}
+        
+        {jobs.length === 0 && (
+          <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+            <p className="text-yellow-800 font-medium">No jobs found in database.</p>
+          </div>
+        )}
         
         {/* Calendar grid */}
         <div className="flex-1 overflow-auto min-w-0">

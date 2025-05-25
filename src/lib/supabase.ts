@@ -29,6 +29,7 @@ export const getWorkers = async () => {
       throw new Error('Supabase is not properly initialized');
     }
 
+    console.log('getWorkers: Fetching workers from Supabase');
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -39,6 +40,7 @@ export const getWorkers = async () => {
       throw error;
     }
     
+    console.log(`getWorkers: Successfully retrieved ${data?.length || 0} workers`);
     return data || [];
   } catch (error) {
     console.error('Error in getWorkers:', error);
@@ -52,6 +54,7 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
       throw new Error('Supabase is not properly initialized');
     }
 
+    console.log('createWorker: Creating worker:', worker);
     const { data, error } = await supabase
       .from('workers')
       .insert([worker])
@@ -63,6 +66,7 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
       throw error;
     }
 
+    console.log('createWorker: Worker created successfully:', data);
     return data;
   } catch (error) {
     console.error('Error in createWorker:', error);
@@ -76,6 +80,7 @@ export const getWorkerJobs = async (workerId: string) => {
       throw new Error('Supabase is not properly initialized');
     }
 
+    console.log('getWorkerJobs: Fetching jobs for worker:', workerId);
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
@@ -86,6 +91,7 @@ export const getWorkerJobs = async (workerId: string) => {
       throw error;
     }
 
+    console.log(`getWorkerJobs: Found ${data?.length || 0} jobs for worker ${workerId}`);
     return data || [];
   } catch (error) {
     console.error('Error in getWorkerJobs:', error);
@@ -99,6 +105,7 @@ export const deleteWorker = async (id: string) => {
       throw new Error('Supabase is not properly initialized');
     }
 
+    console.log('deleteWorker: Deleting worker:', id);
     // Using the function we created in the migration
     const { error } = await supabase.rpc('delete_worker_with_jobs', {
       worker_id: id
@@ -109,6 +116,7 @@ export const deleteWorker = async (id: string) => {
       throw error;
     }
 
+    console.log('deleteWorker: Worker deleted successfully');
     return true;
   } catch (error) {
     console.error('Error in deleteWorker:', error);
@@ -122,17 +130,17 @@ export const getCurrentWorker = async (email: string) => {
       throw new Error('Supabase is not properly initialized');
     }
 
-    console.log('supabase.ts: Fetching worker for email:', email);
+    console.log('getCurrentWorker: Fetching worker for email:', email);
     
     // Verify connection to Supabase
     try {
       const { error: pingError } = await supabase.from('workers').select('count').limit(1);
       if (pingError) {
-        console.error('supabase.ts: Failed to connect to Supabase:', pingError);
+        console.error('getCurrentWorker: Failed to connect to Supabase:', pingError);
         throw new Error(`Supabase connection error: ${pingError.message}`);
       }
     } catch (pingError) {
-      console.error('supabase.ts: Supabase ping failed:', pingError);
+      console.error('getCurrentWorker: Supabase ping failed:', pingError);
       throw new Error('Failed to connect to database');
     }
     
@@ -143,15 +151,15 @@ export const getCurrentWorker = async (email: string) => {
       .maybeSingle();
     
     if (error) {
-      console.error('supabase.ts: Error fetching current worker:', error);
+      console.error('getCurrentWorker: Error fetching current worker:', error);
       throw error;
     }
     
-    console.log('supabase.ts: Worker data for email:', email, data);
+    console.log('getCurrentWorker: Worker data for email:', email, data);
     
     return data;
   } catch (error) {
-    console.error('supabase.ts: Error in getCurrentWorker:', error);
+    console.error('getCurrentWorker: Error in getCurrentWorker:', error);
     throw error;
   }
 };
@@ -162,6 +170,7 @@ export const getJobs = async () => {
       throw new Error('Supabase is not properly initialized');
     }
 
+    console.log('getJobs: Fetching all jobs');
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
@@ -172,6 +181,8 @@ export const getJobs = async () => {
       throw jobsError;
     }
 
+    console.log(`getJobs: Retrieved ${jobs?.length || 0} jobs`);
+    
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
@@ -180,6 +191,8 @@ export const getJobs = async () => {
       console.error('Error fetching secondary workers:', secondaryError);
       throw secondaryError;
     }
+
+    console.log(`getJobs: Retrieved ${secondaryWorkers?.length || 0} secondary worker assignments`);
 
     const jobsWithSecondaryWorkers = jobs.map(job => ({
       ...job,
@@ -203,6 +216,7 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
       throw new Error('Supabase is not properly initialized');
     }
 
+    console.log('createJob: Creating new job:', job);
     const { secondary_worker_ids, ...jobData } = job as any;
     
     const { data: newJob, error: jobError } = await supabase
@@ -216,12 +230,15 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
       throw jobError;
     }
 
+    console.log('createJob: Job created successfully:', newJob);
+    
     if (secondary_worker_ids?.length) {
       const secondaryWorkerData = secondary_worker_ids.map(worker_id => ({
         job_id: newJob.id,
         worker_id
       }));
 
+      console.log('createJob: Adding secondary workers:', secondaryWorkerData);
       const { error: secondaryError } = await supabase
         .from('job_secondary_workers')
         .insert(secondaryWorkerData);
@@ -248,14 +265,7 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
       throw new Error('Supabase is not properly initialized');
     }
 
-    console.log('supabase: updateJob - Input data:', {
-      job_id: id,
-      updates: {
-        ...updates,
-        start_date: updates.start_date ? new Date(updates.start_date).toISOString() : null,
-        end_date: updates.end_date ? new Date(updates.end_date).toISOString() : null
-      }
-    });
+    console.log('updateJob: Updating job:', { id, updates });
     
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
     
@@ -270,6 +280,8 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
       console.error('Error updating job:', jobError);
       throw jobError;
     }
+
+    console.log('updateJob: Job updated successfully:', updatedJob);
 
     if (secondary_worker_ids !== undefined) {
       const { error: deleteError } = await supabase
@@ -288,6 +300,7 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
           worker_id
         }));
 
+        console.log('updateJob: Adding new secondary workers:', secondaryWorkerData);
         const { error: insertError } = await supabase
           .from('job_secondary_workers')
           .insert(secondaryWorkerData);
@@ -314,22 +327,9 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
       secondary_worker_ids: currentSecondaryWorkers.map(sw => sw.worker_id)
     };
     
-    console.log('supabase: updateJob - Success:', {
-      job_id: id,
-      final_data: {
-        ...finalJob,
-        start_date: finalJob.start_date,
-        end_date: finalJob.end_date
-      }
-    });
-    
     return finalJob;
   } catch (error) {
-    console.error('supabase: updateJob - Error:', {
-      job_id: id,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      updates
-    });
+    console.error('Error in updateJob:', error);
     throw error;
   }
 };
@@ -340,6 +340,7 @@ export const deleteJob = async (id: string) => {
       throw new Error('Supabase is not properly initialized');
     }
 
+    console.log('deleteJob: Deleting job:', id);
     const { error } = await supabase
       .from('jobs')
       .delete()
@@ -349,6 +350,8 @@ export const deleteJob = async (id: string) => {
       console.error('Error deleting job:', error);
       throw error;
     }
+    
+    console.log('deleteJob: Job deleted successfully');
   } catch (error) {
     console.error('Error in deleteJob:', error);
     throw error;
