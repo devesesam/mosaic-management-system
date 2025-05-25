@@ -10,35 +10,32 @@ interface WorkerFormProps {
 }
 
 const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, initialWorker }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [worker, setWorker] = useState({
     name: initialWorker?.name || '',
     email: initialWorker?.email || '',
     phone: initialWorker?.phone || '',
-    role: 'admin' // All workers are now admins
+    role: 'admin' as const
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit(worker);
-    onClose();
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onSubmit(worker);
+      onClose();
+    } catch (error) {
+      console.error('Error submitting worker:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setWorker(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleDelete = async () => {
-    if (!initialWorker || !onDelete) return;
-    
-    if (window.confirm('Are you sure you want to delete this worker? This action cannot be undone.')) {
-      try {
-        await onDelete(initialWorker.id);
-        onClose();
-      } catch (error) {
-        console.error('Error deleting worker:', error);
-      }
-    }
   };
 
   return (
@@ -97,34 +94,21 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
             />
           </div>
           
-          {/* Role field removed - all users are now admins */}
-          
-          <div className="flex justify-between space-x-3 pt-4 border-t">
-            {initialWorker && onDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center"
-              >
-                <Trash2 size={16} className="mr-2" />
-                Delete Worker
-              </button>
-            )}
-            <div className="flex space-x-3 ml-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {initialWorker ? 'Update Worker' : 'Add Worker'}
-              </button>
-            </div>
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Adding...' : 'Add Worker'}
+            </button>
           </div>
         </form>
       </div>
