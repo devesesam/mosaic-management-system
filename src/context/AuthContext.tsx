@@ -26,6 +26,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Function to verify worker has correct role
+  const verifyWorkerRole = async (worker: Worker | null, email: string) => {
+    if (!worker && email) {
+      console.log('AuthProvider: Creating new worker record for:', email);
+      return createWorkerForUser({ email });
+    }
+    return worker;
+  };
+
   // Reset all state and clear storage
   const handleSignOut = async () => {
     try {
@@ -83,17 +92,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     console.log('AuthProvider: Initializing auth...');
-    let isActive = true; // To prevent setting state after unmount
+    let isActive = true;
+    let authTimeout: NodeJS.Timeout;
     
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        
         if (session?.user) {
           setSession(session);
           setUser(session.user);
           
           if (session.user.email) {
-            const worker = await getCurrentWorker(session.user.email);
+            let worker = await getCurrentWorker(session.user.email);
+            worker = await verifyWorkerRole(worker, session.user.email);
             if (worker) {
               setCurrentWorker(worker);
             }
@@ -101,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
+        setError('Failed to initialize authentication');
       } finally {
         if (isActive) setLoading(false);
       }
@@ -108,56 +121,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
 
+    // Set a timeout to prevent infinite loading
+    authTimeout = setTimeout(() => {
+      if (isActive && loading) {
+        console.warn('AuthProvider: Auth initialization timed out');
+        setLoading(false);
+        setError('Authentication timed out. Please refresh the page.');
+      }
+    }, 10000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
 
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         await handleSignOut();
-        if (isActive) setLoading(false);
-      } else if (session) {
+      } else if (session?.user?.email) {
         try {
+          const worker = await getCurrentWorker(session.user.email);
+          const verifiedWorker = await verifyWorkerRole(worker, session.user.email);
+          
           if (isActive) {
             setSession(session);
             setUser(session.user);
-          }
-
-          if (session.user.email) {
-            try {
-              console.log('AuthProvider: Fetching worker after auth state change for email:', session.user.email);
-              let worker = await getCurrentWorker(session.user.email);
-              console.log('AuthProvider: Worker found after auth state change:', !!worker);
-
-              if (!worker) {
-                console.warn('AuthProvider: No worker found for email after auth state change:', session.user.email);
-                worker = await createWorkerForUser(session.user);
-                if (worker) {
-                  console.log('AuthProvider: Created new worker record for user after auth state change');
-                } else {
-                  console.error('AuthProvider: Failed to create worker record for user after auth state change');
-                }
-              }
-
-              if (isActive) setCurrentWorker(worker);
-            } catch (workerErr) {
-              console.error('AuthProvider: Error fetching/creating worker after auth state change:', workerErr);
-            } finally {
-              if (isActive) setLoading(false);
-            }
-          } else {
-            if (isActive) setLoading(false);
+            setCurrentWorker(verifiedWorker);
           }
         } catch (err) {
-          console.error('AuthProvider: Auth state change error:', err);
+          console.error('Error in auth state change:', err);
+          setError('Failed to verify user permissions');
+        } finally {
           if (isActive) setLoading(false);
         }
-      } else {
-        if (isActive) setLoading(false);
       }
     });
 
     return () => {
       isActive = false;
       subscription.unsubscribe();
+      clearTimeout(authTimeout);
     };
   }, []);
 
