@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(false);  // Start with loading set to false
+  const [loading, setLoading] = useState(false); // Start with loading false
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -35,13 +35,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
 
       // Clear local storage
-      localStorage.clear();
+      localStorage.removeItem('supabase.auth.token');
 
       // Sign out from Supabase
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Error signing out:', err);
-      setError('Failed to sign out');
     }
   };
 
@@ -62,27 +61,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Set user state
           setSession(session);
           setUser(session.user);
+          setLoading(true);
           
-          // Check if we have a worker profile or need to create one
-          let worker = await getCurrentWorker(session.user.email);
-          
-          if (!worker) {
-            console.log('No worker found, creating profile automatically');
-            try {
+          // Try to get existing worker profile
+          try {
+            let worker = await getCurrentWorker(session.user.email);
+            
+            // If no worker found, create one automatically
+            if (!worker) {
+              console.log('No worker found, creating profile automatically');
               worker = await createWorkerProfile(session.user.email);
-            } catch (profileError) {
-              console.error('Failed to create worker profile:', profileError);
-              setError('Failed to set up your account. Please try again.');
-              await handleSignOut();
-              return;
             }
-          }
-          
-          if (worker) {
-            setCurrentWorker(worker);
-          } else {
-            // If we still don't have a worker, something went wrong
-            setError('Unable to set up your account. Please contact support.');
+            
+            if (worker) {
+              setCurrentWorker(worker);
+              setLoading(false);
+            } else {
+              // If we still don't have a worker, something went wrong
+              setError('Unable to access your account. Please try again.');
+              await handleSignOut();
+            }
+          } catch (error) {
+            console.error('Error getting/creating worker profile:', error);
+            setError('Authentication error. Please try again.');
             await handleSignOut();
           }
         } catch (err) {
@@ -156,8 +157,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await handleSignOut();
   };
 
-  // Default to admin if worker exists but role is undefined
-  const isAdmin = currentWorker ? (currentWorker.role !== 'viewer') : false;
+  // Default to admin if worker exists and role is admin
+  const isAdmin = currentWorker ? (currentWorker.role === 'admin') : false;
 
   const value = {
     session,
