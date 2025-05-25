@@ -206,7 +206,14 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
 
 export const updateJob = async (id: string, updates: Partial<Database['public']['Tables']['jobs']['Update']>) => {
   try {
-    console.log('Updating job with data:', updates);
+    console.log('supabase: updateJob - Input data:', {
+      job_id: id,
+      updates: {
+        ...updates,
+        start_date: updates.start_date ? new Date(updates.start_date).toISOString() : null,
+        end_date: updates.end_date ? new Date(updates.end_date).toISOString() : null
+      }
+    });
     
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
     
@@ -265,11 +272,22 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
       secondary_worker_ids: currentSecondaryWorkers.map(sw => sw.worker_id)
     };
     
-    console.log('Job updated successfully:', finalJob);
+    console.log('supabase: updateJob - Success:', {
+      job_id: id,
+      final_data: {
+        ...finalJob,
+        start_date: finalJob.start_date,
+        end_date: finalJob.end_date
+      }
+    });
     
     return finalJob;
   } catch (error) {
-    console.error('Error in updateJob:', error);
+    console.error('supabase: updateJob - Error:', {
+      job_id: id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      updates
+    });
     throw error;
   }
 };

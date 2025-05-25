@@ -154,9 +154,19 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const handleJobResize = async (job: Job, days: number) => {
     if (!canEdit) return;
     
+    console.log('WeekView: Resize - Initial job data:', {
+      job_id: job.id,
+      start_date: job.start_date,
+      end_date: job.end_date,
+      days
+    });
+    
     try {
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
+      console.log('WeekView: Resize - Parsed start date:', startDate.toISOString());
+      
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
+      console.log('WeekView: Resize - Calculated end date:', newEndDate.toISOString());
       
       await updateJob(job.id, {
         end_date: newEndDate.toISOString()
@@ -164,8 +174,13 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       await fetchJobs();
       toast.success('Job duration updated');
     } catch (error) {
-      toast.error('Failed to update job duration');
-      console.error('Error resizing job:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('WeekView: Error resizing job:', {
+        error: errorMessage,
+        job_id: job.id,
+        attempted_days: days
+      });
+      toast.error(`Failed to update job duration: ${errorMessage}`);
     }
   };
 

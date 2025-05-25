@@ -82,12 +82,26 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     const handleMouseUp = () => {
       if (!parentElement) return;
 
+      console.log('DraggableJob: Resize end - Initial measurements:', {
+        job_id: job.id,
+        cellWidth,
+        initialWidth: originalWidth,
+        initialDays
+      });
+
       setIsResizing(false);
       
       // Calculate final width in days
       const finalWidth = parentElement.getBoundingClientRect().width;
       const finalDays = Math.max(1, Math.round(finalWidth / cellWidth));
       
+      console.log('DraggableJob: Resize end - Final calculations:', {
+        job_id: job.id,
+        finalWidth,
+        finalDays,
+        raw_calculation: finalWidth / cellWidth
+      });
+
       if (finalDays !== initialDays) {
         onResize(job, finalDays);
       }
