@@ -32,23 +32,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   
   // Debug logging for data
   useEffect(() => {
-    if (workers.length === 0) {
-      console.log('CalendarGrid: No workers available');
-    } else {
-      console.log(`CalendarGrid: ${workers.length} workers available`);
-    }
-
-    // Check if there are any jobs for the first day
-    if (days.length > 0 && workers.length > 0) {
-      const firstDayJobs = workers.flatMap(worker => 
-        getWorkerDayJobs(worker.id, days[0])
-      );
-      console.log(`CalendarGrid: Found ${firstDayJobs.length} jobs for the first day`);
-      
-      const unassignedJobs = getWorkerDayJobs(null, days[0]);
-      console.log(`CalendarGrid: Found ${unassignedJobs.length} unassigned jobs for the first day`);
-    }
-  }, [days, workers, getWorkerDayJobs]);
+    console.log('CalendarGrid: Workers data:', {
+      count: workers.length,
+      workers: workers.map(w => ({ id: w.id, name: w.name }))
+    });
+  }, [workers]);
   
   const displayedWorkers = selectedWorker === 'all' 
     ? workers 

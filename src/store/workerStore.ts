@@ -22,27 +22,29 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('Fetching workers from database...');
+      console.log('WorkerStore: Fetching workers from database...');
       const workers = await getWorkers();
       
       // Log worker data for debugging
       if (workers.length === 0) {
-        console.warn('⚠️ No workers returned from database!');
+        console.warn('WorkerStore: ⚠️ No workers returned from database!');
         set({ 
+          workers: [],
           error: 'No workers found. Please check database connection.', 
           loading: false 
         });
       } else {
-        console.log(`✓ Successfully fetched ${workers.length} workers`);
+        console.log(`WorkerStore: ✓ Successfully fetched ${workers.length} workers`);
+        console.log('WorkerStore: First worker:', workers[0]);
         set({ workers, loading: false, error: null });
       }
     } catch (error) {
-      console.error('Error fetching workers:', error);
+      console.error('WorkerStore: Error fetching workers:', error);
       set({ 
         error: 'Failed to fetch workers. Please check your connection and try again.', 
-        loading: false 
+        loading: false,
+        workers: [] // Clear workers on error
       });
-      // Keep existing workers in state to avoid UI flashing empty
       toast.error('Error loading workers - please try refreshing the page');
     }
   },
@@ -51,18 +53,21 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('Adding worker:', workerData);
+      console.log('WorkerStore: Adding worker:', workerData);
       const newWorker = await createWorker(workerData);
-      console.log('Worker added successfully:', newWorker);
+      console.log('WorkerStore: Worker added successfully:', newWorker);
+      
+      // Update state with new worker
       set((state) => ({ 
         workers: [...state.workers, newWorker],
         loading: false,
         error: null
       }));
+      
       toast.success('Worker added successfully');
       return newWorker;
     } catch (error) {
-      console.error('Error adding worker:', error);
+      console.error('WorkerStore: Error adding worker:', error);
       set({ 
         error: 'Failed to add worker', 
         loading: false 
@@ -76,20 +81,24 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('Deleting worker:', id);
+      console.log('WorkerStore: Deleting worker:', id);
       await deleteWorker(id);
+      
       // Update jobs store to unassign jobs
       useJobStore.getState().unassignWorkerJobs(id);
+      
       // Update workers store
       set((state) => ({
         workers: state.workers.filter((worker) => worker.id !== id),
         loading: false,
         error: null
       }));
-      console.log('Worker deleted successfully');
+      
+      console.log('WorkerStore: Worker deleted successfully');
       toast.success('Worker deleted successfully');
     } catch (error) {
-      console.error('Error deleting worker:', error);
+      console.error('WorkerStore: Error deleting worker:', error);
+      
       // If deletion fails, refresh the workers list to ensure sync
       try {
         const workers = await getWorkers();
@@ -101,9 +110,11 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       } catch (refreshError) {
         set({
           error: 'Failed to delete worker and refresh data',
-          loading: false
+          loading: false,
+          workers: [] // Clear workers on error
         });
       }
+      
       toast.error('Failed to delete worker');
       throw error;
     }

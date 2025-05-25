@@ -37,7 +37,7 @@ export const getWorkers = async () => {
         .from('workers')
         .select('count(*)', { count: 'exact', head: true });
         
-      console.log(`getWorkers: Connection test complete, status:`, testError ? 'ERROR' : 'OK');
+      console.log(`getWorkers: Connection test complete, found ${testData?.count || 0} workers`);
       
       if (testError) {
         console.error('getWorkers: Connection test error:', testError);
@@ -47,14 +47,12 @@ export const getWorkers = async () => {
       console.error('getWorkers: Connection test failed:', testError);
     }
     
-    // Add a timestamp to prevent caching issues
-    const timestamp = new Date().getTime();
-    
-    // Actual data fetch with cache-busting
+    // Actual data fetch with no caching
     const { data, error, status } = await supabase
       .from('workers')
-      .select('*', { cache: 'no-store' })
-      .order('name');
+      .select('*')
+      .order('name')
+      .throwOnError();
     
     if (error) {
       console.error('Error fetching workers:', error);
@@ -65,158 +63,12 @@ export const getWorkers = async () => {
       console.warn('getWorkers: No workers found in database!');
     } else {
       console.log(`getWorkers: Successfully retrieved ${data.length} workers (HTTP status: ${status})`);
-      console.log('First worker:', data[0]);
+      console.log('Sample worker:', data[0]);
     }
     
     return data || [];
   } catch (error) {
     console.error('Error in getWorkers:', error);
-    throw error;
-  }
-};
-
-export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
-  try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
-    console.log('createWorker: Creating worker:', worker);
-    const { data, error } = await supabase
-      .from('workers')
-      .insert([worker])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating worker:', error);
-      throw error;
-    }
-
-    console.log('createWorker: Worker created successfully:', data);
-    return data;
-  } catch (error) {
-    console.error('Error in createWorker:', error);
-    throw error;
-  }
-};
-
-export const getWorkerJobs = async (workerId: string) => {
-  try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
-    console.log('getWorkerJobs: Fetching jobs for worker:', workerId);
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('worker_id', workerId);
-
-    if (error) {
-      console.error('Error fetching worker jobs:', error);
-      throw error;
-    }
-
-    console.log(`getWorkerJobs: Found ${data?.length || 0} jobs for worker ${workerId}`);
-    return data || [];
-  } catch (error) {
-    console.error('Error in getWorkerJobs:', error);
-    throw error;
-  }
-};
-
-export const deleteWorker = async (id: string) => {
-  try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
-    console.log('deleteWorker: Deleting worker:', id);
-    // Using the function we created in the migration
-    const { error } = await supabase.rpc('delete_worker_with_jobs', {
-      worker_id: id
-    });
-
-    if (error) {
-      console.error('Error in deleteWorker:', error);
-      throw error;
-    }
-
-    console.log('deleteWorker: Worker deleted successfully');
-    return true;
-  } catch (error) {
-    console.error('Error in deleteWorker:', error);
-    throw error;
-  }
-};
-
-export const getCurrentWorker = async (email: string) => {
-  try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
-    console.log('getCurrentWorker: Fetching worker for email:', email);
-    
-    // Verify connection to Supabase
-    try {
-      const { error: pingError } = await supabase.from('workers').select('count').limit(1);
-      if (pingError) {
-        console.error('getCurrentWorker: Failed to connect to Supabase:', pingError);
-        throw new Error(`Supabase connection error: ${pingError.message}`);
-      }
-    } catch (pingError) {
-      console.error('getCurrentWorker: Supabase ping failed:', pingError);
-      throw new Error('Failed to connect to database');
-    }
-    
-    // Try to get all workers first to see if we can access the table
-    try {
-      const { data: allWorkers, error: allError } = await supabase
-        .from('workers')
-        .select('*')
-        .limit(5);
-      
-      if (allError) {
-        console.error('getCurrentWorker: Failed to get any workers:', allError);
-      } else {
-        console.log(`getCurrentWorker: Successfully fetched ${allWorkers.length} workers as test`);
-      }
-    } catch (testError) {
-      console.error('getCurrentWorker: Test fetch failed:', testError);
-    }
-    
-    // Now try to get the specific worker by email
-    const { data, error, status } = await supabase
-      .from('workers')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('getCurrentWorker: Error fetching current worker:', error);
-      throw error;
-    }
-    
-    if (!data) {
-      console.warn(`getCurrentWorker: No worker found for email: ${email}`);
-      // If no worker found, try creating one
-      try {
-        const newWorker = await createWorkerProfile(email);
-        console.log('getCurrentWorker: Created new worker:', newWorker);
-        return newWorker;
-      } catch (createError) {
-        console.error('getCurrentWorker: Failed to create worker:', createError);
-        throw createError;
-      }
-    }
-    
-    console.log(`getCurrentWorker: Worker data for email: ${email}`, data, `(HTTP status: ${status})`);
-    
-    return data;
-  } catch (error) {
-    console.error('getCurrentWorker: Error in getCurrentWorker:', error);
     throw error;
   }
 };
@@ -245,14 +97,12 @@ export const getJobs = async () => {
       console.error('getJobs: Connection test failed:', testError);
     }
     
-    // Add a timestamp to prevent caching issues
-    const timestamp = new Date().getTime();
-    
-    // Fetch jobs with no filters - get everything
+    // Fetch jobs with no caching
     const { data: jobs, error: jobsError, status: jobsStatus } = await supabase
       .from('jobs')
-      .select('*', { cache: 'no-store' })
-      .order('created_at', { ascending: false });
+      .select('*')
+      .order('created_at', { ascending: false })
+      .throwOnError();
     
     if (jobsError) {
       console.error('Error fetching jobs:', jobsError);
@@ -264,7 +114,8 @@ export const getJobs = async () => {
     // Get secondary worker assignments for each job
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
-      .select('*');
+      .select('*')
+      .throwOnError();
 
     if (secondaryError) {
       console.error('Error fetching secondary workers:', secondaryError);
@@ -283,7 +134,7 @@ export const getJobs = async () => {
         : []
     }));
     
-    // Log the first few jobs for debugging
+    // Log sample data
     if (jobsWithSecondaryWorkers.length > 0) {
       console.log('getJobs: Sample job data:', jobsWithSecondaryWorkers[0]);
     } else {
@@ -445,12 +296,155 @@ export const deleteJob = async (id: string) => {
   }
 };
 
-// Function to directly create a worker profile for a new user
+export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
+  try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
+    console.log('createWorker: Creating worker:', worker);
+    const { data, error } = await supabase
+      .from('workers')
+      .insert([worker])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating worker:', error);
+      throw error;
+    }
+
+    console.log('createWorker: Worker created successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in createWorker:', error);
+    throw error;
+  }
+};
+
+export const getWorkerJobs = async (workerId: string) => {
+  try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
+    console.log('getWorkerJobs: Fetching jobs for worker:', workerId);
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('worker_id', workerId);
+
+    if (error) {
+      console.error('Error fetching worker jobs:', error);
+      throw error;
+    }
+
+    console.log(`getWorkerJobs: Found ${data?.length || 0} jobs for worker ${workerId}`);
+    return data || [];
+  } catch (error) {
+    console.error('Error in getWorkerJobs:', error);
+    throw error;
+  }
+};
+
+export const deleteWorker = async (id: string) => {
+  try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
+    console.log('deleteWorker: Deleting worker:', id);
+    const { error } = await supabase.rpc('delete_worker_with_jobs', {
+      worker_id: id
+    });
+
+    if (error) {
+      console.error('Error in deleteWorker:', error);
+      throw error;
+    }
+
+    console.log('deleteWorker: Worker deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error in deleteWorker:', error);
+    throw error;
+  }
+};
+
+export const getCurrentWorker = async (email: string) => {
+  try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
+    console.log('getCurrentWorker: Fetching worker for email:', email);
+    
+    // Verify connection to Supabase
+    try {
+      const { error: pingError } = await supabase.from('workers').select('count').limit(1);
+      if (pingError) {
+        console.error('getCurrentWorker: Failed to connect to Supabase:', pingError);
+        throw new Error(`Supabase connection error: ${pingError.message}`);
+      }
+    } catch (pingError) {
+      console.error('getCurrentWorker: Supabase ping failed:', pingError);
+      throw new Error('Failed to connect to database');
+    }
+    
+    // Try to get all workers first to see if we can access the table
+    try {
+      const { data: allWorkers, error: allError } = await supabase
+        .from('workers')
+        .select('*')
+        .limit(5);
+      
+      if (allError) {
+        console.error('getCurrentWorker: Failed to get any workers:', allError);
+      } else {
+        console.log(`getCurrentWorker: Successfully fetched ${allWorkers.length} workers as test`);
+      }
+    } catch (testError) {
+      console.error('getCurrentWorker: Test fetch failed:', testError);
+    }
+    
+    // Now try to get the specific worker by email
+    const { data, error, status } = await supabase
+      .from('workers')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('getCurrentWorker: Error fetching current worker:', error);
+      throw error;
+    }
+    
+    if (!data) {
+      console.warn(`getCurrentWorker: No worker found for email: ${email}`);
+      // If no worker found, try creating one
+      try {
+        const newWorker = await createWorkerProfile(email);
+        console.log('getCurrentWorker: Created new worker:', newWorker);
+        return newWorker;
+      } catch (createError) {
+        console.error('getCurrentWorker: Failed to create worker:', createError);
+        throw createError;
+      }
+    }
+    
+    console.log(`getCurrentWorker: Worker data for email: ${email}`, data, `(HTTP status: ${status})`);
+    
+    return data;
+  } catch (error) {
+    console.error('getCurrentWorker: Error in getCurrentWorker:', error);
+    throw error;
+  }
+};
+
 export const createWorkerProfile = async (email: string, name?: string) => {
   try {
     console.log(`createWorkerProfile: Creating worker profile for ${email}...`);
     
-    // Use a transaction to ensure either the worker is found or created
     const { data, error } = await supabase
       .from('workers')
       .upsert(
@@ -480,7 +474,6 @@ export const createWorkerProfile = async (email: string, name?: string) => {
   }
 };
 
-// Function to ensure a record exists in public.users table
 export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
   try {
     console.log(`ensureUserRecord: Ensuring user record for ${email}...`);
@@ -527,7 +520,6 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
   }
 };
 
-// Function to run diagnostics on the database
 export const runDatabaseDiagnostics = async (email: string) => {
   try {
     console.log('Running database diagnostics...');
@@ -587,7 +579,6 @@ export const runDatabaseDiagnostics = async (email: string) => {
   }
 };
 
-// Check RLS Policies
 export const checkRLSPolicies = async () => {
   try {
     console.log('Checking RLS policies...');
