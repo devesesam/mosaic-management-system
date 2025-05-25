@@ -1,3 +1,4 @@
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getJobs, createJob, updateJob, deleteJob } from '../lib/supabase';
 import { Job } from '../types';
