@@ -6,12 +6,14 @@ import toast from 'react-hot-toast';
 export function useWorkers({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
+  // Use smaller staleTime to ensure more frequent refreshes
   const { data: workers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['workers'],
     queryFn: getWorkers,
     enabled,
-    staleTime: 1000 * 30, // 30 seconds before refetching
-    refetchOnWindowFocus: true
+    staleTime: 1000 * 10, // 10 seconds before refetching
+    refetchOnWindowFocus: true,
+    retry: 3, // Try 3 times before giving up
   });
 
   const addWorkerMutation = useMutation({

@@ -26,6 +26,7 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
+      // Direct call with minimal processing
       const jobs = await getJobs();
       set({ jobs, loading: false, error: null });
     } catch (error) {

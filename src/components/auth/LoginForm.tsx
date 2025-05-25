@@ -21,7 +21,6 @@ const LoginForm: React.FC = () => {
     setError(null);
 
     setError(null);
-    console.log('LoginForm: Form submitted, attempting', isSignUp ? 'signup' : 'signin');
     
     try {
       if (isSignUp) {
@@ -30,13 +29,12 @@ const LoginForm: React.FC = () => {
         toast.success('Account created! Please sign in to continue.');
       } else {
         const success = await signIn(email, password);
-        console.log('LoginForm: Sign in result:', success);
         if (!success) {
           setError('Invalid email or password');
         }
       }
     } catch (err) {
-      console.error('LoginForm: Error during auth:', err);
+      console.error('Error during auth:', err);
       setError('Authentication failed. Please try again.');
     } finally {
       setIsSubmitting(false);

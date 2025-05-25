@@ -6,12 +6,14 @@ import toast from 'react-hot-toast';
 export function useJobs({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
+  // Use smaller staleTime to ensure more frequent refreshes
   const { data: jobs = [], isLoading, error, refetch } = useQuery({
     queryKey: ['jobs'],
     queryFn: getJobs,
     enabled,
-    staleTime: 1000 * 30, // 30 seconds before refetching
-    refetchOnWindowFocus: true
+    staleTime: 1000 * 10, // 10 seconds before refetching
+    refetchOnWindowFocus: true,
+    retry: 3, // Try 3 times before giving up
   });
 
   const addJobMutation = useMutation({
@@ -58,7 +60,6 @@ export function useJobs({ enabled = true } = {}) {
     refetch,
     addJob: addJobMutation.mutate,
     updateJob: (id: string, updates: Partial<Job>) => {
-      console.log('useJobs: Updating job:', { id, updates });
       return updateJobMutation.mutate({ id, updates });
     },
     deleteJob: deleteJobMutation.mutate,

@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -55,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize auth and set up listener
   useEffect(() => {
     const initializeAuth = async () => {
+      setLoading(true);
       try {
         // Get current session
         const { data: { session } } = await supabase.auth.getSession();
@@ -65,9 +66,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Check RLS policies to ensure data access
           await checkRLSPolicies();
+          
+          // Force data prefetch after login
+          const { data: jobs } = await supabase.from('jobs').select('count');
+          console.log(`Found ${jobs?.[0]?.count || 0} jobs in the database`);
+          
+          const { data: workers } = await supabase.from('workers').select('count');
+          console.log(`Found ${workers?.[0]?.count || 0} workers in the database`);
         }
       } catch (err) {
         console.error('Error getting session:', err);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -123,6 +133,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (user) {
       initializeWorkerProfile();
+    } else {
+      setLoading(false);
     }
   }, [user]);
 

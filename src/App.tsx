@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useAuth } from './context/AuthContext';
@@ -16,11 +16,14 @@ function App() {
   const { user, loading: authLoading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
+  
+  // Only enable job and worker fetching if we have a user AND a worker profile
   const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
-    enabled: !!user && !!currentWorker
+    enabled: !!user
   });
+  
   const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
-    enabled: !!user && !!currentWorker
+    enabled: !!user
   });
 
   const handleNewJob = () => {
@@ -65,7 +68,7 @@ function App() {
   }
 
   // Show loading spinner while fetching initial data
-  if (user && currentWorker && (isJobsLoading || isWorkersLoading || authLoading)) {
+  if (isJobsLoading || isWorkersLoading || authLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
