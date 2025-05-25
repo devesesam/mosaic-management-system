@@ -605,7 +605,3 @@ export const checkRLSPolicies = async () => {
     throw error;
   }
 };
-
-export { getJobs, createJob, updateJob, deleteJob }
-
-export { createWorker, getWorkers, deleteWorker }
