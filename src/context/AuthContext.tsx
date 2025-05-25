@@ -13,6 +13,7 @@ interface AuthContextProps {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
+  setError: (error: string | null) => void;
   isAdmin: boolean;
 }
 
@@ -290,6 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signOut,
     error,
+    setError,
     isAdmin
   };
 
