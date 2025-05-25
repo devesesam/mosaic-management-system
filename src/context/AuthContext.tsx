@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(true); // Start with loading true
+  const [loading, setLoading] = useState(false); // Start with loading false
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -55,12 +55,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize auth and set up listener
   useEffect(() => {
     const initializeAuth = async () => {
-      setLoading(true);
       try {
         // Get current session
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
+          console.log('Found existing session');
           setUser(session.user);
           setSession(session);
           
@@ -73,11 +73,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const { data: workers } = await supabase.from('workers').select('count');
           console.log(`Found ${workers?.[0]?.count || 0} workers in the database`);
+          
+          // Just to be safe, let's run a query with no count
+          const { data: jobsList } = await supabase.from('jobs').select('*');
+          console.log(`Direct jobs query returned ${jobsList?.length || 0} results`);
         }
       } catch (err) {
         console.error('Error getting session:', err);
-      } finally {
-        setLoading(false);
       }
     };
     
@@ -125,7 +127,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
       } catch (err) {
         console.error('Error initializing worker profile:', err);
-        setError('Error retrieving your account information. Please try again.');
+        // Don't set error, just log it - we can proceed without a proper worker profile
+        // setError('Error retrieving your account information. Please try again.');
       } finally {
         setLoading(false);
       }

@@ -11,11 +11,13 @@ import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle, Loader2 } from 'lucide-react';
+import { supabase } from './lib/supabase';
 
 function App() {
   const { user, loading: authLoading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   
   // Don't depend on currentWorker to enable data loading
   const { jobs, addJob, isLoading: isJobsLoading, error: jobsError, refetch: refetchJobs } = useJobs({
@@ -29,6 +31,8 @@ function App() {
   // Force data refresh when component mounts
   useEffect(() => {
     if (user) {
+      console.log('App: Authenticated - Starting data fetch');
+      
       // Force immediate data refresh on component mount
       refetchJobs();
       refetchWorkers();
@@ -42,6 +46,45 @@ function App() {
       return () => clearInterval(interval);
     }
   }, [user, refetchJobs, refetchWorkers]);
+  
+  // Add a loading timeout to proceed even if data is still loading
+  useEffect(() => {
+    if ((isJobsLoading || isWorkersLoading || authLoading) && !loadingTimeout) {
+      console.log('App: Loading timeout started');
+      const timeoutId = setTimeout(() => {
+        console.log('App: Loading timeout reached - Proceeding anyway');
+        setLoadingTimeout(true);
+      }, 10000); // 10 second timeout
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isJobsLoading, isWorkersLoading, authLoading, loadingTimeout]);
+  
+  // When user logs in, try to force a direct database connection
+  useEffect(() => {
+    if (user && !jobs.length && !workers.length) {
+      const checkDatabase = async () => {
+        try {
+          console.log('App: Performing direct database check');
+          const { data: jobsCheck } = await supabase.from('jobs').select('*');
+          console.log(`App: Direct check found ${jobsCheck?.length || 0} jobs`);
+          
+          const { data: workersCheck } = await supabase.from('workers').select('*');
+          console.log(`App: Direct check found ${workersCheck?.length || 0} workers`);
+          
+          if (jobsCheck?.length || workersCheck?.length) {
+            // Force refresh if we found data
+            refetchJobs();
+            refetchWorkers();
+          }
+        } catch (err) {
+          console.error('App: Direct database check failed', err);
+        }
+      };
+      
+      checkDatabase();
+    }
+  }, [user, jobs.length, workers.length, refetchJobs, refetchWorkers]);
 
   const handleNewJob = () => {
     if (!isAdmin) return;
@@ -86,12 +129,24 @@ function App() {
     );
   }
 
-  // Show loading spinner while fetching initial data
-  if (isJobsLoading || isWorkersLoading || authLoading) {
+  // Show loading spinner while fetching initial data, but with a timeout override
+  if ((isJobsLoading || isWorkersLoading || authLoading) && !loadingTimeout) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
-        <p className="text-gray-600">Loading calendar data...</p>
+        <p className="text-gray-600 mb-2">Loading calendar data...</p>
+        <div className="text-xs text-gray-400">
+          {isJobsLoading ? "Loading jobs... " : ""}
+          {isWorkersLoading ? "Loading workers... " : ""}
+          {authLoading ? "Loading user profile... " : ""}
+        </div>
+        
+        <button
+          onClick={() => setLoadingTimeout(true)}
+          className="mt-6 text-sm underline text-indigo-500 hover:text-indigo-700"
+        >
+          Continue anyway
+        </button>
       </div>
     );
   }
