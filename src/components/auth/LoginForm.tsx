@@ -12,7 +12,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signIn, signUp, error, loading } = useAuth();
+  const { signIn, signUp, error, loading, setError } = useAuth();
 
   useEffect(() => {
     // Reset submitting state when auth loading changes
