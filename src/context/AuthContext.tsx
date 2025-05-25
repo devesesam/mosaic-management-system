@@ -221,6 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
     setLoading(true);
+    let success = false;
     
     try {
       console.log('AuthProvider: Attempting sign in for:', email);
@@ -229,19 +230,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (signInError) {
         console.error('AuthProvider: Sign in error:', signInError);
         setError(signInError.message);
-        setLoading(false);
-        return false;
       } else {
         console.log('AuthProvider: Sign in successful');
-        // Loading will be set to false by the auth state change handler
-        return true;
+        success = true;
       }
     } catch (err) {
       console.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in');
-      setLoading(false);
-      return false;
     }
+    
+    if (!success) {
+      setLoading(false);
+    }
+    return success;
   };
 
   const signUp = async (email: string, password: string) => {

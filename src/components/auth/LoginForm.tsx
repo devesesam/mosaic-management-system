@@ -24,18 +24,25 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
     console.log('LoginForm: Form submitted, attempting', isSignUp ? 'signup' : 'signin');
     
-    if (isSignUp) {
-      await signUp(email, password);
-      setIsSubmitting(false);
-    } else {
-      const success = await signIn(email, password);
-      if (success) {
-        onSuccess();
-      } else {
+    try {
+      if (isSignUp) {
+        await signUp(email, password);
         setIsSubmitting(false);
+      } else {
+        const success = await signIn(email, password);
+        console.log('LoginForm: Sign in result:', success);
+        if (success) {
+          onSuccess();
+        } else {
+          setIsSubmitting(false);
+        }
       }
+    } catch (err) {
+      console.error('LoginForm: Error during auth:', err);
+      setIsSubmitting(false);
     }
   };
 
