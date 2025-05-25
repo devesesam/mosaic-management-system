@@ -14,22 +14,25 @@ const LoginForm: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+
+    setError(null);
     console.log('LoginForm: Form submitted, attempting', isSignUp ? 'signup' : 'signin');
     
     try {
       if (isSignUp) {
         await signUp(email, password);
-        toast.success('Account created successfully. Please sign in.');
+        setIsSignUp(false);
+        toast.success('Account created! Please sign in to continue.');
       } else {
         const success = await signIn(email, password);
         console.log('LoginForm: Sign in result:', success);
         if (!success) {
-          toast.error('Sign in failed');
+          setError('Invalid email or password');
         }
       }
     } catch (err) {
       console.error('LoginForm: Error during auth:', err);
-      toast.error('Authentication failed');
+      setError('Authentication failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

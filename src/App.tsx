@@ -10,12 +10,13 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 function App() {
-  const { user, loading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
+  const { user, loading: authLoading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
+  const [isRetrying, setIsRetrying] = useState(false);
   const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
     enabled: !!user
   });
@@ -42,7 +43,10 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342] mb-4"></div>
+          <p className="text-gray-600">Loading application...</p>
+        </div>
       </div>
     );
   }
@@ -65,21 +69,31 @@ function App() {
   if (user && !currentWorker) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
           <div className="flex justify-center text-amber-500 mb-4">
             <AlertTriangle size={48} />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Account Not Linked</h2>
           <p className="text-gray-600 mb-6">
             Your user account ({user.email}) is not associated with any worker in the system. 
-            Please contact your administrator.
+            The system will attempt to create your profile automatically.
           </p>
-          <button
-            onClick={() => signOut()}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
-          >
-            Sign Out
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => window.location.reload()}
+              disabled={isRetrying}
+              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md disabled:opacity-50 flex items-center justify-center"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+              {isRetrying ? 'Retrying...' : 'Retry'}
+            </button>
+            <button
+              onClick={() => signOut()}
+              className="w-full py-2 px-4 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-md"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
     );
