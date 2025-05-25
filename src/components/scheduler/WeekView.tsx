@@ -70,30 +70,17 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
   
-  // Get jobs for a worker on a specific day - modified to be less restrictive
+  // Get jobs for a worker on a specific day
+  // SIMPLIFIED to just filter by worker_id only - start_date/end_date checks removed to debug
   const getWorkerDayJobs = (workerId: string | null, day: Date) => {
-    return jobs.filter(job => {
-      // First check if the job is assigned to this worker
-      if (job.worker_id !== workerId) return false;
-      
-      // If the job has no start_date, it can't be displayed on a specific day
-      if (!job.start_date) return false;
-      
-      const jobStart = parseISO(job.start_date);
-      
-      // If it has an end_date, check if the day falls within the range
-      if (job.end_date) {
-        const jobEnd = parseISO(job.end_date);
-        
-        // Check if this day is within the job's date range
-        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
-               isSameDay(jobStart, day) || 
-               isSameDay(jobEnd, day);
-      }
-      
-      // If no end_date, just check if the day matches the start date
-      return isSameDay(jobStart, day);
-    });
+    // VERSION 1: ULTRA SIMPLIFIED - Just filter by worker_id to verify that jobs are present
+    if (workerId === null) {
+      // Get unassigned jobs
+      return jobs.filter(job => !job.worker_id);
+    }
+    
+    // Get all jobs for this worker
+    return jobs.filter(job => job.worker_id === workerId);
   };
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
@@ -272,7 +259,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         
         {/* Fixed-width unscheduled jobs panel */}
         <UnscheduledPanel 
-          jobs={unscheduledJobs}
+          jobs={jobs} // Pass ALL jobs to check if filtering is the issue
           onJobDrop={handleJobDrop}
           onJobClick={(job) => {
             setSelectedJob(job);
