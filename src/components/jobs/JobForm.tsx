@@ -10,10 +10,9 @@ interface JobFormProps {
   onSubmit: (job: Omit<Job, 'id' | 'created_at'>) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   initialJob?: Job;
-  readOnly?: boolean;
 }
 
-const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJob, readOnly = false }) => {
+const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJob }) => {
   const { workers, fetchWorkers } = useWorkerStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,6 +40,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   // Initialize form with initial job data
   useEffect(() => {
     if (initialJob) {
+      console.log('JobForm: Initializing with job:', initialJob);
       setFormData({
         ...initialJob,
         secondary_worker_ids: initialJob.secondary_worker_ids || []
@@ -50,17 +50,21 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
 
   // Force refresh workers when form opens
   useEffect(() => {
+    console.log('JobForm: Fetching workers...');
     fetchWorkers();
   }, [fetchWorkers]);
 
+  // Debug workers data
+  useEffect(() => {
+    console.log(`JobForm: ${workers.length} workers available for assignment`);
+  }, [workers]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    if (readOnly) return;
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (readOnly) return;
     const { name, value } = e.target;
     if (!value) {
       setFormData(prev => ({ ...prev, [name]: null }));
@@ -77,7 +81,6 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   };
 
   const handleSecondaryWorkerToggle = (workerId: string) => {
-    if (readOnly) return;
     setFormData(prev => {
       const currentIds = prev.secondary_worker_ids || [];
       const newIds = currentIds.includes(workerId)
@@ -93,7 +96,9 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (readOnly || isSubmitting) return;
+    if (isSubmitting) return;
+    
+    console.log('JobForm: Submitting job data:', formData);
     
     try {
       setIsSubmitting(true);
@@ -109,7 +114,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   };
 
   const handleDelete = async () => {
-    if (readOnly || !initialJob || !onDelete) return;
+    if (!initialJob || !onDelete) return;
     try {
       await onDelete(initialJob.id);
       toast.success('Job deleted successfully');
@@ -126,9 +131,11 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
-            {initialJob ? (readOnly ? 'View Job' : 'Edit Job') : 'New Job'}
-          </h2>
+          <div className="flex items-center">
+            <h2 className="text-xl font-semibold text-gray-800">
+              {initialJob ? 'Edit Job' : 'New Job'}
+            </h2>
+          </div>
           <button 
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -149,8 +156,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 required
                 value={formData.address || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -163,8 +169,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="customer_name"
                 value={formData.customer_name || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -177,8 +182,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="quote_number"
                 value={formData.quote_number || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -191,8 +195,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="fascia_colour"
                 value={formData.fascia_colour || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -205,8 +208,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="spouting_colour"
                 value={formData.spouting_colour || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -219,8 +221,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="spouting_profile"
                 value={formData.spouting_profile || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -233,8 +234,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="roof_colour"
                 value={formData.roof_colour || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -247,8 +247,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="roof_profile"
                 value={formData.roof_profile || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -261,8 +260,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="downpipe_size"
                 value={formData.downpipe_size || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -275,8 +273,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="downpipe_colour"
                 value={formData.downpipe_colour || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
 
@@ -288,8 +285,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="worker_id"
                 value={formData.worker_id || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               >
                 <option value="">Select Worker</option>
                 {workers.map((worker: Worker) => (
@@ -313,14 +309,13 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                   availableSecondaryWorkers.map((worker) => (
                     <label
                       key={worker.id}
-                      className={`flex items-center px-3 py-2 hover:bg-gray-50 ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                      className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         checked={formData.secondary_worker_ids?.includes(worker.id) || false}
                         onChange={() => handleSecondaryWorkerToggle(worker.id)}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                        disabled={readOnly}
                       />
                       <span className="ml-2 text-sm text-gray-700">
                         {worker.name}
@@ -344,8 +339,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="status"
                 value={formData.status || JobStatus.AwaitingOrder}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               >
                 {Object.values(JobStatus).map((status) => (
                   <option key={status} value={status}>
@@ -364,8 +358,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 name="start_date"
                 value={formData.start_date ? format(new Date(formData.start_date), 'yyyy-MM-dd') : ''}
                 onChange={handleDateChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
             
@@ -379,30 +372,27 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 value={formData.end_date ? format(new Date(formData.end_date), 'yyyy-MM-dd') : ''}
                 onChange={handleDateChange}
                 min={formData.start_date ? format(new Date(formData.start_date), 'yyyy-MM-dd') : undefined}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
 
-            {!readOnly && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Tile Color
-                </label>
-                <div className="mt-1 grid grid-cols-8 gap-2">
-                  {colorOptions.map((color) => (
-                    <div 
-                      key={color}
-                      className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform ${
-                        formData.tile_color === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setFormData(prev => ({ ...prev, tile_color: color }))}
-                    />
-                  ))}
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Tile Color
+              </label>
+              <div className="mt-1 grid grid-cols-8 gap-2">
+                {colorOptions.map((color) => (
+                  <div 
+                    key={color}
+                    className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform ${
+                      formData.tile_color === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setFormData(prev => ({ ...prev, tile_color: color }))}
+                  />
+                ))}
               </div>
-            )}
+            </div>
             
             <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-medium text-gray-700">
@@ -413,14 +403,13 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 rows={3}
                 value={formData.notes || ''}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                disabled={readOnly}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
               />
             </div>
           </div>
           
           <div className="flex justify-between space-x-3 pt-3 border-t">
-            {initialJob && onDelete && !readOnly && (
+            {initialJob && onDelete && (
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
@@ -436,27 +425,25 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 onClick={onClose}
                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                {readOnly ? 'Close' : 'Cancel'}
+                Cancel
               </button>
-              {!readOnly && (
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {initialJob ? 'Updating...' : 'Creating...'}
-                    </span>
-                  ) : (
-                    initialJob ? 'Update Job' : 'Create Job'
-                  )}
-                </button>
-              )}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {initialJob ? 'Updating...' : 'Creating...'}
+                  </span>
+                ) : (
+                  initialJob ? 'Update Job' : 'Create Job'
+                )}
+              </button>
             </div>
           </div>
         </form>

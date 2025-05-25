@@ -9,9 +9,12 @@ import {
   isSameDay,
   parseISO,
   addDays,
-  differenceInDays
+  differenceInDays,
+  isWithinInterval,
+  isBefore,
+  isAfter
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Job, Worker } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
@@ -20,15 +23,20 @@ import { useWorkerStore } from '../../store/workerStore';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 
-const WeekView: React.FC = () => {
+interface WeekViewProps {
+}
+
+const WeekView: React.FC<WeekViewProps> = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   
   const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobStore();
-  const { workers, fetchWorkers, addWorker, error: workersError } = useWorkerStore();
+  const { workers, fetchWorkers, addWorker } = useWorkerStore();
+  const { isAdmin } = useAuth();
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -42,13 +50,17 @@ const WeekView: React.FC = () => {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
   
-  // Force data refresh when component mounts
+  // Force data refresh every time the component mounts
   useEffect(() => {
+    console.log('WeekView: Component mounted - Forcing data refresh');
     fetchJobs();
     fetchWorkers();
-    
-    // Also set up an interval to refresh data periodically
+  }, [fetchJobs, fetchWorkers]);
+  
+  // Also set up an interval to refresh data periodically
+  useEffect(() => {
     const intervalId = setInterval(() => {
+      console.log('WeekView: Periodic data refresh');
       fetchJobs();
       fetchWorkers();
     }, 60000); // Refresh every minute
@@ -56,10 +68,23 @@ const WeekView: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [fetchJobs, fetchWorkers]);
   
+  // Debugging output to check data
+  useEffect(() => {
+    console.log('WeekView: Data loaded:', { workers: workers.length, jobs: jobs.length });
+    
+    if (jobs.length > 0) {
+      console.log('WeekView: Sample job:', jobs[0]);
+    }
+    
+    if (workers.length > 0) {
+      console.log('WeekView: Sample worker:', workers[0]);
+    }
+  }, [jobs, workers]);
+  
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
   
-  // Get jobs for a worker on a specific day
+  // Get jobs for a worker on a specific day - modified to be less restrictive
   const getWorkerDayJobs = (workerId: string | null, day: Date) => {
     return jobs.filter(job => {
       // First check if the job is assigned to this worker
@@ -74,7 +99,10 @@ const WeekView: React.FC = () => {
       if (job.end_date) {
         const jobEnd = parseISO(job.end_date);
         
-        return (jobStart <= day && day <= jobEnd);
+        // Check if this day is within the job's date range
+        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
+               isSameDay(jobStart, day) || 
+               isSameDay(jobEnd, day);
       }
       
       // If no end_date, just check if the day matches the start date
@@ -128,6 +156,8 @@ const WeekView: React.FC = () => {
   
   const handleJobDrop = async (job: Job, workerId: string | null, date: Date | null) => {
     try {
+      console.log('WeekView: Handling job drop:', { job_id: job.id, workerId, date });
+      
       let updates: Partial<Job> = {
         worker_id: workerId,
         start_date: date ? date.toISOString() : null
@@ -147,6 +177,7 @@ const WeekView: React.FC = () => {
         updates.end_date = null;
       }
       
+      console.log('WeekView: Updating job with:', updates);
       await updateJob(job.id, updates);
       await fetchJobs(); // Force refresh after update
       toast.success('Job updated successfully');
@@ -157,21 +188,84 @@ const WeekView: React.FC = () => {
   };
 
   const handleJobResize = async (job: Job, days: number) => {
+    console.log('WeekView: Resize - Initial job data:', {
+      job_id: job.id,
+      start_date: job.start_date,
+      end_date: job.end_date,
+      days
+    });
+    
     try {
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
+      console.log('WeekView: Resize - Parsed start date:', startDate.toISOString());
+      
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
+      console.log('WeekView: Resize - Calculated end date:', newEndDate.toISOString());
       
       await updateJob(job.id, {
         end_date: newEndDate.toISOString()
       });
-      await fetchJobs(); // Refresh jobs after update
+      await fetchJobs(); // Force refresh after update
       toast.success('Job duration updated');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Error resizing job:', error);
+      console.error('WeekView: Error resizing job:', {
+        error: errorMessage,
+        job_id: job.id,
+        attempted_days: days
+      });
       toast.error(`Failed to update job duration: ${errorMessage}`);
     }
   };
+  
+  // Debug UI to show job and worker data
+  const DebugPanel = () => (
+    <div className="p-4 bg-white border-b border-gray-200 text-sm text-gray-600">
+      <details>
+        <summary className="cursor-pointer font-medium">Debug Information</summary>
+        <div className="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
+          <div>
+            <strong>Workers:</strong> {workers.length} loaded
+            {workers.length > 0 && (
+              <ul className="ml-4 list-disc">
+                {workers.slice(0, 3).map(w => (
+                  <li key={w.id}>{w.name} ({w.email})</li>
+                ))}
+                {workers.length > 3 && <li>...and {workers.length - 3} more</li>}
+              </ul>
+            )}
+          </div>
+          
+          <div>
+            <strong>Jobs:</strong> {jobs.length} loaded ({unscheduledJobs.length} unscheduled)
+            {jobs.length > 0 && (
+              <ul className="ml-4 list-disc">
+                {jobs.slice(0, 3).map(j => (
+                  <li key={j.id}>{j.address} - {j.status}</li>
+                ))}
+                {jobs.length > 3 && <li>...and {jobs.length - 3} more</li>}
+              </ul>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={() => fetchJobs()}
+              className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+            >
+              Refresh Jobs
+            </button>
+            <button 
+              onClick={() => fetchWorkers()}
+              className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+            >
+              Refresh Workers
+            </button>
+          </div>
+        </div>
+      </details>
+    </div>
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -203,39 +297,13 @@ const WeekView: React.FC = () => {
         </button>
       </div>
       
-      {/* Warning messages */}
-      {workersError && (
-        <div className="p-4 bg-red-50 border-b border-red-200">
-          <div className="flex items-center">
-            <AlertTriangle size={20} className="text-red-500 mr-2" />
-            <p className="text-red-800 font-medium">Error: {workersError}</p>
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button 
-              onClick={() => fetchWorkers()} 
-              className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-            >
-              Retry Loading Workers
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-3 py-1 text-sm border border-red-300 text-red-700 rounded hover:bg-red-50"
-            >
-              Reload Page
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Debug panel */}
+      <DebugPanel />
       
-      {workers.length === 0 && !workersError && (
+      {/* Warning messages */}
+      {workers.length === 0 && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No workers found in database. Add a worker to start scheduling jobs.</p>
-          <button
-            onClick={() => setIsWorkerFormOpen(true)}
-            className="mt-2 px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200"
-          >
-            Add Worker
-          </button>
         </div>
       )}
       
@@ -244,31 +312,6 @@ const WeekView: React.FC = () => {
           <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
         </div>
       )}
-      
-      {/* Debug panel to help diagnose issues */}
-      <div className="p-3 bg-white border-b border-gray-200 text-xs text-gray-600">
-        <details>
-          <summary className="cursor-pointer font-medium">Database Status</summary>
-          <div className="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
-            <p><strong>Workers:</strong> {workers.length} loaded</p>
-            <p><strong>Jobs:</strong> {jobs.length} loaded ({unscheduledJobs.length} unscheduled)</p>
-            <div className="flex gap-2 mt-2">
-              <button 
-                onClick={() => fetchWorkers()}
-                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-              >
-                Refresh Workers
-              </button>
-              <button 
-                onClick={() => fetchJobs()}
-                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-              >
-                Refresh Jobs
-              </button>
-            </div>
-          </div>
-        </details>
-      </div>
       
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">

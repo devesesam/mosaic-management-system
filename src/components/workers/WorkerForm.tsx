@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Trash2 } from 'lucide-react';
-import { Worker, WorkerRole } from '../../types';
+import { Worker } from '../../types';
 
 interface WorkerFormProps {
   onClose: () => void;
@@ -14,7 +14,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
     name: initialWorker?.name || '',
     email: initialWorker?.email || '',
     phone: initialWorker?.phone || '',
-    role: 'admin' as WorkerRole // Everyone is now admin
+    role: 'admin' // All workers are now admins
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,7 +23,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
     onClose();
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setWorker(prev => ({ ...prev, [name]: value }));
   };
@@ -97,8 +97,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
             />
           </div>
           
-          {/* Hidden field - all workers are admins now */}
-          <input type="hidden" name="role" value="admin" />
+          {/* Role field removed - all users are now admins */}
           
           <div className="flex justify-between space-x-3 pt-4 border-t">
             {initialWorker && onDelete && (

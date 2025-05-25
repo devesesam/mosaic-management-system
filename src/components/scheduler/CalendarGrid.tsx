@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDrop } from 'react-dnd';
-import { format, isToday, differenceInDays, isSameDay, addDays, parseISO } from 'date-fns';
+import { format, isToday, differenceInDays, isSameDay, addDays, parseISO, isWithinInterval, isBefore, isAfter } from 'date-fns';
 import { Job, Worker } from '../../types';
 import DraggableJob from './DraggableJob';
 import { Plus, Minus } from 'lucide-react';
@@ -29,6 +29,26 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   const [isManageWorkersOpen, setIsManageWorkersOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
+  
+  // Debug logging for data
+  useEffect(() => {
+    if (workers.length === 0) {
+      console.log('CalendarGrid: No workers available');
+    } else {
+      console.log(`CalendarGrid: ${workers.length} workers available`);
+    }
+
+    // Check if there are any jobs for the first day
+    if (days.length > 0 && workers.length > 0) {
+      const firstDayJobs = workers.flatMap(worker => 
+        getWorkerDayJobs(worker.id, days[0])
+      );
+      console.log(`CalendarGrid: Found ${firstDayJobs.length} jobs for the first day`);
+      
+      const unassignedJobs = getWorkerDayJobs(null, days[0]);
+      console.log(`CalendarGrid: Found ${unassignedJobs.length} unassigned jobs for the first day`);
+    }
+  }, [days, workers, getWorkerDayJobs]);
   
   const displayedWorkers = selectedWorker === 'all' 
     ? workers 
@@ -220,6 +240,36 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   const mainJob = sortedJobs.length > 0 ? sortedJobs[0] : null;
   const hasMoreJobs = sortedJobs.length > 1;
   
+  // Fixed cell height
+  const cellHeight = 100;
+  
+  let jobSpan = 1;
+  let showText = false;
+  
+  if (mainJob && mainJob.start_date && mainJob.end_date) {
+    const startDate = parseISO(mainJob.start_date);
+    const endDate = parseISO(mainJob.end_date);
+    
+    const shouldRender = isSameDay(day, startDate) || 
+                        (dayIndex === 0 && isBefore(startDate, day));
+    
+    showText = isSameDay(day, startDate) || (dayIndex === 0 && isBefore(startDate, day));
+    
+    if (shouldRender) {
+      const remainingDays = days.length - dayIndex;
+      const jobDaysRemaining = differenceInDays(endDate, day) + 1;
+      jobSpan = Math.min(jobDaysRemaining, remainingDays);
+    }
+  }
+  
+  // Debug jobs (only in dev mode)
+  useEffect(() => {
+    if (jobs.length > 0 && dayIndex === 0) {
+      console.log(`CalendarCell: Worker ${workerId || 'unassigned'} has ${jobs.length} jobs for day ${format(day, 'MM-dd')}:`, 
+        jobs.map(j => ({ id: j.id, address: j.address, start: j.start_date })));
+    }
+  }, [jobs, workerId, day, dayIndex]);
+  
   return (
     <div
       ref={drop}
@@ -228,18 +278,24 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
         ${isOver ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
       `}
-      style={{ height: '100px' }}
+      style={{ height: `${cellHeight}px` }}
     >
       <div className="h-full relative p-1">
         {mainJob && (
-          <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
+          <div 
+            className="absolute left-0 right-0 top-0 mx-1 mt-1"
+            style={{ 
+              width: `calc(${jobSpan} * 100% - 0.5rem)`,
+              height: "calc(100% - 6px)"
+            }}
+          >
             <DraggableJob
               job={mainJob}
               onClick={() => onJobClick(mainJob)}
               isScheduled={true}
               onResize={(days) => onJobResize(mainJob, days)}
               isWeekView={true}
-              showText={true}
+              showText={showText}
             />
           </div>
         )}

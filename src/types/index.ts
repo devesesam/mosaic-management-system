@@ -8,7 +8,7 @@ export enum JobStatus {
   Closed = 'Closed'
 }
 
-// Everyone is now admin - no different roles
+// All users are admins
 export type WorkerRole = 'admin';
 
 export interface Job {

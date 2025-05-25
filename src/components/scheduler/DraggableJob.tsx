@@ -10,7 +10,6 @@ interface DraggableJobProps {
   onResize?: (job: Job, days: number) => void;
   isWeekView?: boolean;
   showText?: boolean;
-  readOnly?: boolean;
   days?: Date[];
   dayIndex?: number;
   span?: number;
@@ -23,7 +22,6 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
   onResize,
   isWeekView = false,
   showText = true,
-  readOnly = false,
   days,
   dayIndex,
   span
@@ -37,11 +35,11 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging()
     }),
-    canDrag: () => !isResizing && !readOnly
+    canDrag: () => !isResizing
   });
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    if (!onResize || !isScheduled || readOnly || !ref.current?.parentElement) return;
+    if (!onResize || !isScheduled || !ref.current?.parentElement) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -78,12 +76,26 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     const handleMouseUp = () => {
       if (!parentElement) return;
 
+      console.log('DraggableJob: Resize end - Initial measurements:', {
+        job_id: job.id,
+        cellWidth,
+        initialWidth: originalWidth,
+        initialDays
+      });
+
       setIsResizing(false);
       
       // Calculate final width in days
       const finalWidth = parentElement.getBoundingClientRect().width;
       const finalDays = Math.max(1, Math.round(finalWidth / cellWidth));
       
+      console.log('DraggableJob: Resize end - Final calculations:', {
+        job_id: job.id,
+        finalWidth,
+        finalDays,
+        raw_calculation: finalWidth / cellWidth
+      });
+
       if (finalDays !== initialDays) {
         onResize(job, finalDays);
       }
@@ -94,7 +106,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [job, onResize, isScheduled, readOnly]);
+  }, [isScheduled, job, onResize]);
   
   drag(ref);
   
@@ -108,13 +120,12 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         relative
         z-10
         ${isWeekView ? 'h-full' : ''}
-        ${readOnly ? 'cursor-default' : ''}
       `}
       style={{
         position: 'relative',
         width: isScheduled ? '100%' : 'auto',
         height: isWeekView && isScheduled ? '100%' : isScheduled ? '22px' : 'auto',
-        cursor: isResizing ? 'ew-resize' : readOnly ? 'default' : 'grab',
+        cursor: isResizing ? 'ew-resize' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none'
       }}
@@ -128,7 +139,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         showText={showText}
       />
       
-      {isScheduled && onResize && !readOnly && (
+      {isScheduled && onResize && (
         <div
           className="absolute right-0 top-0 h-full w-6 cursor-ew-resize hover:bg-gray-400/20 z-20"
           onMouseDown={handleResizeStart}
