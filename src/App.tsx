@@ -59,6 +59,7 @@ function App() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
       </div>
     );
+  }
 
   // Show account not linked message if no worker profile
   if (user && !currentWorker) {
@@ -145,7 +146,7 @@ function App() {
         />
       </div>
     </DndProvider>
-  )
+  );
 }
 
-export default App
+export default App;
