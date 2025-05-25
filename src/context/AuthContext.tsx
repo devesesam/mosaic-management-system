@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseInitialized } from '../lib/supabase';
 import { Worker } from '../types';
 import { getCurrentWorker } from '../lib/supabase';
 
@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         // Check if Supabase URL and key are available
-        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        if (!isSupabaseInitialized()) {
           console.error('AuthProvider: Missing Supabase credentials in environment variables');
           setError('Application configuration error. Please contact support.');
           if (isActive) setLoading(false);

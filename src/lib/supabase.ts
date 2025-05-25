@@ -1,20 +1,34 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Initialize with empty strings first
+let supabaseUrl = '';
+let supabaseAnonKey = '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase credentials. Please check your .env file.');
+try {
+  supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase credentials in environment variables');
+  }
+} catch (error) {
+  console.error('Error loading Supabase credentials:', error);
 }
 
-export const supabase = createClient<Database>(
-  supabaseUrl || '',
-  supabaseAnonKey || ''
-);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+// Helper function to check if Supabase is properly initialized
+export const isSupabaseInitialized = () => {
+  return Boolean(supabaseUrl && supabaseAnonKey);
+};
 
 export const getWorkers = async () => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -34,6 +48,10 @@ export const getWorkers = async () => {
 
 export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     const { data, error } = await supabase
       .from('workers')
       .insert([worker])
@@ -54,6 +72,10 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
 
 export const getWorkerJobs = async (workerId: string) => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
@@ -73,6 +95,10 @@ export const getWorkerJobs = async (workerId: string) => {
 
 export const deleteWorker = async (id: string) => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     // Using the function we created in the migration
     const { error } = await supabase.rpc('delete_worker_with_jobs', {
       worker_id: id
@@ -92,6 +118,10 @@ export const deleteWorker = async (id: string) => {
 
 export const getCurrentWorker = async (email: string) => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     console.log('supabase.ts: Fetching worker for email:', email);
     
     // Verify connection to Supabase
@@ -128,6 +158,10 @@ export const getCurrentWorker = async (email: string) => {
 
 export const getJobs = async () => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
@@ -165,6 +199,10 @@ export const getJobs = async () => {
 
 export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['Insert'], 'id' | 'created_at'>) => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     const { secondary_worker_ids, ...jobData } = job as any;
     
     const { data: newJob, error: jobError } = await supabase
@@ -206,6 +244,10 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
 
 export const updateJob = async (id: string, updates: Partial<Database['public']['Tables']['jobs']['Update']>) => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     console.log('supabase: updateJob - Input data:', {
       job_id: id,
       updates: {
@@ -294,6 +336,10 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
 
 export const deleteJob = async (id: string) => {
   try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
     const { error } = await supabase
       .from('jobs')
       .delete()
