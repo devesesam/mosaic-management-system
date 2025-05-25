@@ -13,26 +13,24 @@ const LoginForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    if (setError) setError(null);
+    setError(null);
     console.log('LoginForm: Form submitted, attempting', isSignUp ? 'signup' : 'signin');
     
     try {
       if (isSignUp) {
         await signUp(email, password);
         toast.success('Account created successfully. Please sign in.');
-        setIsSubmitting(false);
       } else {
         const success = await signIn(email, password);
         console.log('LoginForm: Sign in result:', success);
-        if (success) {
-          toast.success('Signed in successfully');
-        } else {
-          setIsSubmitting(false);
+        if (!success) {
+          toast.error('Sign in failed');
         }
       }
     } catch (err) {
       console.error('LoginForm: Error during auth:', err);
       toast.error('Authentication failed');
+    } finally {
       setIsSubmitting(false);
     }
   };

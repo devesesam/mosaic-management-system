@@ -3,12 +3,13 @@ import { getJobs, createJob, updateJob, deleteJob } from '../lib/supabase';
 import { Job } from '../types';
 import toast from 'react-hot-toast';
 
-export function useJobs() {
+export function useJobs({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
   const { data: jobs = [], isLoading, error } = useQuery({
     queryKey: ['jobs'],
     queryFn: getJobs,
+    enabled
   });
 
   const addJobMutation = useMutation({

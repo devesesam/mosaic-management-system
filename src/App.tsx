@@ -16,8 +16,12 @@ function App() {
   const { user, loading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
-  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs();
-  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers();
+  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
+    enabled: !!user
+  });
+  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
+    enabled: !!user
+  });
 
   const handleNewJob = () => {
     if (!isAdmin) return;
@@ -49,13 +53,12 @@ function App() {
   }
 
   // Show loading spinner while fetching initial data
-  if (isJobsLoading || isWorkersLoading) {
+  if ((user && (isJobsLoading || isWorkersLoading))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
       </div>
     );
-  }
 
   // Show account not linked message if no worker profile
   if (user && !currentWorker) {

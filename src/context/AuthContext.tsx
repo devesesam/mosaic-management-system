@@ -84,10 +84,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('AuthProvider: Initializing auth...');
     let isActive = true; // To prevent setting state after unmount
+    
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setSession(session);
+          setUser(session.user);
+          
+          if (session.user.email) {
+            const worker = await getCurrentWorker(session.user.email);
+            if (worker) {
+              setCurrentWorker(worker);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    };
 
-    // Force sign out on mount
-    handleSignOut();
-    setLoading(false);
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
@@ -145,28 +164,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
     setLoading(true);
-    let success = false;
     
     try {
       console.log('AuthProvider: Attempting sign in for:', email);
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       
       if (signInError) {
+        setLoading(false);
         console.error('AuthProvider: Sign in error:', signInError);
         setError(signInError.message);
+        return false;
       } else {
         console.log('AuthProvider: Sign in successful');
-        success = true;
+        return true;
       }
     } catch (err) {
+      setLoading(false);
       console.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in');
+      return false;
     }
-    
-    if (!success) {
-      setLoading(false);
-    }
-    return success;
   };
 
   const signUp = async (email: string, password: string) => {
