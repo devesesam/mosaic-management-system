@@ -29,12 +29,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleSignOut = async () => {
     setLoading(true);
     try {
-      await supabase.auth.signOut();
+      // Clear all state
       setSession(null);
       setUser(null);
       setCurrentWorker(null);
       setError(null);
+      
+      // Clear local storage
       localStorage.clear();
+      
+      // Sign out from Supabase
+      await supabase.auth.signOut();
     } catch (err) {
       console.error('Error signing out:', err);
       setError('Failed to sign out');
@@ -84,78 +89,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const initializeAuth = async () => {
       try {
-        // Check if Supabase URL and key are available
-        if (!isSupabaseInitialized()) {
-          console.error('AuthProvider: Missing Supabase credentials in environment variables');
-          setError('Application configuration error. Please contact support.');
-          if (isActive) setLoading(false);
-          return;
-        }
-
-        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('AuthProvider: Error fetching session:', sessionError);
-          setError('Failed to initialize authentication');
-          if (isActive) setLoading(false);
-          return;
-        }
-        
-        console.log('AuthProvider: Session fetched:', !!currentSession);
-        
-        if (!currentSession) {
-          console.log('AuthProvider: No active session found');
-          if (isActive) setLoading(false);
-          return;
-        }
-
-        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          console.error('AuthProvider: Error fetching user:', userError);
-          setError('Failed to fetch user information');
-          if (isActive) setLoading(false);
-          return;
-        }
-        
-        console.log('AuthProvider: User fetched:', !!currentUser);
-        
-        if (!currentUser) {
-          console.log('AuthProvider: No user found in session');
-          if (isActive) setLoading(false);
-          return;
-        }
-
-        if (isActive) {
-          setSession(currentSession);
-          setUser(currentUser);
-        }
-        
-        if (currentUser.email) {
-          try {
-            console.log('AuthProvider: Fetching worker for email:', currentUser.email);
-            let worker = await getCurrentWorker(currentUser.email);
-            console.log('AuthProvider: Worker found:', !!worker, worker);
-            
-            if (!worker) {
-              console.warn('AuthProvider: No worker found for email:', currentUser.email);
-              worker = await createWorkerForUser(currentUser);
-              if (worker) {
-                console.log('AuthProvider: Created new worker record for user');
-              } else {
-                console.error('AuthProvider: Failed to create worker record for user');
-              }
-            }
-            
-            if (isActive) setCurrentWorker(worker);
-          } catch (workerErr) {
-            console.error('AuthProvider: Error fetching/creating worker:', workerErr);
-          } finally {
-            if (isActive) setLoading(false);
-          }
-        } else {
-          if (isActive) setLoading(false);
-        }
+        // Force logout on page load/refresh
+        await handleSignOut();
       } catch (err) {
         console.error('AuthProvider: Auth initialization error:', err);
         if (isActive) {
