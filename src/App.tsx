@@ -10,6 +10,7 @@ import JobForm from './components/jobs/JobForm';
 import { useJobStore } from './store/jobStore';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
+import { useEffect } from 'react';
 
 function App() {
   const { user, loading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
@@ -17,6 +18,14 @@ function App() {
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const { addJob, fetchJobs } = useJobStore();
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [showApp, setShowApp] = useState(false);
+
+  useEffect(() => {
+    // Reset showApp when user logs out
+    if (!user) {
+      setShowApp(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -43,16 +52,16 @@ function App() {
     }
   };
 
-  if (loading) {
+  if (!showApp) {
+    return <LoginForm onSuccess={() => setShowApp(true)} />;
+  }
+
+  if (loading && user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
       </div>
     );
-  }
-
-  if (!user) {
-    return <LoginForm />;
   }
 
   if (user && !currentWorker) {
