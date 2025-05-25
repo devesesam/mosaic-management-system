@@ -26,17 +26,16 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: '0.0.0.0',
-    strictPort: true,
+    host: true,
+    strictPort: false,
     hmr: {
-      overlay: false,
-      clientPort: 443
+      overlay: false
     }
   },
   preview: {
     port: 5173,
-    host: '0.0.0.0',
-    strictPort: true
+    host: true,
+    strictPort: false
   },
   optimizeDeps: {
     include: [
