@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Book as Roof } from 'lucide-react';
+import { useEffect } from 'react';
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -10,18 +11,30 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { signIn, signUp, error, loading } = useAuth();
+
+  useEffect(() => {
+    // Reset submitting state when auth loading changes
+    if (!loading) {
+      setIsSubmitting(false);
+    }
+  }, [loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     console.log('LoginForm: Form submitted, attempting', isSignUp ? 'signup' : 'signin');
     
     if (isSignUp) {
       await signUp(email, password);
+      setIsSubmitting(false);
     } else {
       const success = await signIn(email, password);
       if (success) {
         onSuccess();
+      } else {
+        setIsSubmitting(false);
       }
     }
   };
@@ -85,10 +98,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           <div className="flex flex-col space-y-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#0a2342] hover:bg-[#0c2d5a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70"
             >
-              {loading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
+              {isSubmitting ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
             </button>
             
             <button
