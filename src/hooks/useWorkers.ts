@@ -1,7 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getWorkers, createWorker, deleteWorker } from '../lib/supabase';
+import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
+import { useJobStore } from './jobStore';
 import toast from 'react-hot-toast';
+
+interface WorkerState {
+  workers: Worker[];
+  loading: boolean;
+  error: string | null;
+  fetchWorkers: () => Promise<void>;
+  addWorker: (worker: Omit<Worker, 'id' | 'created_at'>) => Promise<Worker>;
+  deleteWorker: (id: string) => Promise<void>;
+}
 
 export function useWorkers({ enabled = true } = {}) {
   const queryClient = useQueryClient();
@@ -11,7 +21,13 @@ export function useWorkers({ enabled = true } = {}) {
     queryFn: getWorkers,
     enabled,
     staleTime: 1000 * 30, // 30 seconds before refetching
-    refetchOnWindowFocus: true
+    refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: 1000,
+    onError: (error) => {
+      console.error('useWorkers: Error fetching workers:', error);
+      toast.error('Failed to load workers');
+    }
   });
 
   const addWorkerMutation = useMutation({
@@ -37,6 +53,15 @@ export function useWorkers({ enabled = true } = {}) {
       toast.error('Failed to delete worker');
     },
   });
+
+  // Log data changes
+  React.useEffect(() => {
+    console.log('useWorkers: Workers data updated:', {
+      count: workers.length,
+      loading: isLoading,
+      error: error ? 'Error loading workers' : null
+    });
+  }, [workers, isLoading, error]);
 
   return {
     workers,

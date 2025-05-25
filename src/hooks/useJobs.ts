@@ -11,7 +11,13 @@ export function useJobs({ enabled = true } = {}) {
     queryFn: getJobs,
     enabled,
     staleTime: 1000 * 30, // 30 seconds before refetching
-    refetchOnWindowFocus: true
+    refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: 1000,
+    onError: (error) => {
+      console.error('useJobs: Error fetching jobs:', error);
+      toast.error('Failed to load jobs');
+    }
   });
 
   const addJobMutation = useMutation({
@@ -50,6 +56,15 @@ export function useJobs({ enabled = true } = {}) {
       toast.error('Failed to delete job');
     },
   });
+
+  // Log data changes
+  React.useEffect(() => {
+    console.log('useJobs: Jobs data updated:', {
+      count: jobs.length,
+      loading: isLoading,
+      error: error ? 'Error loading jobs' : null
+    });
+  }, [jobs, isLoading, error]);
 
   return {
     jobs,
