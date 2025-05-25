@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);  // Start with loading set to false
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -45,97 +45,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Create a worker profile automatically if one doesn't exist
-  const createWorkerForUser = async (userEmail: string): Promise<Worker | null> => {
-    if (!userEmail) {
-      console.error('Cannot create worker record - email is missing');
-      return null;
-    }
-
-    try {
-      console.log('Creating worker profile for:', userEmail);
-      
-      // Create worker using upsert to handle both create and update cases
-      const { data, error } = await supabase
-        .from('workers')
-        .upsert(
-          { 
-            name: userEmail.split('@')[0],
-            email: userEmail,
-            role: 'admin'
-          },
-          { onConflict: 'email' }
-        )
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error creating worker profile:', error);
-        return null;
-      }
-      
-      console.log('Worker profile created/updated successfully:', data);
-      return data;
-    } catch (err) {
-      console.error('Error in createWorkerForUser:', err);
-      return null;
-    }
-  };
-
   useEffect(() => {
-    console.log('AuthProvider: Initializing auth...');
-    let isActive = true;
+    console.log('AuthProvider: Setting up auth listener...');
     
-    // Initial auth state - ensure signed out by default
-    const initializeAuth = async () => {
-      try {
-        await handleSignOut();
-        
-        if (isActive) {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Error initializing auth:', err);
-        setError('Failed to initialize authentication');
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
+    // Start with clean state - no loading screen
+    handleSignOut();
+    
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
 
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         await handleSignOut();
-        if (isActive) setLoading(false);
       } else if (session?.user?.email) {
         try {
+          // Set user state
           setSession(session);
           setUser(session.user);
           
-          // Get worker profile or create one if it doesn't exist
+          // Check if we have a worker profile or need to create one
           let worker = await getCurrentWorker(session.user.email);
           
           if (!worker) {
-            worker = await createWorkerForUser(session.user.email);
+            console.log('No worker found, creating profile automatically');
+            try {
+              worker = await createWorkerProfile(session.user.email);
+            } catch (profileError) {
+              console.error('Failed to create worker profile:', profileError);
+              setError('Failed to set up your account. Please try again.');
+              await handleSignOut();
+              return;
+            }
           }
           
-          if (isActive) {
+          if (worker) {
             setCurrentWorker(worker);
-            setLoading(false);
+          } else {
+            // If we still don't have a worker, something went wrong
+            setError('Unable to set up your account. Please contact support.');
+            await handleSignOut();
           }
         } catch (err) {
-          console.error('Error in auth state change:', err);
-          setError('Failed to verify user permissions');
-          if (isActive) setLoading(false);
+          console.error('Error handling auth state change:', err);
+          setError('Authentication error. Please try again.');
+          await handleSignOut();
         }
       }
     });
 
     return () => {
-      isActive = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -149,18 +107,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       
       if (signInError) {
-        setLoading(false);
         console.error('AuthProvider: Sign in error:', signInError);
         setError(signInError.message);
+        setLoading(false);
         return false;
       } else {
         console.log('AuthProvider: Sign in successful');
         return true;
       }
     } catch (err) {
-      setLoading(false);
       console.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in');
+      setLoading(false);
       return false;
     }
   };

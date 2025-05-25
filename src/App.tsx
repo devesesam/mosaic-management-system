@@ -39,20 +39,7 @@ function App() {
     }
   };
 
-  // Show loading spinner while authenticating
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
-        <div className="text-gray-600">
-          <p className="text-center">Initializing application...</p>
-          <p className="text-sm text-gray-500 mt-2">This may take a few seconds</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show login form if no user
+  // Show login form if no user - immediately show this instead of loading screen
   if (!user) {
     return <LoginForm />;
   }
