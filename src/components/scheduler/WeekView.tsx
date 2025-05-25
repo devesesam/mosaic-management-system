@@ -57,14 +57,12 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   useEffect(() => {
     fetchJobs();
     fetchWorkers();
-  }, [fetchJobs, fetchWorkers]);
-  
-  // Also set up an interval to refresh data periodically
-  useEffect(() => {
+    
+    // Also set up more frequent refreshes
     const intervalId = setInterval(() => {
       fetchJobs();
       fetchWorkers();
-    }, 60000); // Refresh every minute
+    }, 10000); // Every 10 seconds
     
     return () => clearInterval(intervalId);
   }, [fetchJobs, fetchWorkers]);
@@ -200,6 +198,10 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     }
   };
 
+  // Debug count display
+  const totalJobCount = jobs.length;
+  const scheduledJobCount = jobs.filter(j => j.worker_id && j.start_date).length;
+
   return (
     <div className="flex h-full flex-col">
       {/* Week navigation header */}
@@ -222,12 +224,18 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           </button>
         </div>
         
-        <button
-          onClick={goToToday}
-          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-        >
-          Today
-        </button>
+        <div className="flex items-center gap-4">
+          <div className="text-xs text-gray-500">
+            {totalJobCount} job{totalJobCount !== 1 ? 's' : ''} total 
+            ({scheduledJobCount} scheduled)
+          </div>
+          <button
+            onClick={goToToday}
+            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+          >
+            Today
+          </button>
+        </div>
       </div>
       
       {/* Warning messages */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useAuth } from './context/AuthContext';
@@ -17,14 +17,31 @@ function App() {
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   
-  // Only enable job and worker fetching if we have a user AND a worker profile
-  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
+  // Don't depend on currentWorker to enable data loading
+  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError, refetch: refetchJobs } = useJobs({
     enabled: !!user
   });
   
-  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
+  const { workers, isLoading: isWorkersLoading, error: workersError, refetch: refetchWorkers } = useWorkers({
     enabled: !!user
   });
+
+  // Force data refresh when component mounts
+  useEffect(() => {
+    if (user) {
+      // Force immediate data refresh on component mount
+      refetchJobs();
+      refetchWorkers();
+      
+      // Set up periodic refresh
+      const interval = setInterval(() => {
+        refetchJobs();
+        refetchWorkers();
+      }, 5000); // Refresh every 5 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [user, refetchJobs, refetchWorkers]);
 
   const handleNewJob = () => {
     if (!isAdmin) return;
@@ -36,6 +53,8 @@ function App() {
     try {
       await addJob(jobData);
       setIsJobFormOpen(false);
+      // Immediately refetch data after adding a job
+      refetchJobs();
     } catch (error) {
       console.error('Error creating job:', error);
     }
@@ -89,12 +108,20 @@ function App() {
           <p className="text-gray-600 mb-6">
             {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
-          >
-            Refresh Page
-          </button>
+          <div className="space-y-3">
+            <div className="text-sm text-gray-500">
+              <p className="font-medium">Diagnostic Information:</p>
+              <p>Jobs: {jobs?.length || 0}</p>
+              <p>Workers: {workers?.length || 0}</p>
+              <p>User email: {user.email}</p>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+            >
+              Refresh Page
+            </button>
+          </div>
         </div>
       </div>
     );

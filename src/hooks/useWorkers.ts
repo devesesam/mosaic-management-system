@@ -14,6 +14,7 @@ export function useWorkers({ enabled = true } = {}) {
     staleTime: 1000 * 10, // 10 seconds before refetching
     refetchOnWindowFocus: true,
     retry: 3, // Try 3 times before giving up
+    refetchInterval: 10000 // Automatic refresh every 10 seconds
   });
 
   const addWorkerMutation = useMutation({
@@ -39,6 +40,9 @@ export function useWorkers({ enabled = true } = {}) {
       toast.error('Failed to delete worker');
     },
   });
+
+  // Debug workers on mount
+  console.log(`useWorkers: Worker data loaded with ${workers.length} workers`);
 
   return {
     workers,

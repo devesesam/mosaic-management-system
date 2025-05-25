@@ -14,6 +14,7 @@ export function useJobs({ enabled = true } = {}) {
     staleTime: 1000 * 10, // 10 seconds before refetching
     refetchOnWindowFocus: true,
     retry: 3, // Try 3 times before giving up
+    refetchInterval: 10000 // Automatic refresh every 10 seconds
   });
 
   const addJobMutation = useMutation({
@@ -53,6 +54,9 @@ export function useJobs({ enabled = true } = {}) {
     },
   });
 
+  // Debug jobs on mount
+  console.log(`useJobs: Job data loaded with ${jobs.length} jobs`);
+  
   return {
     jobs,
     isLoading,

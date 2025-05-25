@@ -77,13 +77,11 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   // Force refresh jobs when component mounts
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
-  
-  // Also set up an interval to refresh data periodically
-  useEffect(() => {
+    
+    // Also set up more frequent refreshes
     const intervalId = setInterval(() => {
       fetchJobs();
-    }, 60000); // Refresh every minute
+    }, 10000); // Every 10 seconds
     
     return () => clearInterval(intervalId);
   }, [fetchJobs]);
@@ -339,6 +337,10 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     }
   };
 
+  // Debug count display
+  const totalJobCount = jobs.length;
+  const scheduledJobCount = jobs.filter(j => j.start_date).length;
+
   return (
     <div className="flex h-full flex-col">
       {/* Main calendar area with flex-1 to take remaining space */}
@@ -365,12 +367,18 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             </button>
           </div>
           
-          <button
-            onClick={goToToday}
-            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            Today
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-gray-500">
+              {totalJobCount} job{totalJobCount !== 1 ? 's' : ''} total 
+              ({scheduledJobCount} scheduled)
+            </div>
+            <button
+              onClick={goToToday}
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Today
+            </button>
+          </div>
         </div>
         
         {/* Warning messages */}
