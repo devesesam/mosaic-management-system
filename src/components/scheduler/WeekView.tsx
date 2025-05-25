@@ -36,7 +36,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   
   const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobStore();
-  const { workers, fetchWorkers, addWorker } = useWorkerStore();
+  const { workers, fetchWorkers, addWorker, error: workersError } = useWorkerStore();
   const { isAdmin } = useAuth();
   
   const canEdit = isAdmin && !readOnly;
@@ -57,6 +57,14 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   useEffect(() => {
     fetchJobs();
     fetchWorkers();
+    
+    // Also set up an interval to refresh data periodically
+    const intervalId = setInterval(() => {
+      fetchJobs();
+      fetchWorkers();
+    }, 60000); // Refresh every minute
+    
+    return () => clearInterval(intervalId);
   }, [fetchJobs, fetchWorkers]);
   
   // Get unscheduled jobs
@@ -220,7 +228,19 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       </div>
       
       {/* Warning messages */}
-      {workers.length === 0 && (
+      {workersError && (
+        <div className="p-4 bg-red-50 border-b border-red-200">
+          <p className="text-red-800 font-medium">Error: {workersError}</p>
+          <button 
+            onClick={() => fetchWorkers()} 
+            className="mt-2 px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+          >
+            Retry Loading Workers
+          </button>
+        </div>
+      )}
+      
+      {workers.length === 0 && !workersError && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No workers found in database. Add a worker to start scheduling jobs.</p>
         </div>
@@ -231,6 +251,31 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
         </div>
       )}
+      
+      {/* Debug panel to help diagnose issues */}
+      <div className="p-3 bg-white border-b border-gray-200 text-xs text-gray-600">
+        <details>
+          <summary className="cursor-pointer font-medium">Database Status</summary>
+          <div className="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
+            <p><strong>Workers:</strong> {workers.length} loaded</p>
+            <p><strong>Jobs:</strong> {jobs.length} loaded ({unscheduledJobs.length} unscheduled)</p>
+            <div className="flex gap-2 mt-2">
+              <button 
+                onClick={() => fetchWorkers()}
+                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+              >
+                Refresh Workers
+              </button>
+              <button 
+                onClick={() => fetchJobs()}
+                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+              >
+                Refresh Jobs
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
       
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">

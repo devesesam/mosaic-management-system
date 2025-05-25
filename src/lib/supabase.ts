@@ -19,11 +19,30 @@ export const isSupabaseInitialized = () => {
 
 export const getWorkers = async () => {
   try {
-    const { data } = await supabase.from('workers').select('*');
+    // Log for debugging purposes
+    console.log('Fetching workers from Supabase');
+    
+    // Direct database query to bypass RLS issues
+    const { data, error, status } = await supabase
+      .from('workers')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      console.error('Error fetching workers:', error);
+      throw error;
+    }
+    
+    console.log(`Retrieved ${data?.length || 0} workers (HTTP status: ${status})`);
+    
+    if (!data || data.length === 0) {
+      console.warn('No workers found in the database');
+    }
+    
     return data || [];
   } catch (error) {
     console.error('Error in getWorkers:', error);
-    return []; 
+    throw error;
   }
 };
 
@@ -45,15 +64,16 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
 
 export const getWorkerJobs = async (workerId: string) => {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('jobs')
       .select('*')
       .eq('worker_id', workerId);
 
+    if (error) throw error;
     return data || [];
   } catch (error) {
     console.error('Error in getWorkerJobs:', error);
-    return []; 
+    throw error;
   }
 };
 
@@ -73,27 +93,57 @@ export const deleteWorker = async (id: string) => {
 
 export const getCurrentWorker = async (email: string) => {
   try {
-    const { data } = await supabase
+    console.log('Fetching worker for email:', email);
+    
+    // Direct query to get the worker
+    const { data, error, status } = await supabase
       .from('workers')
       .select('*')
       .eq('email', email)
       .maybeSingle();
     
+    if (error) {
+      console.error('Error fetching current worker:', error);
+      throw error;
+    }
+    
+    console.log(`Worker data for email: ${email}`, data, `(HTTP status: ${status})`);
+    
+    if (!data) {
+      console.warn('No worker found for email:', email);
+    }
+    
     return data;
   } catch (error) {
     console.error('Error in getCurrentWorker:', error);
-    return null;
+    throw error;
   }
 };
 
 export const getJobs = async () => {
   try {
-    const { data: jobs } = await supabase.from('jobs').select('*');
+    // Fetch jobs with no filters
+    const { data: jobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('*')
+      .order('created_at', { ascending: false });
     
-    // Get secondary worker assignments
-    const { data: secondaryWorkers } = await supabase
+    if (jobsError) {
+      console.error('Error fetching jobs:', jobsError);
+      throw jobsError;
+    }
+
+    console.log(`Retrieved ${jobs?.length || 0} jobs`);
+    
+    // Get secondary worker assignments for each job
+    const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
+
+    if (secondaryError) {
+      console.error('Error fetching secondary workers:', secondaryError);
+      throw secondaryError;
+    }
 
     // Combine jobs with their secondary workers
     const jobsWithSecondaryWorkers = (jobs || []).map(job => ({
@@ -108,7 +158,7 @@ export const getJobs = async () => {
     return jobsWithSecondaryWorkers;
   } catch (error) {
     console.error('Error in getJobs:', error);
-    return []; 
+    throw error;
   }
 };
 
@@ -162,10 +212,12 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
 
     if (secondary_worker_ids !== undefined) {
       // Delete existing secondary workers
-      await supabase
+      const { error: deleteError } = await supabase
         .from('job_secondary_workers')
         .delete()
         .eq('job_id', id);
+
+      if (deleteError) throw deleteError;
 
       if (secondary_worker_ids?.length) {
         const secondaryWorkerData = secondary_worker_ids.map(worker_id => ({
@@ -174,16 +226,20 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
         }));
 
         // Insert new secondary workers
-        await supabase
+        const { error: insertError } = await supabase
           .from('job_secondary_workers')
           .insert(secondaryWorkerData);
+
+        if (insertError) throw insertError;
       }
     }
 
-    const { data: currentSecondaryWorkers } = await supabase
+    const { data: currentSecondaryWorkers, error: fetchError } = await supabase
       .from('job_secondary_workers')
       .select('worker_id')
       .eq('job_id', id);
+
+    if (fetchError) throw fetchError;
 
     const finalJob = {
       ...updatedJob,
@@ -214,6 +270,8 @@ export const deleteJob = async (id: string) => {
 // Function to directly create a worker profile for a new user
 export const createWorkerProfile = async (email: string, name?: string) => {
   try {
+    console.log(`Creating worker profile for ${email}...`);
+    
     const { data, error } = await supabase
       .from('workers')
       .upsert(
@@ -230,28 +288,63 @@ export const createWorkerProfile = async (email: string, name?: string) => {
       .select()
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error('Failed to create worker profile:', error);
+      throw error;
+    }
+    
+    console.log('Worker profile created/updated:', data);
     return data;
   } catch (error) {
     console.error('Error creating worker profile:', error);
-    // Return a default worker if creation fails
-    return {
-      id: '00000000-0000-0000-0000-000000000000',
-      name: email.split('@')[0],
-      email: email,
-      role: 'admin',
-      created_at: new Date().toISOString(),
-      phone: null
-    };
+    
+    // As a fallback, try a direct insert
+    try {
+      const { data, error } = await supabase
+        .from('workers')
+        .insert([{
+          name: name || email.split('@')[0],
+          email: email,
+          role: 'admin'
+        }])
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
+    } catch (secondError) {
+      console.error('Fallback creation also failed:', secondError);
+      throw secondError;
+    }
   }
 };
 
 // Function to ensure a record exists in public.users table
 export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
   try {
+    console.log(`Ensuring user record for ${email}...`);
+    
+    // First check if the user already exists
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authUserId)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "Row not found" which is expected
+      console.error('Error checking if user exists:', checkError);
+    }
+    
+    if (existingUser) {
+      console.log('User record already exists:', existingUser);
+      return existingUser;
+    }
+    
+    // If not, create the user record
+    console.log('Creating new user record with ID:', authUserId);
     const { data, error } = await supabase
       .from('users')
-      .upsert([{
+      .insert([{
         id: authUserId,
         name: name || email.split('@')[0],
         email: email,
@@ -260,62 +353,122 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating user record:', error);
+      throw error;
+    }
+    
+    console.log('User record created successfully:', data);
     return data;
   } catch (error) {
     console.error('Error in ensureUserRecord:', error);
-    return null;
+    throw error;
   }
 };
 
 // Function to run diagnostics on the database
 export const runDatabaseDiagnostics = async (email: string) => {
   try {
-    // Simple diagnostic checks
-    const { data: workers } = await supabase.from('workers').select('*').limit(5);
-    const { data: jobs } = await supabase.from('jobs').select('*').limit(5);
-    const { data: users } = await supabase.from('users').select('*').limit(5);
-    const { data: { user } } = await supabase.auth.getUser();
+    console.log('Running database diagnostics...');
+    
+    // Check workers
+    const { data: workers, error: workersError } = await supabase
+      .from('workers')
+      .select('*');
+    
+    if (workersError) {
+      console.error('Error fetching workers:', workersError);
+    } else {
+      console.log(`Workers table contains ${workers.length} records`);
+      const userWorker = workers.find(w => w.email === email);
+      console.log(`User worker record:`, userWorker || 'Not found');
+    }
+    
+    // Check jobs
+    const { data: jobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('*');
+    
+    if (jobsError) {
+      console.error('Error fetching jobs:', jobsError);
+    } else {
+      console.log(`Jobs table contains ${jobs.length} records`);
+    }
+    
+    // Check users
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('*');
+    
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+    } else {
+      console.log(`Users table contains ${users.length} records`);
+      const userRecord = users.find(u => u.email === email);
+      console.log(`User record:`, userRecord || 'Not found');
+    }
     
     return {
       workersCount: workers?.length || 0,
       jobsCount: jobs?.length || 0,
       usersCount: users?.length || 0,
       userWorker: workers?.find(w => w.email === email) || null,
-      userRecord: users?.find(u => u.email === email) || null,
-      authUser: user
+      userRecord: users?.find(u => u.email === email) || null
     };
   } catch (error) {
     console.error('Error running diagnostics:', error);
-    return {
-      workersCount: 0,
-      jobsCount: 0,
-      usersCount: 0,
-      userWorker: null,
-      userRecord: null,
-      authUser: null
-    };
+    throw error;
   }
 };
 
 // Check RLS Policies
 export const checkRLSPolicies = async () => {
   try {
-    const { data: workers } = await supabase.from('workers').select('*').limit(5);
-    const { data: jobs } = await supabase.from('jobs').select('*').limit(5);
-    const { data: secondaryWorkers } = await supabase.from('job_secondary_workers').select('*').limit(5);
+    console.log('Checking RLS policies...');
+    
+    // Try to read from workers table
+    const { data: workers, error: workersError } = await supabase
+      .from('workers')
+      .select('*')
+      .limit(5);
+    
+    if (workersError) {
+      console.error('RLS Check: Error reading workers:', workersError);
+    } else {
+      console.log(`RLS Check: Successfully read ${workers.length} workers`);
+    }
+    
+    // Try to read from jobs table
+    const { data: jobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('*')
+      .limit(5);
+    
+    if (jobsError) {
+      console.error('RLS Check: Error reading jobs:', jobsError);
+    } else {
+      console.log(`RLS Check: Successfully read ${jobs.length} jobs`);
+    }
+    
+    // Try to read secondary workers
+    const { data: secondaryWorkers, error: swError } = await supabase
+      .from('job_secondary_workers')
+      .select('*')
+      .limit(5);
+    
+    if (swError) {
+      console.error('RLS Check: Error reading job_secondary_workers:', swError);
+    } else {
+      console.log(`RLS Check: Successfully read ${secondaryWorkers.length} secondary worker assignments`);
+    }
     
     return {
-      canReadWorkers: workers?.length >= 0,
-      canReadJobs: jobs?.length >= 0,
-      canReadSecondaryWorkers: secondaryWorkers?.length >= 0
+      canReadWorkers: !workersError,
+      canReadJobs: !jobsError,
+      canReadSecondaryWorkers: !swError
     };
   } catch (error) {
     console.error('Error checking RLS policies:', error);
-    return {
-      canReadWorkers: false,
-      canReadJobs: false,
-      canReadSecondaryWorkers: false
-    };
+    throw error;
   }
 };

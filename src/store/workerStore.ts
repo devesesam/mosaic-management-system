@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
 import { useJobStore } from './jobStore';
+import toast from 'react-hot-toast';
 
 interface WorkerState {
   workers: Worker[];
@@ -12,7 +13,7 @@ interface WorkerState {
   deleteWorker: (id: string) => Promise<void>;
 }
 
-export const useWorkerStore = create<WorkerState>((set) => ({
+export const useWorkerStore = create<WorkerState>((set, get) => ({
   workers: [],
   loading: false,
   error: null,
@@ -21,16 +22,18 @@ export const useWorkerStore = create<WorkerState>((set) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('workerStore: Fetching workers from Supabase');
+      console.log('Fetching workers from database...');
       const workers = await getWorkers();
-      console.log(`workerStore: Fetched ${workers.length} workers from Supabase`);
-      set({ workers, loading: false });
+      console.log(`Fetched ${workers.length} workers from database`);
+      set({ workers, loading: false, error: null });
     } catch (error) {
       console.error('Error fetching workers:', error);
       set({ 
-        error: 'Failed to fetch workers', 
+        error: 'Failed to fetch workers. Please check your connection and try again.', 
         loading: false 
       });
+      // Keep existing workers in state to avoid UI flashing empty
+      toast.error('Error loading workers');
     }
   },
   
@@ -38,12 +41,13 @@ export const useWorkerStore = create<WorkerState>((set) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('workerStore: Adding worker:', workerData);
+      console.log('Adding worker:', workerData);
       const newWorker = await createWorker(workerData);
-      console.log('workerStore: Worker added successfully:', newWorker);
+      console.log('Worker added successfully:', newWorker);
       set((state) => ({ 
         workers: [...state.workers, newWorker],
-        loading: false 
+        loading: false,
+        error: null
       }));
       return newWorker;
     } catch (error) {
@@ -60,25 +64,33 @@ export const useWorkerStore = create<WorkerState>((set) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('workerStore: Deleting worker:', id);
+      console.log('Deleting worker:', id);
       await deleteWorker(id);
       // Update jobs store to unassign jobs
       useJobStore.getState().unassignWorkerJobs(id);
       // Update workers store
       set((state) => ({
         workers: state.workers.filter((worker) => worker.id !== id),
-        loading: false
+        loading: false,
+        error: null
       }));
-      console.log('workerStore: Worker deleted successfully');
+      console.log('Worker deleted successfully');
     } catch (error) {
       console.error('Error deleting worker:', error);
       // If deletion fails, refresh the workers list to ensure sync
-      const workers = await getWorkers();
-      set({ 
-        workers,
-        error: 'Failed to delete worker', 
-        loading: false 
-      });
+      try {
+        const workers = await getWorkers();
+        set({ 
+          workers,
+          error: 'Failed to delete worker', 
+          loading: false 
+        });
+      } catch (refreshError) {
+        set({
+          error: 'Failed to delete worker and refresh data',
+          loading: false
+        });
+      }
       throw error;
     }
   }
