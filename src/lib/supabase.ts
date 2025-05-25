@@ -33,24 +33,27 @@ export const getWorkers = async () => {
     
     // Debug: Test the connection first
     try {
-      const { count, error: countError } = await supabase
+      const { data: testData, error: testError } = await supabase
         .from('workers')
-        .select('*', { count: 'exact', head: true });
+        .select('count(*)', { count: 'exact', head: true });
         
-      console.log(`getWorkers: Connection test shows ${count} workers available`);
+      console.log(`getWorkers: Connection test complete, status:`, testError ? 'ERROR' : 'OK');
       
-      if (countError) {
-        console.error('getWorkers: Connection test error:', countError);
-        throw countError;
+      if (testError) {
+        console.error('getWorkers: Connection test error:', testError);
+        throw testError;
       }
     } catch (testError) {
       console.error('getWorkers: Connection test failed:', testError);
     }
     
-    // Actual data fetch
+    // Add a timestamp to prevent caching issues
+    const timestamp = new Date().getTime();
+    
+    // Actual data fetch with cache-busting
     const { data, error, status } = await supabase
       .from('workers')
-      .select('*')
+      .select('*', { cache: 'no-store' })
       .order('name');
     
     if (error) {
@@ -58,7 +61,13 @@ export const getWorkers = async () => {
       throw error;
     }
     
-    console.log(`getWorkers: Successfully retrieved ${data?.length || 0} workers (HTTP status: ${status})`);
+    if (!data || data.length === 0) {
+      console.warn('getWorkers: No workers found in database!');
+    } else {
+      console.log(`getWorkers: Successfully retrieved ${data.length} workers (HTTP status: ${status})`);
+      console.log('First worker:', data[0]);
+    }
+    
     return data || [];
   } catch (error) {
     console.error('Error in getWorkers:', error);
@@ -162,6 +171,23 @@ export const getCurrentWorker = async (email: string) => {
       throw new Error('Failed to connect to database');
     }
     
+    // Try to get all workers first to see if we can access the table
+    try {
+      const { data: allWorkers, error: allError } = await supabase
+        .from('workers')
+        .select('*')
+        .limit(5);
+      
+      if (allError) {
+        console.error('getCurrentWorker: Failed to get any workers:', allError);
+      } else {
+        console.log(`getCurrentWorker: Successfully fetched ${allWorkers.length} workers as test`);
+      }
+    } catch (testError) {
+      console.error('getCurrentWorker: Test fetch failed:', testError);
+    }
+    
+    // Now try to get the specific worker by email
     const { data, error, status } = await supabase
       .from('workers')
       .select('*')
@@ -171,6 +197,19 @@ export const getCurrentWorker = async (email: string) => {
     if (error) {
       console.error('getCurrentWorker: Error fetching current worker:', error);
       throw error;
+    }
+    
+    if (!data) {
+      console.warn(`getCurrentWorker: No worker found for email: ${email}`);
+      // If no worker found, try creating one
+      try {
+        const newWorker = await createWorkerProfile(email);
+        console.log('getCurrentWorker: Created new worker:', newWorker);
+        return newWorker;
+      } catch (createError) {
+        console.error('getCurrentWorker: Failed to create worker:', createError);
+        throw createError;
+      }
     }
     
     console.log(`getCurrentWorker: Worker data for email: ${email}`, data, `(HTTP status: ${status})`);
@@ -206,10 +245,13 @@ export const getJobs = async () => {
       console.error('getJobs: Connection test failed:', testError);
     }
     
+    // Add a timestamp to prevent caching issues
+    const timestamp = new Date().getTime();
+    
     // Fetch jobs with no filters - get everything
     const { data: jobs, error: jobsError, status: jobsStatus } = await supabase
       .from('jobs')
-      .select('*')
+      .select('*', { cache: 'no-store' })
       .order('created_at', { ascending: false });
     
     if (jobsError) {
@@ -244,6 +286,8 @@ export const getJobs = async () => {
     // Log the first few jobs for debugging
     if (jobsWithSecondaryWorkers.length > 0) {
       console.log('getJobs: Sample job data:', jobsWithSecondaryWorkers[0]);
+    } else {
+      console.warn('getJobs: No jobs found in database!');
     }
     
     return jobsWithSecondaryWorkers || [];

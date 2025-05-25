@@ -10,6 +10,7 @@ import {
   checkRLSPolicies
 } from '../lib/supabase';
 import { Worker } from '../types';
+import toast from 'react-hot-toast';
 
 interface AuthContextProps {
   session: Session | null;
@@ -62,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-          console.log('AuthProvider: Found existing session for user:', session.user.email);
+          console.log('AuthProvider: Found existing session');
           setUser(session.user);
           setSession(session);
           
@@ -111,7 +112,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // If no worker found, create one
         if (!worker) {
           console.log('AuthProvider: No worker profile found, creating one...');
-          worker = await createWorkerProfile(user.email);
+          try {
+            worker = await createWorkerProfile(user.email);
+            console.log('Worker profile created:', worker);
+          } catch (createError) {
+            console.error('Failed to create worker profile:', createError);
+            toast.error('Failed to create your worker profile');
+          }
         }
         
         // Ensure a record exists in public.users that links to auth.users

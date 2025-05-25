@@ -265,8 +265,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Debug jobs (only in dev mode)
   useEffect(() => {
     if (jobs.length > 0 && dayIndex === 0) {
-      console.log(`CalendarCell: Worker ${workerId || 'unassigned'} has ${jobs.length} jobs for day ${format(day, 'MM-dd')}:`, 
-        jobs.map(j => ({ id: j.id, address: j.address, start: j.start_date })));
+      console.log(`CalendarCell: Worker ${workerId || 'unassigned'} has ${jobs.length} jobs for day ${format(day, 'MM-dd')}`);
     }
   }, [jobs, workerId, day, dayIndex]);
   
