@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useDrop } from 'react-dnd';
-import { format, isToday, differenceInDays, isSameDay, addDays, parseISO, isWithinInterval, isBefore, isAfter } from 'date-fns';
+import { format, isToday, differenceInDays, isSameDay, addDays, parseISO } from 'date-fns';
 import { Job, Worker } from '../../types';
 import DraggableJob from './DraggableJob';
 import { Plus, Minus } from 'lucide-react';
 import WorkerManageModal from './WorkerManageModal';
 import DayJobsModal from './DayJobsModal';
-import { useAuth } from '../../context/AuthContext';
 
 interface CalendarGridProps {
   days: Date[];
@@ -16,7 +15,6 @@ interface CalendarGridProps {
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onNewWorker: () => void;
-  readOnly?: boolean;
 }
 
 const CalendarGrid: React.FC<CalendarGridProps> = ({
@@ -26,15 +24,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   onJobDrop,
   onJobClick,
   onJobResize,
-  onNewWorker,
-  readOnly = false
+  onNewWorker
 }) => {
   const [isManageWorkersOpen, setIsManageWorkersOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
-  const { isAdmin } = useAuth();
-  
-  const canEdit = isAdmin && !readOnly;
   
   const displayedWorkers = selectedWorker === 'all' 
     ? workers 
@@ -60,24 +54,22 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
               ))}
             </select>
           </div>
-          {canEdit && (
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={() => setIsManageWorkersOpen(true)}
-                className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
-                title="Manage Workers"
-              >
-                <Minus className="h-5 w-5 text-gray-600" />
-              </button>
-              <button
-                onClick={onNewWorker}
-                className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
-                title="Add New Worker"
-              >
-                <Plus className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setIsManageWorkersOpen(true)}
+              className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
+              title="Manage Workers"
+            >
+              <Minus className="h-5 w-5 text-gray-600" />
+            </button>
+            <button
+              onClick={onNewWorker}
+              className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
+              title="Add New Worker"
+            >
+              <Plus className="h-5 w-5 text-gray-600" />
+            </button>
+          </div>
         </div>
         
         {/* Day headers */}
@@ -119,7 +111,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
               onJobClick={onJobClick}
               onJobResize={onJobResize}
               onShowMore={(date) => setSelectedDay({ date, workerId: null })}
-              readOnly={readOnly}
             />
           ))}
         </div>
@@ -129,9 +120,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           <div key={worker.id} className="flex border-b border-gray-200">
             <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
               {worker.name}
-              {worker.role === 'viewer' && (
-                <span className="ml-2 text-xs text-amber-600 font-normal">(View Only)</span>
-              )}
             </div>
             {days.map(day => (
               <CalendarCell
@@ -144,7 +132,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onJobClick={onJobClick}
                 onJobResize={onJobResize}
                 onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
-                readOnly={readOnly}
               />
             ))}
           </div>
@@ -152,7 +139,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       </div>
 
       {/* Worker Management Modal */}
-      {isManageWorkersOpen && canEdit && (
+      {isManageWorkersOpen && (
         <WorkerManageModal
           onClose={() => setIsManageWorkersOpen(false)}
           workers={workers}
@@ -184,7 +171,6 @@ interface CalendarCellProps {
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
-  readOnly?: boolean;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -195,8 +181,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobDrop,
   onJobClick,
   onJobResize,
-  onShowMore,
-  readOnly = false
+  onShowMore
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -205,8 +190,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     },
     collect: monitor => ({
       isOver: !!monitor.isOver()
-    }),
-    canDrop: () => !readOnly
+    })
   });
 
   // Current day index in the week
@@ -236,28 +220,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   const mainJob = sortedJobs.length > 0 ? sortedJobs[0] : null;
   const hasMoreJobs = sortedJobs.length > 1;
   
-  // Fixed cell height
-  const cellHeight = 100;
-  
-  let jobSpan = 1;
-  let showText = false;
-  
-  if (mainJob && mainJob.start_date && mainJob.end_date) {
-    const startDate = parseISO(mainJob.start_date);
-    const endDate = parseISO(mainJob.end_date);
-    
-    const shouldRender = isSameDay(day, startDate) || 
-                        (dayIndex === 0 && isBefore(startDate, day));
-    
-    showText = isSameDay(day, startDate) || (dayIndex === 0 && isBefore(startDate, day));
-    
-    if (shouldRender) {
-      const remainingDays = days.length - dayIndex;
-      const jobDaysRemaining = differenceInDays(endDate, day) + 1;
-      jobSpan = Math.min(jobDaysRemaining, remainingDays);
-    }
-  }
-  
   return (
     <div
       ref={drop}
@@ -265,27 +227,19 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
         ${isOver ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
-        ${readOnly ? 'cursor-default' : ''}
       `}
-      style={{ height: `${cellHeight}px` }}
+      style={{ height: '100px' }}
     >
       <div className="h-full relative p-1">
         {mainJob && (
-          <div 
-            className="absolute left-0 right-0 top-0 mx-1 mt-1"
-            style={{ 
-              width: `calc(${jobSpan} * 100% - 0.5rem)`,
-              height: "calc(100% - 6px)"
-            }}
-          >
+          <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
             <DraggableJob
               job={mainJob}
               onClick={() => onJobClick(mainJob)}
               isScheduled={true}
               onResize={(days) => onJobResize(mainJob, days)}
               isWeekView={true}
-              showText={showText}
-              readOnly={readOnly}
+              showText={true}
             />
           </div>
         )}

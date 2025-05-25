@@ -14,7 +14,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
     name: initialWorker?.name || '',
     email: initialWorker?.email || '',
     phone: initialWorker?.phone || '',
-    role: initialWorker?.role || 'viewer' as WorkerRole
+    role: 'admin' as WorkerRole // Everyone is now admin
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,20 +97,8 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
             />
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Role
-            </label>
-            <select
-              name="role"
-              value={worker.role}
-              onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
-            >
-              <option value="admin">Admin (Full Access)</option>
-              <option value="viewer">Viewer (Read Only)</option>
-            </select>
-          </div>
+          {/* Hidden field - all workers are admins now */}
+          <input type="hidden" name="role" value="admin" />
           
           <div className="flex justify-between space-x-3 pt-4 border-t">
             {initialWorker && onDelete && (

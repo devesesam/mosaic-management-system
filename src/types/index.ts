@@ -8,7 +8,8 @@ export enum JobStatus {
   Closed = 'Closed'
 }
 
-export type WorkerRole = 'admin' | 'viewer';
+// Everyone is now admin - no different roles
+export type WorkerRole = 'admin';
 
 export interface Job {
   id: string;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Job, JobStatus, Worker } from '../../types';
 import { useWorkerStore } from '../../store/workerStore';
-import { X, Trash2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { X, Trash2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -41,7 +41,6 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   // Initialize form with initial job data
   useEffect(() => {
     if (initialJob) {
-      console.log('JobForm: Initializing with job:', initialJob);
       setFormData({
         ...initialJob,
         secondary_worker_ids: initialJob.secondary_worker_ids || []
@@ -51,14 +50,8 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
 
   // Force refresh workers when form opens
   useEffect(() => {
-    console.log('JobForm: Fetching workers...');
     fetchWorkers();
   }, [fetchWorkers]);
-
-  // Debug workers data
-  useEffect(() => {
-    console.log(`JobForm: ${workers.length} workers available for assignment`);
-  }, [workers]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (readOnly) return;
@@ -102,8 +95,6 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     e.preventDefault();
     if (readOnly || isSubmitting) return;
     
-    console.log('JobForm: Submitting job data:', formData);
-    
     try {
       setIsSubmitting(true);
       await onSubmit(formData as Omit<Job, 'id' | 'created_at'>);
@@ -135,17 +126,9 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b">
-          <div className="flex items-center">
-            <h2 className="text-xl font-semibold text-gray-800">
-              {initialJob ? (readOnly ? 'View Job' : 'Edit Job') : 'New Job'}
-            </h2>
-            {readOnly && (
-              <div className="ml-3 flex items-center bg-amber-100 text-amber-800 rounded-full px-3 py-1 text-xs">
-                <ShieldAlert size={14} className="mr-1" />
-                Read Only
-              </div>
-            )}
-          </div>
+          <h2 className="text-xl font-semibold text-gray-800">
+            {initialJob ? (readOnly ? 'View Job' : 'Edit Job') : 'New Job'}
+          </h2>
           <button 
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -312,7 +295,6 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 {workers.map((worker: Worker) => (
                   <option key={worker.id} value={worker.id}>
                     {worker.name}
-                    {worker.role === 'viewer' ? ' (View Only)' : ''}
                   </option>
                 ))}
               </select>
@@ -342,7 +324,6 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                       />
                       <span className="ml-2 text-sm text-gray-700">
                         {worker.name}
-                        {worker.role === 'viewer' ? ' (View Only)' : ''}
                       </span>
                     </label>
                   ))

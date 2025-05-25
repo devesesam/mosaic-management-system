@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   format, 
   startOfMonth, 
@@ -13,11 +13,7 @@ import {
   addDays,
   addMonths,
   subMonths,
-  differenceInDays,
-  isBefore,
-  isAfter,
-  max,
-  isWithinInterval
+  differenceInDays
 } from 'date-fns';
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
@@ -26,24 +22,16 @@ import UnscheduledPanel from './UnscheduledPanel';
 import JobForm from '../jobs/JobForm';
 import DayJobsModal from './DayJobsModal';
 import DraggableJob from './DraggableJob';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
 
-interface MonthViewProps {
-  readOnly?: boolean;
-}
-
-const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
+const MonthView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   
-  const { jobs, fetchJobs, updateJob, deleteJob } = useJobStore();
-  const { isAdmin } = useAuth();
-  
-  const canEdit = isAdmin && !readOnly;
+  const { jobs, fetchJobs, updateJob, deleteJob, error: jobsError } = useJobStore();
   
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -93,11 +81,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       // If job has an end date, check if the day falls within the range
       if (job.end_date) {
         const jobEnd = parseISO(job.end_date);
-        
-        // Check if this day is within the job's date range
-        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
-               isSameDay(jobStart, day) || 
-               isSameDay(jobEnd, day);
+        return (day >= jobStart && day <= jobEnd);
       }
       
       // If no end date, just check if the day matches the start date
@@ -105,53 +89,16 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     });
   };
   
-  // Helper function to check if a date is within a range (inclusive)
-  const isWithinRange = (date: Date, start: Date, end: Date) => {
-    return (
-      isAfter(date, start) && isBefore(date, end) ||
-      isSameDay(date, start) ||
-      isSameDay(date, end)
-    );
-  };
-  
-  // Helper function to check if a row is already occupied at specific columns
-  const isRowOccupied = (assignments: number[], rowIdx: number, startCol: number, endCol: number) => {
-    for (let col = startCol; col <= endCol; col++) {
-      if (assignments[col] && assignments[col].includes(rowIdx)) {
-        return true;
-      }
-    }
-    return false;
-  };
-  
   // Calculate multi-day job positions for the entire month view
   const getMultiDayJobs = () => {
-    // For multiple weeks, we need to calculate row positions for multi-day jobs
     const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number}[] = [];
     const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
     
     // Get all multi-day jobs
     const jobsWithDates = jobs.filter(job => 
       job.start_date && job.end_date && 
-      !isSameDay(parseISO(job.start_date), parseISO(job.end_date)) && 
-      // Only include jobs that would be visible in the current month view
-      (
-        isWithinRange(parseISO(job.start_date), calendarStart, calendarEnd) ||
-        isWithinRange(parseISO(job.end_date), calendarStart, calendarEnd) ||
-        (isBefore(parseISO(job.start_date), calendarStart) && isAfter(parseISO(job.end_date), calendarEnd))
-      )
-    ).sort((a, b) => {
-      // Sort primarily by start date (earlier first)
-      const startA = parseISO(a.start_date!);
-      const startB = parseISO(b.start_date!);
-      const startCompare = startA.getTime() - startB.getTime();
-      if (startCompare !== 0) return startCompare;
-      
-      // If start dates are the same, sort by duration (longer jobs first)
-      const endA = parseISO(a.end_date!);
-      const endB = parseISO(b.end_date!);
-      return differenceInDays(endB, startB) - differenceInDays(endA, startA);
-    });
+      !isSameDay(parseISO(job.start_date), parseISO(job.end_date))
+    );
     
     // Initialize row assignments for each week
     weeks.forEach((_, weekIdx) => {
@@ -169,7 +116,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
         const weekEnd = week[6];
         
         // Skip if job is completely outside this week
-        if (isBefore(endDate, weekStart) || isAfter(startDate, weekEnd)) {
+        if (endDate < weekStart || startDate > weekEnd) {
           return;
         }
         
@@ -177,29 +124,32 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
         let startCol = 0;
         let endCol = 6;
         
-        // Adjust start column if job starts during or after this week
-        if (isAfter(startDate, weekStart) || isSameDay(startDate, weekStart)) {
-          for (let i = 0; i < 7; i++) {
-            if (isSameDay(week[i], startDate) || (i > 0 && isBefore(week[i-1], startDate) && isAfter(week[i], startDate))) {
-              startCol = i;
-              break;
-            }
+        // Calculate correct start column
+        for (let i = 0; i < 7; i++) {
+          if (isSameDay(week[i], startDate) || (i === 0 && startDate < week[i])) {
+            startCol = i;
+            break;
+          } else if (i > 0 && startDate > week[i-1] && startDate < week[i]) {
+            startCol = i;
+            break;
           }
         }
         
-        // Adjust end column if job ends during this week
-        if (isBefore(endDate, weekEnd) || isSameDay(endDate, weekEnd)) {
-          for (let i = 6; i >= 0; i--) {
-            if (isSameDay(week[i], endDate) || (i < 6 && isAfter(week[i+1], endDate) && isBefore(week[i], endDate))) {
-              endCol = i;
-              break;
-            }
+        // Calculate correct end column
+        for (let i = 6; i >= 0; i--) {
+          if (isSameDay(week[i], endDate) || (i === 6 && endDate > week[i])) {
+            endCol = i;
+            break;
+          } else if (i < 6 && endDate > week[i] && endDate < week[i+1]) {
+            endCol = i;
+            break;
           }
         }
         
         // Find an available row in this week
         let rowIdx = 0;
-        while (isRowOccupied(rowAssignments[weekIdx], rowIdx, startCol, endCol)) {
+        while (rowAssignments[weekIdx][startCol].includes(rowIdx) || 
+               rowAssignments[weekIdx][endCol].includes(rowIdx)) {
           rowIdx++;
         }
         
@@ -224,35 +174,25 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   
   const multiDayJobs = getMultiDayJobs();
 
-  // Calculate max rows needed for each week (considering both single day and multi-day jobs)
+  // Calculate max rows needed for each week (for proper cell height)
   const weekHeights = weeks.map((week, weekIndex) => {
-    // First, get max row index of multi-day jobs in this week
+    // Find the maximum row index used by multi-day jobs in this week
     const multiDayRows = multiDayJobs
       .filter(mj => mj.weekIdx === weekIndex)
       .map(mj => mj.rowIdx);
     
     const maxMultiDayRow = multiDayRows.length > 0 ? Math.max(...multiDayRows) : -1;
     
-    // Then, check single-day jobs in each day of the week
-    const maxSingleDayJobs = week.map(day => {
-      const dayJobs = getDayJobs(day).filter(job => 
-        !multiDayJobs.some(mj => mj.job.id === job.id)
-      );
-      return dayJobs.length;
-    });
+    // Count max single-day jobs per day in this week
+    const maxSingleDayJobs = Math.max(
+      ...week.map(day => getDayJobs(day).length)
+    );
     
-    const maxSingleDayCount = Math.max(...maxSingleDayJobs);
-    
-    // Max rows needed is the greater of multi-day rows or single-day jobs count
-    const maxRows = Math.max(maxMultiDayRow + 1, maxSingleDayCount);
-    
-    // Calculate cell height: min 100px + 24px per row + 40px padding
-    return Math.max(100, (maxRows * 24) + 40);
+    // Calculate cell height based on the greater of multi-day rows or single-day jobs
+    return Math.max(100, ((Math.max(maxMultiDayRow + 1, maxSingleDayJobs) + 1) * 24) + 40);
   });
 
   const handleJobDrop = async (job: Job, date: Date) => {
-    if (!canEdit) return;
-    
     try {
       let updates: Partial<Job> = {
         start_date: date.toISOString()
@@ -280,8 +220,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   };
 
   const handleJobSubmit = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
-    if (!canEdit) return;
-    
     try {
       if (selectedJob) {
         await updateJob(selectedJob.id, jobData);
@@ -297,8 +235,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   };
 
   const handleDeleteJob = async (id: string) => {
-    if (!canEdit) return;
-    
     try {
       await deleteJob(id);
       await fetchJobs(); // Refresh jobs after delete
@@ -313,8 +249,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
 
   // Handle job resize
   const handleJobResize = async (job: Job, days: number) => {
-    if (!canEdit) return;
-    
     try {
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
@@ -365,6 +299,21 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
         </div>
         
         {/* Warning messages */}
+        {jobsError && (
+          <div className="p-4 bg-red-50 border-b border-red-200">
+            <div className="flex items-center">
+              <AlertTriangle size={20} className="text-red-500 mr-2" />
+              <p className="text-red-800 font-medium">Error: {jobsError}</p>
+            </div>
+            <button
+              onClick={() => fetchJobs()}
+              className="mt-2 px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+            >
+              Retry Loading Jobs
+            </button>
+          </div>
+        )}
+        
         {jobs.length === 0 && (
           <div className="p-4 bg-yellow-50 border-b border-yellow-200">
             <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
@@ -402,7 +351,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
                   multiDayJobs={multiDayJobs}
                   weekHeight={weekHeights[weekIndex]}
                   onJobResize={handleJobResize}
-                  readOnly={!canEdit}
                 />
               ))
             )}
@@ -418,7 +366,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
           setSelectedJob(job);
           setIsJobFormOpen(true);
         }}
-        readOnly={!canEdit}
       />
 
       {/* Job form modal */}
@@ -429,9 +376,8 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             setSelectedJob(null);
           }}
           onSubmit={handleJobSubmit}
-          onDelete={canEdit ? handleDeleteJob : undefined}
+          onDelete={handleDeleteJob}
           initialJob={selectedJob || undefined}
-          readOnly={!canEdit}
         />
       )}
 
@@ -464,7 +410,6 @@ interface CalendarDayProps {
   multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number}[];
   weekHeight: number;
   onJobResize: (job: Job, days: number) => void;
-  readOnly?: boolean;
 }
 
 const CalendarDay: React.FC<CalendarDayProps> = ({ 
@@ -479,8 +424,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   dayIdx,
   multiDayJobs,
   weekHeight,
-  onJobResize,
-  readOnly = false
+  onJobResize
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -489,8 +433,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     },
     collect: monitor => ({
       isOver: !!monitor.isOver()
-    }),
-    canDrop: () => !readOnly
+    })
   });
 
   // Show a "more" button if there are too many jobs to display
@@ -524,7 +467,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
               onClick={() => onJobClick(job)}
               isScheduled={true}
               isWeekView={false}
-              readOnly={readOnly}
             />
           </div>
         ))}
@@ -560,7 +502,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
                 isScheduled={true}
                 isWeekView={false}
                 onResize={(days) => onJobResize(job, days)}
-                readOnly={readOnly}
               />
             </div>
           );

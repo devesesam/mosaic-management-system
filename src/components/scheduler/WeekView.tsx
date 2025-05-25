@@ -20,13 +20,8 @@ import { useWorkerStore } from '../../store/workerStore';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
 
-interface WeekViewProps {
-  readOnly?: boolean;
-}
-
-const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
+const WeekView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
@@ -34,9 +29,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   
   const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobStore();
   const { workers, fetchWorkers, addWorker, error: workersError } = useWorkerStore();
-  const { isAdmin } = useAuth();
-  
-  const canEdit = isAdmin && !readOnly;
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -91,8 +83,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   };
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
-    if (!canEdit) return;
-    
     try {
       if (selectedJob) {
         await updateJob(selectedJob.id, jobData);
@@ -112,8 +102,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   };
 
   const handleDeleteJob = async (id: string) => {
-    if (!canEdit) return;
-    
     try {
       await deleteJob(id);
       await fetchJobs(); // Force refresh after delete
@@ -127,8 +115,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   };
 
   const handleSubmitWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>) => {
-    if (!canEdit) return;
-    
     try {
       await addWorker(workerData);
       await fetchWorkers(); // Force refresh after add
@@ -141,8 +127,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   };
   
   const handleJobDrop = async (job: Job, workerId: string | null, date: Date | null) => {
-    if (!canEdit) return;
-    
     try {
       let updates: Partial<Job> = {
         worker_id: workerId,
@@ -173,8 +157,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   };
 
   const handleJobResize = async (job: Job, days: number) => {
-    if (!canEdit) return;
-    
     try {
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
@@ -248,14 +230,12 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       {workers.length === 0 && !workersError && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No workers found in database. Add a worker to start scheduling jobs.</p>
-          {canEdit && (
-            <button
-              onClick={() => setIsWorkerFormOpen(true)}
-              className="mt-2 px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200"
-            >
-              Add Worker
-            </button>
-          )}
+          <button
+            onClick={() => setIsWorkerFormOpen(true)}
+            className="mt-2 px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200"
+          >
+            Add Worker
+          </button>
         </div>
       )}
       
@@ -304,8 +284,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
               setIsJobFormOpen(true);
             }}
             onJobResize={handleJobResize}
-            onNewWorker={() => canEdit && setIsWorkerFormOpen(true)}
-            readOnly={!canEdit}
+            onNewWorker={() => setIsWorkerFormOpen(true)}
           />
         </div>
         
@@ -317,7 +296,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
             setSelectedJob(job);
             setIsJobFormOpen(true);
           }}
-          readOnly={!canEdit}
         />
       </div>
       
@@ -329,14 +307,13 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
             setSelectedJob(null);
           }}
           onSubmit={handleSubmitJob}
-          onDelete={canEdit ? handleDeleteJob : undefined}
+          onDelete={handleDeleteJob}
           initialJob={selectedJob || undefined}
-          readOnly={!canEdit}
         />
       )}
 
       {/* Worker form modal */}
-      {isWorkerFormOpen && canEdit && (
+      {isWorkerFormOpen && (
         <WorkerForm
           onClose={() => setIsWorkerFormOpen(false)}
           onSubmit={handleSubmitWorker}

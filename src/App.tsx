@@ -10,23 +10,26 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 function App() {
-  const { user, error: authError, isAdmin, currentWorker, signOut } = useAuth();
+  const { user, loading: authLoading, error: authError, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   
-  const { jobs, addJob } = useJobs();
-  const { workers } = useWorkers();
+  const { jobs, addJob, isLoading: isJobsLoading } = useJobs({
+    enabled: !!user
+  });
+  
+  const { workers, isLoading: isWorkersLoading } = useWorkers({
+    enabled: !!user
+  });
 
   const handleNewJob = () => {
-    if (!isAdmin) return;
     setIsJobFormOpen(true);
   };
 
   const handleSubmitJob = async (jobData: any) => {
-    if (!isAdmin) return;
     try {
       await addJob(jobData);
       setIsJobFormOpen(false);
@@ -34,6 +37,18 @@ function App() {
       console.error('Error creating job:', error);
     }
   };
+
+  // Show loading screen when authenticating
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show login form if no user
   if (!user) {
@@ -60,6 +75,16 @@ function App() {
       </div>
     );
   }
+  
+  // Show loading spinner while fetching initial data
+  if (isJobsLoading || isWorkersLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mb-4" />
+        <p className="text-gray-600">Loading calendar data...</p>
+      </div>
+    );
+  }
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -72,13 +97,13 @@ function App() {
 
         <main className="flex-1 overflow-hidden">
           {activeView === 'week' ? (
-            <WeekView readOnly={!isAdmin} />
+            <WeekView />
           ) : (
-            <MonthView readOnly={!isAdmin} />
+            <MonthView />
           )}
         </main>
 
-        {isJobFormOpen && isAdmin && (
+        {isJobFormOpen && (
           <JobForm
             onClose={() => setIsJobFormOpen(false)}
             onSubmit={handleSubmitJob}

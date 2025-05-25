@@ -196,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await handleSignOut();
   };
 
-  // All users are treated as admins to ensure they can see everything
+  // All users are now admins
   const isAdmin = true;
 
   const value = {

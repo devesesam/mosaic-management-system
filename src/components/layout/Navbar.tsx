@@ -1,5 +1,5 @@
 import React from 'react';
-import { Book as Roof, LogOut, Plus, Shield } from 'lucide-react';
+import { Book as Roof, LogOut, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface NavbarProps {
@@ -9,7 +9,7 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) => {
-  const { signOut, currentWorker, isAdmin } = useAuth();
+  const { signOut, currentWorker } = useAuth();
 
   return (
     <nav className="bg-[#0a2342] shadow-md">
@@ -24,12 +24,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) 
                 <span className="text-white/70 text-sm mr-2">
                   {currentWorker.name}
                 </span>
-                {!isAdmin && (
-                  <div className="bg-amber-500/80 text-white text-xs px-2 py-0.5 rounded-full flex items-center">
-                    <Shield size={10} className="mr-1" />
-                    View Only
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -58,15 +52,13 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) 
               </button>
             </div>
             
-            {isAdmin && (
-              <button
-                onClick={onNewJob}
-                className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Job
-              </button>
-            )}
+            <button
+              onClick={onNewJob}
+              className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Job
+            </button>
             
             <button
               onClick={() => signOut()}

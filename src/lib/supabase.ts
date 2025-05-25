@@ -22,7 +22,7 @@ export const getWorkers = async () => {
     // Log for debugging purposes
     console.log('Fetching workers from Supabase');
     
-    // First try a direct approach with minimal filtering
+    // Direct database query with no filters
     const { data, error, status } = await supabase
       .from('workers')
       .select('*');
@@ -33,28 +33,6 @@ export const getWorkers = async () => {
     }
     
     console.log(`Retrieved ${data?.length || 0} workers (HTTP status: ${status})`);
-    
-    if (!data || data.length === 0) {
-      console.warn('No workers found in the database');
-      
-      // As a fallback, try a direct SQL query approach via RPC
-      console.log('Attempting fallback method to fetch workers...');
-      try {
-        const { data: visibilityCheck, error: rpcError } = await supabase
-          .rpc('check_worker_visibility');
-          
-        if (rpcError) {
-          console.error('Fallback worker check failed:', rpcError);
-        } else if (visibilityCheck && visibilityCheck.sample_workers) {
-          const sampleWorkers = visibilityCheck.sample_workers;
-          console.log('Found workers via diagnostic function:', sampleWorkers);
-          return Array.isArray(sampleWorkers) ? sampleWorkers : [];
-        }
-      } catch (rpcErr) {
-        console.error('RPC fallback failed:', rpcErr);
-      }
-    }
-    
     return data || [];
   } catch (error) {
     console.error('Error in getWorkers:', error);
@@ -65,9 +43,12 @@ export const getWorkers = async () => {
 
 export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
   try {
+    // Force role to be 'admin'
+    const workerWithRole = { ...worker, role: 'admin' };
+    
     const { data, error } = await supabase
       .from('workers')
-      .insert([worker])
+      .insert([workerWithRole])
       .select()
       .single();
 
@@ -96,6 +77,7 @@ export const getWorkerJobs = async (workerId: string) => {
 
 export const deleteWorker = async (id: string) => {
   try {
+    // Use our custom function to properly handle worker deletion
     const { error } = await supabase.rpc('delete_worker_with_jobs', {
       worker_id: id
     });
@@ -112,7 +94,7 @@ export const getCurrentWorker = async (email: string) => {
   try {
     console.log('Fetching worker for email:', email);
     
-    // First attempt: Try to get worker by email
+    // Direct query with no filters
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -128,29 +110,10 @@ export const getCurrentWorker = async (email: string) => {
       return data;
     }
     
-    // Second attempt: Try to list all workers and find one with matching email
-    console.log('No worker found, trying fallback method...');
-    const { data: allWorkers, error: listError } = await supabase
-      .from('workers')
-      .select('*');
-    
-    if (listError) {
-      console.error('Error fetching all workers:', listError);
-    } else if (allWorkers && allWorkers.length > 0) {
-      const matchingWorker = allWorkers.find(w => w.email === email);
-      if (matchingWorker) {
-        console.log('Found matching worker in fallback list:', matchingWorker);
-        return matchingWorker;
-      }
-      
-      // If we have workers but none match this email, log them all for debugging
-      console.log(`Found ${allWorkers.length} workers but none match email ${email}:`);
-      allWorkers.forEach((w, i) => console.log(`Worker ${i+1}:`, w.name, w.email));
-    }
-    
-    // No worker found with matching email
-    console.warn('No worker found for email:', email);
-    return null;
+    // Fallback: Try to get ANY worker and create a profile
+    console.log('No worker found for current user, creating new worker profile');
+    const newWorker = await createWorkerProfile(email, email.split('@')[0]);
+    return newWorker;
   } catch (error) {
     console.error('Error in getCurrentWorker:', error);
     throw error;
@@ -170,8 +133,6 @@ export const getJobs = async () => {
       throw jobsError;
     }
 
-    console.log(`Retrieved ${jobs?.length || 0} jobs`);
-    
     // Get secondary worker assignments for each job
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
@@ -309,19 +270,7 @@ export const createWorkerProfile = async (email: string, name?: string) => {
   try {
     console.log(`Creating worker profile for ${email}...`);
     
-    // First check if this worker already exists
-    const { data: existingWorker, error: checkError } = await supabase
-      .from('workers')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
-    
-    if (!checkError && existingWorker) {
-      console.log('Worker already exists:', existingWorker);
-      return existingWorker;
-    }
-    
-    // First attempt - standard upsert
+    // Always create workers as admin role
     const { data, error } = await supabase
       .from('workers')
       .upsert(
@@ -338,47 +287,13 @@ export const createWorkerProfile = async (email: string, name?: string) => {
       .select()
       .single();
       
-    if (!error && data) {
-      console.log('Worker profile created/updated:', data);
-      return data;
-    }
-    
     if (error) {
-      console.error('Failed to create worker profile with upsert:', error);
+      console.error('Failed to create worker profile:', error);
+      throw error;
     }
     
-    // Second attempt - direct insert
-    const { data: insertData, error: insertError } = await supabase
-      .from('workers')
-      .insert([{
-        name: name || email.split('@')[0],
-        email: email,
-        role: 'admin'
-      }])
-      .select()
-      .single();
-        
-    if (!insertError && insertData) {
-      console.log('Worker created with direct insert:', insertData);
-      return insertData;
-    }
-    
-    if (insertError) {
-      console.error('Failed to create worker with direct insert:', insertError);
-    }
-    
-    // Third attempt - try with RPC or functions if available
-    console.error('All standard methods failed to create worker profile');
-    
-    // As an absolute last resort, return a mock worker object
-    return {
-      id: '00000000-0000-0000-0000-000000000000',
-      name: name || email.split('@')[0],
-      email: email,
-      phone: null,
-      role: 'admin',
-      created_at: new Date().toISOString()
-    };
+    console.log('Worker profile created/updated:', data);
+    return data;
   } catch (error) {
     console.error('Error creating worker profile:', error);
     throw error;
@@ -406,7 +321,7 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
       return existingUser;
     }
     
-    // If not, create the user record
+    // If not, create the user record - always as admin role
     console.log('Creating new user record with ID:', authUserId);
     const { data, error } = await supabase
       .from('users')
