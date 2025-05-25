@@ -20,7 +20,12 @@ const LoginForm: React.FC = () => {
     setIsSubmitting(true);
     setError(null);
 
-    setError(null);
+    // Password validation for sign up
+    if (isSignUp && password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setIsSubmitting(false);
+      return;
+    }
     
     try {
       if (isSignUp) {
@@ -84,7 +89,7 @@ const LoginForm: React.FC = () => {
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                placeholder={isSignUp ? 'Password (min. 6 characters)' : 'Password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
