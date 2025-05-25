@@ -76,27 +76,17 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
 
   // Force refresh jobs when component mounts
   useEffect(() => {
-    console.log('MonthView: Component mounted - Forcing data refresh');
     fetchJobs();
   }, [fetchJobs]);
   
   // Also set up an interval to refresh data periodically
   useEffect(() => {
     const intervalId = setInterval(() => {
-      console.log('MonthView: Periodic data refresh');
       fetchJobs();
     }, 60000); // Refresh every minute
     
     return () => clearInterval(intervalId);
   }, [fetchJobs]);
-  
-  // Debug to check data loading
-  useEffect(() => {
-    console.log('MonthView: Jobs loaded:', jobs.length);
-    if (jobs.length > 0) {
-      console.log('MonthView: Sample job:', jobs[0]);
-    }
-  }, [jobs]);
 
   // Get unscheduled jobs (no date and no worker)
   const unscheduledJobs = jobs.filter(job => !job.start_date && !job.worker_id);
@@ -273,8 +263,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     if (!canEdit) return;
     
     try {
-      console.log('MonthView: Handling job drop:', { job_id: job.id, date });
-      
       let updates: Partial<Job> = {
         start_date: date.toISOString()
       };
@@ -291,7 +279,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
         updates.end_date = date.toISOString();
       }
       
-      console.log('MonthView: Updating job with:', updates);
       await updateJob(job.id, updates);
       await fetchJobs(); // Refresh jobs after update
       toast.success('Job scheduled');
@@ -338,8 +325,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     if (!canEdit) return;
     
     try {
-      console.log('MonthView: Handling job resize:', { job_id: job.id, days });
-      
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
       
@@ -353,35 +338,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       console.error('Error resizing job:', error);
     }
   };
-  
-  // Debug UI to show job data
-  const DebugPanel = () => (
-    <div className="p-3 bg-white border-b border-gray-200 text-sm text-gray-600">
-      <details>
-        <summary className="cursor-pointer font-medium">Debug Information</summary>
-        <div className="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
-          <div>
-            <strong>Jobs:</strong> {jobs.length} loaded ({unscheduledJobs.length} unscheduled)
-            {jobs.length > 0 && (
-              <ul className="ml-4 list-disc">
-                {jobs.slice(0, 3).map(j => (
-                  <li key={j.id}>{j.address} - {j.status}</li>
-                ))}
-                {jobs.length > 3 && <li>...and {jobs.length - 3} more</li>}
-              </ul>
-            )}
-          </div>
-          
-          <button 
-            onClick={() => fetchJobs()}
-            className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-          >
-            Refresh Jobs
-          </button>
-        </div>
-      </details>
-    </div>
-  );
 
   return (
     <div className="flex h-full flex-col">
@@ -417,10 +373,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
           </button>
         </div>
         
-        {/* Debug panel */}
-        <DebugPanel />
-        
-        {/* Debug information */}
+        {/* Warning messages */}
         {jobs.length === 0 && (
           <div className="p-4 bg-yellow-50 border-b border-yellow-200">
             <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>

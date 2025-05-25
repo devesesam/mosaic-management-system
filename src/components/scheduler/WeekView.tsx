@@ -55,7 +55,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   
   // Force data refresh every time the component mounts
   useEffect(() => {
-    console.log('WeekView: Component mounted - Forcing data refresh');
     fetchJobs();
     fetchWorkers();
   }, [fetchJobs, fetchWorkers]);
@@ -63,26 +62,12 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   // Also set up an interval to refresh data periodically
   useEffect(() => {
     const intervalId = setInterval(() => {
-      console.log('WeekView: Periodic data refresh');
       fetchJobs();
       fetchWorkers();
     }, 60000); // Refresh every minute
     
     return () => clearInterval(intervalId);
   }, [fetchJobs, fetchWorkers]);
-  
-  // Debugging output to check data
-  useEffect(() => {
-    console.log('WeekView: Data loaded:', { workers: workers.length, jobs: jobs.length });
-    
-    if (jobs.length > 0) {
-      console.log('WeekView: Sample job:', jobs[0]);
-    }
-    
-    if (workers.length > 0) {
-      console.log('WeekView: Sample worker:', workers[0]);
-    }
-  }, [jobs, workers]);
   
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
@@ -167,8 +152,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     if (!canEdit) return;
     
     try {
-      console.log('WeekView: Handling job drop:', { job_id: job.id, workerId, date });
-      
       let updates: Partial<Job> = {
         worker_id: workerId,
         start_date: date ? date.toISOString() : null
@@ -188,7 +171,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         updates.end_date = null;
       }
       
-      console.log('WeekView: Updating job with:', updates);
       await updateJob(job.id, updates);
       await fetchJobs(); // Force refresh after update
       toast.success('Job updated successfully');
@@ -201,19 +183,10 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const handleJobResize = async (job: Job, days: number) => {
     if (!canEdit) return;
     
-    console.log('WeekView: Resize - Initial job data:', {
-      job_id: job.id,
-      start_date: job.start_date,
-      end_date: job.end_date,
-      days
-    });
-    
     try {
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
-      console.log('WeekView: Resize - Parsed start date:', startDate.toISOString());
       
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
-      console.log('WeekView: Resize - Calculated end date:', newEndDate.toISOString());
       
       await updateJob(job.id, {
         end_date: newEndDate.toISOString()
@@ -222,63 +195,10 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       toast.success('Job duration updated');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('WeekView: Error resizing job:', {
-        error: errorMessage,
-        job_id: job.id,
-        attempted_days: days
-      });
+      console.error('Error resizing job:', error);
       toast.error(`Failed to update job duration: ${errorMessage}`);
     }
   };
-  
-  // Debug UI to show job and worker data
-  const DebugPanel = () => (
-    <div className="p-4 bg-white border-b border-gray-200 text-sm text-gray-600">
-      <details>
-        <summary className="cursor-pointer font-medium">Debug Information</summary>
-        <div className="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
-          <div>
-            <strong>Workers:</strong> {workers.length} loaded
-            {workers.length > 0 && (
-              <ul className="ml-4 list-disc">
-                {workers.slice(0, 3).map(w => (
-                  <li key={w.id}>{w.name} ({w.email}) - {w.role}</li>
-                ))}
-                {workers.length > 3 && <li>...and {workers.length - 3} more</li>}
-              </ul>
-            )}
-          </div>
-          
-          <div>
-            <strong>Jobs:</strong> {jobs.length} loaded ({unscheduledJobs.length} unscheduled)
-            {jobs.length > 0 && (
-              <ul className="ml-4 list-disc">
-                {jobs.slice(0, 3).map(j => (
-                  <li key={j.id}>{j.address} - {j.status}</li>
-                ))}
-                {jobs.length > 3 && <li>...and {jobs.length - 3} more</li>}
-              </ul>
-            )}
-          </div>
-          
-          <div className="flex gap-2">
-            <button 
-              onClick={() => fetchJobs()}
-              className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-            >
-              Refresh Jobs
-            </button>
-            <button 
-              onClick={() => fetchWorkers()}
-              className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-            >
-              Refresh Workers
-            </button>
-          </div>
-        </div>
-      </details>
-    </div>
-  );
 
   return (
     <div className="flex h-full flex-col">
@@ -309,9 +229,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           Today
         </button>
       </div>
-      
-      {/* Debug panel */}
-      <DebugPanel />
       
       {/* Warning messages */}
       {workers.length === 0 && (

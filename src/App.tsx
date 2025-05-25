@@ -10,13 +10,12 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 function App() {
   const { user, loading: authLoading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
-  const [isRetrying, setIsRetrying] = useState(false);
   const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
     enabled: !!user && !!currentWorker
   });
@@ -38,14 +37,6 @@ function App() {
       console.error('Error creating job:', error);
     }
   };
-  
-  useEffect(() => {
-    if (user && !currentWorker) {
-      console.log('App: User authenticated but no worker profile found');
-    } else if (user && currentWorker) {
-      console.log('App: User authenticated with worker profile:', currentWorker);
-    }
-  }, [user, currentWorker]);
 
   // Show login form if no user - immediately show this instead of loading screen
   if (!user) {

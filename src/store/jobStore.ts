@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJob, getJobs, updateJob, deleteJob } from '../lib/supabase';
 import { Job } from '../types';
+import toast from 'react-hot-toast';
 
 interface JobState {
   jobs: Job[];
@@ -25,9 +26,7 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('jobStore: Fetching jobs from Supabase');
       const jobs = await getJobs();
-      console.log(`jobStore: Fetched ${jobs.length} jobs from Supabase`);
       set({ jobs, loading: false, error: null });
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -35,9 +34,6 @@ export const useJobStore = create<JobState>((set, get) => ({
         error: error instanceof Error ? error.message : 'Failed to fetch jobs', 
         loading: false
       });
-      
-      // Don't clear the jobs array if there was an error
-      // This prevents the UI from flickering if the fetch fails
     }
   },
   
@@ -66,9 +62,7 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('jobStore: Updating job:', { id, updates });
       const updatedJob = await updateJob(id, updates);
-      console.log('jobStore: Job updated successfully:', updatedJob);
       
       // Completely refresh job list to ensure consistency
       const allJobs = await getJobs();
