@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
-import { useJobStore } from './jobStore';
 import toast from 'react-hot-toast';
 
 interface WorkerState {
@@ -25,7 +24,6 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       console.log('WorkerStore: Fetching workers from database...');
       const workers = await getWorkers();
       
-      // Log worker data for debugging
       if (workers.length === 0) {
         console.warn('WorkerStore: ⚠️ No workers returned from database!');
         set({ 
@@ -35,7 +33,6 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
         });
       } else {
         console.log(`WorkerStore: ✓ Successfully fetched ${workers.length} workers`);
-        console.log('WorkerStore: First worker:', workers[0]);
         set({ workers, loading: false, error: null });
       }
     } catch (error) {
@@ -55,9 +52,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     try {
       console.log('WorkerStore: Adding worker:', workerData);
       const newWorker = await createWorker(workerData);
-      console.log('WorkerStore: Worker added successfully:', newWorker);
       
-      // Update state with new worker
       set((state) => ({ 
         workers: [...state.workers, newWorker],
         loading: false,
@@ -83,9 +78,6 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     try {
       console.log('WorkerStore: Deleting worker:', id);
       await deleteWorker(id);
-      
-      // Update jobs store to unassign jobs
-      useJobStore.getState().unassignWorkerJobs(id);
       
       // Update workers store
       set((state) => ({

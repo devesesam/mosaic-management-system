@@ -13,7 +13,7 @@ interface JobState {
   updateJob: (id: string, updates: Partial<Job>) => Promise<Job>;
   deleteJob: (id: string) => Promise<void>;
   setSelectedJob: (job: Job | null) => void;
-  unassignWorkerJobs: (workerId: string) => void;
+  unassignWorkerJobs: (workerId: string) => Promise<void>;
 }
 
 export const useJobStore = create<JobState>((set, get) => ({
@@ -26,14 +26,13 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      // Direct call with minimal processing
       const jobs = await getJobs();
       set({ jobs, loading: false, error: null });
     } catch (error) {
       console.error('Error fetching jobs:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch jobs', 
-        loading: false
+        loading: false 
       });
     }
   },
@@ -65,11 +64,8 @@ export const useJobStore = create<JobState>((set, get) => ({
     try {
       const updatedJob = await updateJob(id, updates);
       
-      // Completely refresh job list to ensure consistency
-      const allJobs = await getJobs();
-      
       set((state) => ({
-        jobs: allJobs,
+        jobs: state.jobs.map(job => job.id === id ? updatedJob : job),
         loading: false,
         error: null
       }));
@@ -90,12 +86,8 @@ export const useJobStore = create<JobState>((set, get) => ({
     
     try {
       await deleteJob(id);
-      
-      // Completely refresh job list to ensure consistency
-      const allJobs = await getJobs();
-      
       set((state) => ({
-        jobs: allJobs,
+        jobs: state.jobs.filter(job => job.id !== id),
         loading: false,
         error: null
       }));
@@ -113,13 +105,23 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ selectedJob: job });
   },
 
-  unassignWorkerJobs: (workerId) => {
-    set((state) => ({
-      jobs: state.jobs.map(job => 
-        job.worker_id === workerId 
-          ? { ...job, worker_id: null, start_date: null, end_date: null }
-          : job
-      )
-    }));
+  unassignWorkerJobs: async (workerId) => {
+    const state = get();
+    const jobsToUpdate = state.jobs.filter(job => job.worker_id === workerId);
+    
+    for (const job of jobsToUpdate) {
+      try {
+        await updateJob(job.id, {
+          worker_id: null,
+          start_date: null,
+          end_date: null
+        });
+      } catch (error) {
+        console.error(`Failed to unassign job ${job.id}:`, error);
+      }
+    }
+    
+    // Refresh jobs after unassigning
+    await get().fetchJobs();
   }
 }));
