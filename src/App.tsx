@@ -38,6 +38,14 @@ function App() {
       console.error('Error creating job:', error);
     }
   };
+  
+  useEffect(() => {
+    if (user && !currentWorker) {
+      console.log('App: User authenticated but no worker profile found');
+    } else if (user && currentWorker) {
+      console.log('App: User authenticated with worker profile:', currentWorker);
+    }
+  }, [user, currentWorker]);
 
   // Show login form if no user - immediately show this instead of loading screen
   if (!user) {
@@ -66,7 +74,7 @@ function App() {
   }
 
   // Show loading spinner while fetching initial data
-  if (user && currentWorker && (isJobsLoading || isWorkersLoading)) {
+  if (user && currentWorker && (isJobsLoading || isWorkersLoading || authLoading)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
@@ -75,6 +83,7 @@ function App() {
     );
   }
 
+  // Show error if there's any problem with the jobs or workers data
   if (jobsError || workersError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

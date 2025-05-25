@@ -6,10 +6,12 @@ import toast from 'react-hot-toast';
 export function useWorkers({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
-  const { data: workers = [], isLoading, error } = useQuery({
+  const { data: workers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['workers'],
     queryFn: getWorkers,
-    enabled
+    enabled,
+    staleTime: 1000 * 30, // 30 seconds before refetching
+    refetchOnWindowFocus: true
   });
 
   const addWorkerMutation = useMutation({
@@ -40,6 +42,7 @@ export function useWorkers({ enabled = true } = {}) {
     workers,
     isLoading,
     error,
+    refetch,
     addWorker: addWorkerMutation.mutate,
     deleteWorker: deleteWorkerMutation.mutate,
     isAddingWorker: addWorkerMutation.isPending,

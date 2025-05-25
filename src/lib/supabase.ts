@@ -30,6 +30,23 @@ export const getWorkers = async () => {
     }
 
     console.log('getWorkers: Fetching workers from Supabase');
+    
+    // Debug: Test the connection first
+    try {
+      const { count, error: countError } = await supabase
+        .from('workers')
+        .select('*', { count: 'exact', head: true });
+        
+      console.log(`getWorkers: Connection test shows ${count} workers available`);
+      
+      if (countError) {
+        console.error('getWorkers: Connection test error:', countError);
+        throw countError;
+      }
+    } catch (testError) {
+      console.error('getWorkers: Connection test failed:', testError);
+    }
+    
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -171,6 +188,23 @@ export const getJobs = async () => {
     }
 
     console.log('getJobs: Fetching all jobs');
+    
+    // Test connection first
+    try {
+      const { count, error: countError } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true });
+        
+      console.log(`getJobs: Connection test shows ${count} jobs available`);
+      
+      if (countError) {
+        console.error('getJobs: Connection test error:', countError);
+        throw countError;
+      }
+    } catch (testError) {
+      console.error('getJobs: Connection test failed:', testError);
+    }
+    
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
@@ -361,7 +395,7 @@ export const deleteJob = async (id: string) => {
 // Function to directly create a worker profile for a new user
 export const createWorkerProfile = async (email: string, name?: string) => {
   try {
-    console.log(`Creating worker profile for ${email}...`);
+    console.log(`createWorkerProfile: Creating worker profile for ${email}...`);
     
     // Use a transaction to ensure either the worker is found or created
     const { data, error } = await supabase
@@ -389,6 +423,113 @@ export const createWorkerProfile = async (email: string, name?: string) => {
     return data;
   } catch (error) {
     console.error('Error creating worker profile:', error);
+    throw error;
+  }
+};
+
+// Function to ensure a record exists in public.users table
+export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
+  try {
+    console.log(`ensureUserRecord: Ensuring user record for ${email}...`);
+    
+    // First check if the user already exists
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authUserId)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "Row not found" which is expected
+      console.error('Error checking if user exists:', checkError);
+    }
+    
+    if (existingUser) {
+      console.log('User record already exists:', existingUser);
+      return existingUser;
+    }
+    
+    // If not, create the user record
+    console.log('Creating new user record with ID:', authUserId);
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{
+        id: authUserId,
+        name: name || email.split('@')[0],
+        email: email,
+        role: 'admin'
+      }])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating user record:', error);
+      throw error;
+    }
+    
+    console.log('User record created successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in ensureUserRecord:', error);
+    throw error;
+  }
+};
+
+// Function to run diagnostics on the database
+export const runDatabaseDiagnostics = async (email: string) => {
+  try {
+    console.log('Running database diagnostics...');
+    
+    // Check workers
+    const { data: workers, error: workersError } = await supabase
+      .from('workers')
+      .select('*');
+    
+    if (workersError) {
+      console.error('Error fetching workers:', workersError);
+    } else {
+      console.log(`Workers table contains ${workers.length} records`);
+      const userWorker = workers.find(w => w.email === email);
+      console.log(`User worker record:`, userWorker || 'Not found');
+    }
+    
+    // Check jobs
+    const { data: jobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('*');
+    
+    if (jobsError) {
+      console.error('Error fetching jobs:', jobsError);
+    } else {
+      console.log(`Jobs table contains ${jobs.length} records`);
+    }
+    
+    // Check users
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('*');
+    
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+    } else {
+      console.log(`Users table contains ${users.length} records`);
+      const userRecord = users.find(u => u.email === email);
+      console.log(`User record:`, userRecord || 'Not found');
+    }
+    
+    // Check auth user
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('Current auth user:', user || 'Not authenticated');
+    
+    return {
+      workersCount: workers?.length || 0,
+      jobsCount: jobs?.length || 0,
+      usersCount: users?.length || 0,
+      userWorker: workers?.find(w => w.email === email) || null,
+      userRecord: users?.find(u => u.email === email) || null,
+      authUser: user
+    };
+  } catch (error) {
+    console.error('Error running diagnostics:', error);
     throw error;
   }
 };

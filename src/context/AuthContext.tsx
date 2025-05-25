@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseInitialized, getCurrentWorker, createWorkerProfile } from '../lib/supabase';
+import { 
+  supabase, 
+  isSupabaseInitialized, 
+  getCurrentWorker, 
+  createWorkerProfile,
+  ensureUserRecord, 
+  runDatabaseDiagnostics
+} from '../lib/supabase';
 import { Worker } from '../types';
 
 interface AuthContextProps {
@@ -22,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(false); // Start with loading false
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -44,8 +51,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Initialize auth and set up listener
   useEffect(() => {
     console.log('AuthProvider: Setting up auth listener...');
+    
+    const initializeAuth = async () => {
+      try {
+        // Get current session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          console.log('AuthProvider: Found existing session for user:', session.user.email);
+          setUser(session.user);
+          setSession(session);
+        }
+      } catch (err) {
+        console.error('AuthProvider: Error getting session:', err);
+      }
+    };
+    
+    initializeAuth();
     
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -53,41 +78,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         await handleSignOut();
-      } else if (session?.user?.email) {
-        try {
-          // Set user state
-          setSession(session);
-          setUser(session.user);
-          setLoading(true);
-          
-          // Try to get existing worker profile
-          try {
-            let worker = await getCurrentWorker(session.user.email);
-            
-            // If no worker found, create one automatically
-            if (!worker) {
-              console.log('No worker found, creating profile automatically');
-              worker = await createWorkerProfile(session.user.email);
-            }
-            
-            if (worker) {
-              setCurrentWorker(worker);
-              setLoading(false);
-            } else {
-              // If we still don't have a worker, something went wrong
-              setError('Unable to access your account. Please try again.');
-              await handleSignOut();
-            }
-          } catch (error) {
-            console.error('Error getting/creating worker profile:', error);
-            setError('Authentication error. Please try again.');
-            await handleSignOut();
-          }
-        } catch (err) {
-          console.error('Error handling auth state change:', err);
-          setError('Authentication error. Please try again.');
-          await handleSignOut();
-        }
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user);
+        setSession(session);
       }
     });
 
@@ -95,6 +88,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []);
+
+  // Handle worker profile whenever user changes
+  useEffect(() => {
+    const initializeWorkerProfile = async () => {
+      if (!user?.email) return;
+      
+      console.log('AuthProvider: Initializing worker profile for', user.email);
+      setLoading(true);
+      
+      try {
+        // Run diagnostics to check database state
+        await runDatabaseDiagnostics(user.email);
+        
+        // Try to get or create worker profile
+        let worker = await getCurrentWorker(user.email);
+        
+        // If no worker found, create one
+        if (!worker) {
+          console.log('AuthProvider: No worker profile found, creating one...');
+          worker = await createWorkerProfile(user.email);
+        }
+        
+        // Ensure a record exists in public.users that links to auth.users
+        await ensureUserRecord(user.id, user.email);
+        
+        // Set current worker
+        console.log('AuthProvider: Setting current worker:', worker);
+        setCurrentWorker(worker);
+        
+      } catch (err) {
+        console.error('AuthProvider: Error initializing worker profile:', err);
+        setError('Error retrieving your account information. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (user) {
+      initializeWorkerProfile();
+    }
+  }, [user]);
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
