@@ -6,7 +6,8 @@ import {
   getCurrentWorker, 
   createWorkerProfile,
   ensureUserRecord, 
-  runDatabaseDiagnostics
+  runDatabaseDiagnostics,
+  checkRLSPolicies
 } from '../lib/supabase';
 import { Worker } from '../types';
 
@@ -64,6 +65,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('AuthProvider: Found existing session for user:', session.user.email);
           setUser(session.user);
           setSession(session);
+          
+          // Check RLS policies to ensure data access
+          await checkRLSPolicies();
         }
       } catch (err) {
         console.error('AuthProvider: Error getting session:', err);
@@ -101,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Run diagnostics to check database state
         await runDatabaseDiagnostics(user.email);
         
-        // Try to get or create worker profile
+        // Try to get worker profile
         let worker = await getCurrentWorker(user.email);
         
         // If no worker found, create one
