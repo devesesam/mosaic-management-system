@@ -3,11 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Book as Roof } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-interface LoginFormProps {
-  onSuccess: () => void;
-}
-
-const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
+const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -30,7 +26,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         console.log('LoginForm: Sign in result:', success);
         if (success) {
           toast.success('Signed in successfully');
-          onSuccess();
         } else {
           setIsSubmitting(false);
         }
