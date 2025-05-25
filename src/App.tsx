@@ -11,33 +11,24 @@ import { useJobStore } from './store/jobStore';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 
-const LoadingSpinner = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
-  </div>
-);
-
 function App() {
   const { user, loading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const { addJob, fetchJobs } = useJobStore();
   const [fetchError, setFetchError] = useState<string | null>(null);
-
-  // Track if jobs are being loaded
-  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     if (user) {
       console.log('App: User authenticated, fetching jobs');
-      setIsLoadingJobs(true);
-      fetchJobs()
-      .catch(error => {
-        console.error('App: Error fetching jobs:', error);
-        setFetchError('Failed to load jobs. Please try refreshing the page.');
-      })
-      .finally(() => {
-        setIsLoadingJobs(false);
+      Promise.all([
+        fetchJobs().catch(error => {
+          console.error('App: Error fetching jobs:', error);
+          setFetchError('Failed to load jobs. Please try refreshing the page.');
+        })
+      ]).finally(() => {
+        setIsInitialized(true);
       });
     }
   }, [user, fetchJobs]);
@@ -57,14 +48,18 @@ function App() {
     }
   };
 
-  // Show login form if no user
-  if (!user) {
+  // Show login form if no user and not loading
+  if (!user && !loading) {
     return <LoginForm />;
   }
 
-  // Show loading spinner while authentication or jobs are loading
-  if (loading || isLoadingJobs) {
-    return <LoadingSpinner />;
+  // Show loading spinner while initializing
+  if (loading || !isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
+      </div>
+    );
   }
 
   // Show account not linked message if no worker profile
