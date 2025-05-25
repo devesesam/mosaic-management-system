@@ -9,12 +9,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true
-  },
-  global: {
-    fetch: fetch.bind(globalThis)
-  },
-  db: {
-    schema: 'public'
   }
 });
 
@@ -25,13 +19,11 @@ export const isSupabaseInitialized = () => {
 
 export const getWorkers = async () => {
   try {
-    // Absolute simplest query possible
     const { data } = await supabase.from('workers').select('*');
-    console.log(`getWorkers: Retrieved ${data?.length || 0} workers`);
     return data || [];
   } catch (error) {
     console.error('Error in getWorkers:', error);
-    return []; // Return empty array instead of throwing
+    return []; 
   }
 };
 
@@ -61,13 +53,12 @@ export const getWorkerJobs = async (workerId: string) => {
     return data || [];
   } catch (error) {
     console.error('Error in getWorkerJobs:', error);
-    return []; // Return empty array instead of throwing
+    return []; 
   }
 };
 
 export const deleteWorker = async (id: string) => {
   try {
-    // Using the function we created in the migration
     const { error } = await supabase.rpc('delete_worker_with_jobs', {
       worker_id: id
     });
@@ -91,15 +82,13 @@ export const getCurrentWorker = async (email: string) => {
     return data;
   } catch (error) {
     console.error('Error in getCurrentWorker:', error);
-    return null; // Return null instead of throwing
+    return null;
   }
 };
 
 export const getJobs = async () => {
   try {
-    // Absolute simplest query possible
     const { data: jobs } = await supabase.from('jobs').select('*');
-    console.log(`getJobs: Retrieved ${jobs?.length || 0} jobs`);
     
     // Get secondary worker assignments
     const { data: secondaryWorkers } = await supabase
@@ -119,13 +108,12 @@ export const getJobs = async () => {
     return jobsWithSecondaryWorkers;
   } catch (error) {
     console.error('Error in getJobs:', error);
-    return []; // Return empty array instead of throwing
+    return []; 
   }
 };
 
 export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['Insert'], 'id' | 'created_at'>) => {
   try {
-    console.log('Creating new job:', job);
     const { secondary_worker_ids, ...jobData } = job as any;
     
     const { data: newJob, error: jobError } = await supabase
@@ -226,7 +214,6 @@ export const deleteJob = async (id: string) => {
 // Function to directly create a worker profile for a new user
 export const createWorkerProfile = async (email: string, name?: string) => {
   try {
-    // Simple upsert with minimal error handling
     const { data, error } = await supabase
       .from('workers')
       .upsert(
@@ -262,7 +249,6 @@ export const createWorkerProfile = async (email: string, name?: string) => {
 // Function to ensure a record exists in public.users table
 export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
   try {
-    // Simple upsert with minimal error handling
     const { data, error } = await supabase
       .from('users')
       .upsert([{
@@ -291,13 +277,6 @@ export const runDatabaseDiagnostics = async (email: string) => {
     const { data: users } = await supabase.from('users').select('*').limit(5);
     const { data: { user } } = await supabase.auth.getUser();
     
-    console.log('Database diagnostics:', {
-      workersCount: workers?.length || 0,
-      jobsCount: jobs?.length || 0,
-      usersCount: users?.length || 0,
-      isAuthenticated: !!user
-    });
-    
     return {
       workersCount: workers?.length || 0,
       jobsCount: jobs?.length || 0,
@@ -322,16 +301,9 @@ export const runDatabaseDiagnostics = async (email: string) => {
 // Check RLS Policies
 export const checkRLSPolicies = async () => {
   try {
-    // Simple checks with minimal processing
     const { data: workers } = await supabase.from('workers').select('*').limit(5);
     const { data: jobs } = await supabase.from('jobs').select('*').limit(5);
     const { data: secondaryWorkers } = await supabase.from('job_secondary_workers').select('*').limit(5);
-    
-    console.log('RLS policy check:', {
-      canReadWorkers: workers?.length >= 0,
-      canReadJobs: jobs?.length >= 0,
-      canReadSecondaryWorkers: secondaryWorkers?.length >= 0
-    });
     
     return {
       canReadWorkers: workers?.length >= 0,

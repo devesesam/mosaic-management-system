@@ -77,28 +77,178 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   // Force refresh jobs when component mounts
   useEffect(() => {
     fetchJobs();
-    
-    // Also set up more frequent refreshes
-    const intervalId = setInterval(() => {
-      fetchJobs();
-    }, 10000); // Every 10 seconds
-    
-    return () => clearInterval(intervalId);
   }, [fetchJobs]);
 
   // Get unscheduled jobs (no date and no worker)
   const unscheduledJobs = jobs.filter(job => !job.start_date && !job.worker_id);
 
-  // Get jobs for a specific day - SIMPLIFIED version for debugging
+  // Get jobs for a specific day
   const getDayJobs = (day: Date) => {
     return jobs.filter(job => {
-      // Only check if job has start_date that matches this day
+      // If job has no start date, it can't be displayed on a specific day
       if (!job.start_date) return false;
       
       const jobStart = parseISO(job.start_date);
+      
+      // If job has an end date, check if the day falls within the range
+      if (job.end_date) {
+        const jobEnd = parseISO(job.end_date);
+        
+        // Check if this day is within the job's date range
+        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
+               isSameDay(jobStart, day) || 
+               isSameDay(jobEnd, day);
+      }
+      
+      // If no end date, just check if the day matches the start date
       return isSameDay(jobStart, day);
     });
   };
+  
+  // Helper function to check if a date is within a range (inclusive)
+  const isWithinRange = (date: Date, start: Date, end: Date) => {
+    return (
+      isAfter(date, start) && isBefore(date, end) ||
+      isSameDay(date, start) ||
+      isSameDay(date, end)
+    );
+  };
+  
+  // Helper function to check if a row is already occupied at specific columns
+  const isRowOccupied = (assignments: number[], rowIdx: number, startCol: number, endCol: number) => {
+    for (let col = startCol; col <= endCol; col++) {
+      if (assignments[col] && assignments[col].includes(rowIdx)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  
+  // Calculate multi-day job positions for the entire month view
+  const getMultiDayJobs = () => {
+    // For multiple weeks, we need to calculate row positions for multi-day jobs
+    const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number}[] = [];
+    const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
+    
+    // Get all multi-day jobs
+    const jobsWithDates = jobs.filter(job => 
+      job.start_date && job.end_date && 
+      !isSameDay(parseISO(job.start_date), parseISO(job.end_date)) && 
+      // Only include jobs that would be visible in the current month view
+      (
+        isWithinRange(parseISO(job.start_date), calendarStart, calendarEnd) ||
+        isWithinRange(parseISO(job.end_date), calendarStart, calendarEnd) ||
+        (isBefore(parseISO(job.start_date), calendarStart) && isAfter(parseISO(job.end_date), calendarEnd))
+      )
+    ).sort((a, b) => {
+      // Sort primarily by start date (earlier first)
+      const startA = parseISO(a.start_date!);
+      const startB = parseISO(b.start_date!);
+      const startCompare = startA.getTime() - startB.getTime();
+      if (startCompare !== 0) return startCompare;
+      
+      // If start dates are the same, sort by duration (longer jobs first)
+      const endA = parseISO(a.end_date!);
+      const endB = parseISO(b.end_date!);
+      return differenceInDays(endB, startB) - differenceInDays(endA, startA);
+    });
+    
+    // Initialize row assignments for each week
+    weeks.forEach((_, weekIdx) => {
+      rowAssignments[weekIdx] = Array(7).fill(null).map(() => []);
+    });
+    
+    // Process each multi-day job
+    jobsWithDates.forEach(job => {
+      const startDate = parseISO(job.start_date!);
+      const endDate = parseISO(job.end_date!);
+      
+      // For each week, check if the job spans days within that week
+      weeks.forEach((week, weekIdx) => {
+        const weekStart = week[0];
+        const weekEnd = week[6];
+        
+        // Skip if job is completely outside this week
+        if (isBefore(endDate, weekStart) || isAfter(startDate, weekEnd)) {
+          return;
+        }
+        
+        // Find start and end column within this week
+        let startCol = 0;
+        let endCol = 6;
+        
+        // Adjust start column if job starts during or after this week
+        if (isAfter(startDate, weekStart) || isSameDay(startDate, weekStart)) {
+          for (let i = 0; i < 7; i++) {
+            if (isSameDay(week[i], startDate) || (i > 0 && isBefore(week[i-1], startDate) && isAfter(week[i], startDate))) {
+              startCol = i;
+              break;
+            }
+          }
+        }
+        
+        // Adjust end column if job ends during this week
+        if (isBefore(endDate, weekEnd) || isSameDay(endDate, weekEnd)) {
+          for (let i = 6; i >= 0; i--) {
+            if (isSameDay(week[i], endDate) || (i < 6 && isAfter(week[i+1], endDate) && isBefore(week[i], endDate))) {
+              endCol = i;
+              break;
+            }
+          }
+        }
+        
+        // Find an available row in this week
+        let rowIdx = 0;
+        while (isRowOccupied(rowAssignments[weekIdx], rowIdx, startCol, endCol)) {
+          rowIdx++;
+        }
+        
+        // Mark this row as occupied for these columns
+        for (let col = startCol; col <= endCol; col++) {
+          rowAssignments[weekIdx][col].push(rowIdx);
+        }
+        
+        // Add this segment to our list
+        multiDayJobs.push({
+          job,
+          startCol,
+          endCol,
+          weekIdx,
+          rowIdx
+        });
+      });
+    });
+    
+    return multiDayJobs;
+  };
+  
+  const multiDayJobs = getMultiDayJobs();
+
+  // Calculate max rows needed for each week (considering both single day and multi-day jobs)
+  const weekHeights = weeks.map((week, weekIndex) => {
+    // First, get max row index of multi-day jobs in this week
+    const multiDayRows = multiDayJobs
+      .filter(mj => mj.weekIdx === weekIndex)
+      .map(mj => mj.rowIdx);
+    
+    const maxMultiDayRow = multiDayRows.length > 0 ? Math.max(...multiDayRows) : -1;
+    
+    // Then, check single-day jobs in each day of the week
+    const maxSingleDayJobs = week.map(day => {
+      const dayJobs = getDayJobs(day).filter(job => 
+        !multiDayJobs.some(mj => mj.job.id === job.id)
+      );
+      return dayJobs.length;
+    });
+    
+    const maxSingleDayCount = Math.max(...maxSingleDayJobs);
+    
+    // Max rows needed is the greater of multi-day rows or single-day jobs count
+    const maxRows = Math.max(maxMultiDayRow + 1, maxSingleDayCount);
+    
+    // Calculate cell height: min 100px + 24px per row + 40px padding
+    return Math.max(100, (maxRows * 24) + 40);
+  });
 
   const handleJobDrop = async (job: Job, date: Date) => {
     if (!canEdit) return;
@@ -180,10 +330,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     }
   };
 
-  // Debug count display
-  const totalJobCount = jobs.length;
-  const scheduledJobCount = jobs.filter(j => j.start_date).length;
-
   return (
     <div className="flex h-full flex-col">
       {/* Main calendar area with flex-1 to take remaining space */}
@@ -210,18 +356,12 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             </button>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="text-xs text-gray-500">
-              {totalJobCount} job{totalJobCount !== 1 ? 's' : ''} total 
-              ({scheduledJobCount} scheduled)
-            </div>
-            <button
-              onClick={goToToday}
-              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-            >
-              Today
-            </button>
-          </div>
+          <button
+            onClick={goToToday}
+            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+          >
+            Today
+          </button>
         </div>
         
         {/* Warning messages */}
@@ -230,20 +370,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
           </div>
         )}
-        
-        {/* Debug info panel */}
-        <div className="p-2 bg-gray-50 border-b border-gray-200 text-sm flex justify-between items-center">
-          <div>
-            <span className="font-medium">Total jobs:</span> {jobs.length} | 
-            <span className="font-medium ml-2">Unscheduled:</span> {unscheduledJobs.length}
-          </div>
-          <button
-            onClick={() => fetchJobs()}
-            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-          >
-            Refresh Data
-          </button>
-        </div>
         
         <div className="flex-1 grid grid-rows-[auto_1fr] overflow-hidden bg-white">
           {/* Weekday headers */}
@@ -271,6 +397,10 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
                   }}
                   onShowMore={() => setSelectedDay(day)}
                   isInCurrentMonth={isSameMonth(day, currentDate)}
+                  weekIdx={weekIndex}
+                  dayIdx={dayIndex}
+                  multiDayJobs={multiDayJobs}
+                  weekHeight={weekHeights[weekIndex]}
                   onJobResize={handleJobResize}
                   readOnly={!canEdit}
                 />
@@ -282,7 +412,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
 
       {/* Fixed-width unscheduled jobs panel */}
       <UnscheduledPanel
-        jobs={jobs} // Pass ALL jobs to check if filtering is the issue
+        jobs={unscheduledJobs}
         onJobDrop={(job) => handleJobDrop(job, new Date())}
         onJobClick={(job) => {
           setSelectedJob(job);
@@ -329,6 +459,10 @@ interface CalendarDayProps {
   onJobClick: (job: Job) => void;
   onShowMore: () => void;
   isInCurrentMonth: boolean;
+  weekIdx: number;
+  dayIdx: number;
+  multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number}[];
+  weekHeight: number;
   onJobResize: (job: Job, days: number) => void;
   readOnly?: boolean;
 }
@@ -341,6 +475,10 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   onJobClick, 
   onShowMore, 
   isInCurrentMonth,
+  weekIdx,
+  dayIdx,
+  multiDayJobs,
+  weekHeight,
   onJobResize,
   readOnly = false
 }) => {
@@ -359,9 +497,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   const visibleRows = 2; // Number of rows to display before showing "more" button
   const totalJobs = jobs.length;
   const hasMoreJobs = totalJobs > visibleRows;
-  
-  // Always show job count for debugging
-  const jobCount = jobs.length;
 
   return (
     <div 
@@ -373,14 +508,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         ${isOver ? 'bg-blue-100' : ''}
       `}
     >
-      <div className="flex justify-between items-center px-1.5 py-0.5 text-xs font-medium border-b border-gray-100">
+      <div className="text-right px-1.5 py-0.5 text-xs font-medium border-b border-gray-100">
         {format(day, 'd')}
-        {/* Always show job count in top-right */}
-        {jobCount > 0 && (
-          <span className="bg-gray-100 text-gray-600 text-xs px-1 rounded">
-            {jobCount}
-          </span>
-        )}
       </div>
       
       {/* Container for jobs */}
@@ -410,6 +539,32 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
           </button>
         )}
       </div>
+
+      {/* Multi-day job segments */}
+      {multiDayJobs
+        .filter(mj => mj.weekIdx === weekIdx && mj.startCol === dayIdx)
+        .map(({ job, startCol, endCol, rowIdx }) => {
+          const spanDays = endCol - startCol + 1;
+          return (
+            <div 
+              key={`multiday-${job.id}`}
+              className="absolute left-0 z-10"
+              style={{
+                width: `calc(${spanDays} * 100%)`,
+                top: `${24 + rowIdx * 24}px`, // Position based on row index
+              }}
+            >
+              <DraggableJob
+                job={job}
+                onClick={() => onJobClick(job)}
+                isScheduled={true}
+                isWeekView={false}
+                onResize={(days) => onJobResize(job, days)}
+                readOnly={readOnly}
+              />
+            </div>
+          );
+        })}
     </div>
   );
 };

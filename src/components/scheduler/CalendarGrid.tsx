@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useDrop } from 'react-dnd';
 import { format, isToday, differenceInDays, isSameDay, addDays, parseISO, isWithinInterval, isBefore, isAfter } from 'date-fns';
 import { Job, Worker } from '../../types';
@@ -35,28 +35,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   const { isAdmin } = useAuth();
   
   const canEdit = isAdmin && !readOnly;
-  
-  // Display jobs for debugging - this will make jobs visible regardless of filtering
-  const allJobs: Record<string, number> = {};
-  
-  if (workers.length > 0 && days.length > 0) {
-    workers.forEach(worker => {
-      days.forEach(day => {
-        const jobsForCell = getWorkerDayJobs(worker.id, day);
-        const key = `${worker.id}-${format(day, 'yyyy-MM-dd')}`;
-        allJobs[key] = jobsForCell.length;
-      });
-    });
-    
-    // Also check unassigned jobs
-    days.forEach(day => {
-      const unassignedJobs = getWorkerDayJobs(null, day);
-      const key = `unassigned-${format(day, 'yyyy-MM-dd')}`;
-      allJobs[key] = unassignedJobs.length;
-    });
-  }
-  
-  const totalJobsDisplayed = Object.values(allJobs).reduce((sum, count) => sum + count, 0);
   
   const displayedWorkers = selectedWorker === 'all' 
     ? workers 
@@ -114,22 +92,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             <div className="text-lg text-center font-medium">{format(day, 'd')}</div>
           </div>
         ))}
-      </div>
-
-      {/* Debug info - always show this to help debugging */}
-      <div className="p-2 bg-gray-50 border-b border-gray-200 text-sm">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="font-medium">Workers:</span> {workers.length} | 
-            <span className="font-medium ml-2">Jobs displayed:</span> {totalJobsDisplayed}
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-          >
-            Refresh Data
-          </button>
-        </div>
       </div>
 
       {/* No workers message */}
@@ -250,15 +212,51 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
-  // Find the most important job for this cell - simplify sorting to just take the first job
-  const mainJob = jobs.length > 0 ? jobs[0] : null;
-  const hasMoreJobs = jobs.length > 1;
+  // Find the most important job for this cell
+  const sortedJobs = [...jobs]
+    .sort((a, b) => {
+      // First sort by jobs that have both dates
+      const aHasBothDates = !!(a.start_date && a.end_date);
+      const bHasBothDates = !!(b.start_date && b.end_date);
+      
+      if (aHasBothDates && !bHasBothDates) return -1;
+      if (!aHasBothDates && bHasBothDates) return 1;
+      
+      // Then by start date (newest first)
+      if (a.start_date && b.start_date) {
+        const aDate = new Date(a.start_date);
+        const bDate = new Date(b.start_date);
+        return bDate.getTime() - aDate.getTime();
+      }
+      
+      // Finally by created date
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
   
-  // Always show job count for debugging
-  const jobCount = jobs.length;
+  const mainJob = sortedJobs.length > 0 ? sortedJobs[0] : null;
+  const hasMoreJobs = sortedJobs.length > 1;
   
   // Fixed cell height
   const cellHeight = 100;
+  
+  let jobSpan = 1;
+  let showText = false;
+  
+  if (mainJob && mainJob.start_date && mainJob.end_date) {
+    const startDate = parseISO(mainJob.start_date);
+    const endDate = parseISO(mainJob.end_date);
+    
+    const shouldRender = isSameDay(day, startDate) || 
+                        (dayIndex === 0 && isBefore(startDate, day));
+    
+    showText = isSameDay(day, startDate) || (dayIndex === 0 && isBefore(startDate, day));
+    
+    if (shouldRender) {
+      const remainingDays = days.length - dayIndex;
+      const jobDaysRemaining = differenceInDays(endDate, day) + 1;
+      jobSpan = Math.min(jobDaysRemaining, remainingDays);
+    }
+  }
   
   return (
     <div
@@ -272,18 +270,13 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       style={{ height: `${cellHeight}px` }}
     >
       <div className="h-full relative p-1">
-        {/* Always show job count in corner for debugging */}
-        {jobCount > 0 && (
-          <div className="absolute top-0 right-0 bg-gray-100 text-gray-600 text-xs px-1 rounded-bl">
-            {jobCount}
-          </div>
-        )}
-        
-        {/* Main job display */}
         {mainJob && (
           <div 
-            className="absolute left-0 right-0 top-0 mx-1 mt-4"
-            style={{ height: "calc(100% - 10px)" }}
+            className="absolute left-0 right-0 top-0 mx-1 mt-1"
+            style={{ 
+              width: `calc(${jobSpan} * 100% - 0.5rem)`,
+              height: "calc(100% - 6px)"
+            }}
           >
             <DraggableJob
               job={mainJob}
@@ -291,7 +284,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               isScheduled={true}
               onResize={(days) => onJobResize(mainJob, days)}
               isWeekView={true}
-              showText={true}
+              showText={showText}
               readOnly={readOnly}
             />
           </div>
@@ -302,7 +295,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             onClick={() => onShowMore(day)}
             className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-10"
           >
-            +{jobs.length - 1} more
+            +{sortedJobs.length - 1} more
           </button>
         )}
         

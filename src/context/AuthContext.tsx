@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { 
   supabase, 
-  isSupabaseInitialized, 
   getCurrentWorker, 
   createWorkerProfile,
   ensureUserRecord, 
@@ -30,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(false); // Start with loading false
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -60,23 +59,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-          console.log('Found existing session');
           setUser(session.user);
           setSession(session);
           
           // Check RLS policies to ensure data access
           await checkRLSPolicies();
-          
-          // Force data prefetch after login
-          const { data: jobs } = await supabase.from('jobs').select('count');
-          console.log(`Found ${jobs?.[0]?.count || 0} jobs in the database`);
-          
-          const { data: workers } = await supabase.from('workers').select('count');
-          console.log(`Found ${workers?.[0]?.count || 0} workers in the database`);
-          
-          // Just to be safe, let's run a query with no count
-          const { data: jobsList } = await supabase.from('jobs').select('*');
-          console.log(`Direct jobs query returned ${jobsList?.length || 0} results`);
         }
       } catch (err) {
         console.error('Error getting session:', err);
@@ -127,8 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
       } catch (err) {
         console.error('Error initializing worker profile:', err);
-        // Don't set error, just log it - we can proceed without a proper worker profile
-        // setError('Error retrieving your account information. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -149,7 +134,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       
       if (signInError) {
-        console.error('Sign in error:', signInError);
         setError(signInError.message);
         setLoading(false);
         return false;
@@ -157,7 +141,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
     } catch (err) {
-      console.error('Error signing in:', err);
       setError('Failed to sign in');
       setLoading(false);
       return false;
@@ -178,13 +161,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (signUpError) {
-        console.error('Sign up error:', signUpError);
         setError(signUpError.message);
       } else {
         setError('Account created. Please sign in.');
       }
     } catch (err) {
-      console.error('Error signing up:', err);
       setError('Failed to sign up');
     } finally {
       setLoading(false);

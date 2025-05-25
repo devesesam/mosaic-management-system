@@ -55,20 +55,10 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
     });
   }, [unscheduledJobs, searchTerm, selectedColor]);
   
-  // Debug counts
-  const totalJobs = jobs.length;
-  const unscheduledCount = unscheduledJobs.length;
-  const filteredCount = filteredJobs.length;
-  
   return (
     <div className="w-[200px] min-w-[200px] border-l border-gray-200 bg-gray-50 flex flex-col">
       <div className="p-3 font-semibold text-gray-800 border-b border-gray-200 bg-gray-100">
         Jobs to Schedule ({filteredJobs.length})
-      </div>
-
-      {/* Debug counts - always show this */}
-      <div className="px-2 py-1 bg-blue-50 text-xs text-blue-700 border-b border-blue-100">
-        Total jobs: {totalJobs} | Unscheduled: {unscheduledCount} | Filtered: {filteredCount}
       </div>
 
       {/* Search and filters */}
@@ -121,13 +111,9 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
         ref={drop}
         className={`flex-1 p-2 overflow-y-auto ${isOver && !readOnly ? 'bg-blue-50' : ''}`}
       >
-        {jobs.length === 0 ? (
+        {filteredJobs.length === 0 ? (
           <div className="p-3 text-sm text-gray-500 italic">
-            No jobs available in the database
-          </div>
-        ) : filteredJobs.length === 0 ? (
-          <div className="p-3 text-sm text-gray-500 italic">
-            No jobs match the filters
+            {unscheduledJobs.length === 0 ? 'No unscheduled jobs' : 'No jobs match the filters'}
           </div>
         ) : (
           <div className="space-y-2">

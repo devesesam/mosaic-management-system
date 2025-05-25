@@ -53,34 +53,39 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
   
-  // Force data refresh every time the component mounts
+  // Force data refresh when component mounts
   useEffect(() => {
     fetchJobs();
     fetchWorkers();
-    
-    // Also set up more frequent refreshes
-    const intervalId = setInterval(() => {
-      fetchJobs();
-      fetchWorkers();
-    }, 10000); // Every 10 seconds
-    
-    return () => clearInterval(intervalId);
   }, [fetchJobs, fetchWorkers]);
   
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
   
   // Get jobs for a worker on a specific day
-  // SIMPLIFIED to just filter by worker_id only - start_date/end_date checks removed to debug
   const getWorkerDayJobs = (workerId: string | null, day: Date) => {
-    // VERSION 1: ULTRA SIMPLIFIED - Just filter by worker_id to verify that jobs are present
-    if (workerId === null) {
-      // Get unassigned jobs
-      return jobs.filter(job => !job.worker_id);
-    }
-    
-    // Get all jobs for this worker
-    return jobs.filter(job => job.worker_id === workerId);
+    return jobs.filter(job => {
+      // First check if the job is assigned to this worker
+      if (job.worker_id !== workerId) return false;
+      
+      // If the job has no start_date, it can't be displayed on a specific day
+      if (!job.start_date) return false;
+      
+      const jobStart = parseISO(job.start_date);
+      
+      // If it has an end_date, check if the day falls within the range
+      if (job.end_date) {
+        const jobEnd = parseISO(job.end_date);
+        
+        // Check if this day is within the job's date range
+        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
+               isSameDay(jobStart, day) || 
+               isSameDay(jobEnd, day);
+      }
+      
+      // If no end_date, just check if the day matches the start date
+      return isSameDay(jobStart, day);
+    });
   };
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
@@ -170,7 +175,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     
     try {
       const startDate = job.start_date ? parseISO(job.start_date) : new Date();
-      
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
       
       await updateJob(job.id, {
@@ -184,10 +188,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       toast.error(`Failed to update job duration: ${errorMessage}`);
     }
   };
-
-  // Debug count display
-  const totalJobCount = jobs.length;
-  const scheduledJobCount = jobs.filter(j => j.worker_id && j.start_date).length;
 
   return (
     <div className="flex h-full flex-col">
@@ -211,18 +211,12 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           </button>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="text-xs text-gray-500">
-            {totalJobCount} job{totalJobCount !== 1 ? 's' : ''} total 
-            ({scheduledJobCount} scheduled)
-          </div>
-          <button
-            onClick={goToToday}
-            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            Today
-          </button>
-        </div>
+        <button
+          onClick={goToToday}
+          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+        >
+          Today
+        </button>
       </div>
       
       {/* Warning messages */}
@@ -259,7 +253,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         
         {/* Fixed-width unscheduled jobs panel */}
         <UnscheduledPanel 
-          jobs={jobs} // Pass ALL jobs to check if filtering is the issue
+          jobs={unscheduledJobs}
           onJobDrop={handleJobDrop}
           onJobClick={(job) => {
             setSelectedJob(job);
