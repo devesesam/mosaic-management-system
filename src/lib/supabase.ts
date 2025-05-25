@@ -45,17 +45,17 @@ export const getWorkers = async () => {
       }
     } catch (testError) {
       console.error('getWorkers: Connection test failed:', testError);
+      throw testError;
     }
     
     // Actual data fetch with no caching
     const { data, error, status } = await supabase
       .from('workers')
       .select('*')
-      .order('name')
-      .throwOnError();
+      .order('name');
     
     if (error) {
-      console.error('Error fetching workers:', error);
+      console.error('getWorkers: Error fetching workers:', error);
       throw error;
     }
     
@@ -63,7 +63,7 @@ export const getWorkers = async () => {
       console.warn('getWorkers: No workers found in database!');
     } else {
       console.log(`getWorkers: Successfully retrieved ${data.length} workers (HTTP status: ${status})`);
-      console.log('Sample worker:', data[0]);
+      console.log('getWorkers: First worker:', data[0]);
     }
     
     return data || [];
