@@ -7,36 +7,17 @@ import Navbar from './components/layout/Navbar';
 import WeekView from './components/scheduler/WeekView';
 import MonthView from './components/scheduler/MonthView';
 import JobForm from './components/jobs/JobForm';
-import { useJobStore } from './store/jobStore';
+import { useJobs } from './hooks/useJobs';
+import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
-import { useWorkerStore } from './store/workerStore';
 
 function App() {
   const { user, loading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
-  const { jobs, addJob, fetchJobs } = useJobStore();
-  const { workers, fetchWorkers } = useWorkerStore();
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      console.log('App: User authenticated, fetching jobs');
-      setIsInitialized(false);
-      Promise.all([
-        fetchJobs(),
-        fetchWorkers()
-      ]).finally(() => {
-        setIsInitialized(true);
-      }).catch(error => {
-        console.error('App: Error fetching data:', error);
-        setFetchError('Failed to load data. Please try refreshing the page.');
-        setIsInitialized(true);
-      });
-    }
-  }, [user, fetchJobs, fetchWorkers]);
+  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs();
+  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers();
 
   const handleNewJob = () => {
     if (!isAdmin) return;
@@ -68,7 +49,7 @@ function App() {
   }
 
   // Show loading spinner while fetching initial data
-  if (!isInitialized) {
+  if (isJobsLoading || isWorkersLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2342]"></div>
@@ -100,7 +81,7 @@ function App() {
     );
   }
 
-  if (fetchError) {
+  if (jobsError || workersError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
@@ -108,7 +89,9 @@ function App() {
             <AlertTriangle size={48} />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Error Loading Data</h2>
-          <p className="text-gray-600 mb-6">{fetchError}</p>
+          <p className="text-gray-600 mb-6">
+            {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
+          </p>
           <button
             onClick={() => window.location.reload()}
             className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
