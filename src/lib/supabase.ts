@@ -354,3 +354,38 @@ export const deleteJob = async (id: string) => {
     throw error;
   }
 };
+
+// Function to directly create a worker profile for a new user
+export const createWorkerProfile = async (email: string, name?: string) => {
+  try {
+    console.log(`Creating worker profile for ${email}...`);
+    
+    // Use a transaction to ensure either the worker is found or created
+    const { data, error } = await supabase
+      .from('workers')
+      .upsert(
+        {
+          name: name || email.split('@')[0],
+          email: email,
+          role: 'admin'
+        },
+        { 
+          onConflict: 'email',
+          ignoreDuplicates: false
+        }
+      )
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Failed to create worker profile:', error);
+      throw error;
+    }
+    
+    console.log('Worker profile created/updated:', data);
+    return data;
+  } catch (error) {
+    console.error('Error creating worker profile:', error);
+    throw error;
+  }
+};

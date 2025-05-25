@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseInitialized } from '../lib/supabase';
+import { supabase, isSupabaseInitialized, getCurrentWorker, createWorkerProfile } from '../lib/supabase';
 import { Worker } from '../types';
-import { getCurrentWorker } from '../lib/supabase';
 
 interface AuthContextProps {
   session: Session | null;
@@ -26,50 +25,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Function to create a worker record for a user if one doesn't exist
-  const createWorkerForUser = async (userEmail: string): Promise<Worker | null> => {
-    if (!userEmail) {
-      console.error('AuthProvider: Cannot create worker record - email is missing');
-      return null;
-    }
-
-    try {
-      console.log('AuthProvider: Creating worker record for email:', userEmail);
-      
-      const { data, error } = await supabase
-        .from('workers')
-        .insert([
-          { 
-            name: userEmail.split('@')[0], // Use part of email as name
-            email: userEmail,
-            role: 'admin' // Default to admin role
-          }
-        ])
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('AuthProvider: Error creating worker record:', error);
-        return null;
-      }
-      
-      console.log('AuthProvider: Worker record created successfully:', data);
-      return data;
-    } catch (err) {
-      console.error('AuthProvider: Error in createWorkerForUser:', err);
-      return null;
-    }
-  };
-
-  // Function to verify worker has correct role
-  const verifyWorkerRole = async (worker: Worker | null, email: string): Promise<Worker | null> => {
-    if (!worker && email) {
-      console.log('AuthProvider: No worker found, creating new worker record for:', email);
-      return createWorkerForUser(email);
-    }
-    return worker;
-  };
-
   // Reset all state and clear storage
   const handleSignOut = async () => {
     try {
@@ -90,6 +45,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Function to ensure a worker profile exists for the current user
+  const ensureWorkerProfile = async (userEmail: string): Promise<Worker | null> => {
+    if (!userEmail) {
+      console.error('Cannot create worker record - email is missing');
+      return null;
+    }
+
+    try {
+      console.log('Ensuring worker profile exists for:', userEmail);
+      
+      // First, try to get the existing worker
+      let worker = await getCurrentWorker(userEmail);
+      
+      // If no worker found, create one
+      if (!worker) {
+        console.log('No worker profile found, creating one...');
+        try {
+          worker = await createWorkerProfile(userEmail);
+          console.log('Worker profile created successfully:', worker);
+        } catch (createError) {
+          console.error('Failed to create worker profile:', createError);
+          throw new Error('Could not create worker profile');
+        }
+      }
+      
+      return worker;
+    } catch (error) {
+      console.error('Error ensuring worker profile:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     console.log('AuthProvider: Initializing auth...');
     let isActive = true;
@@ -105,24 +92,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (session.user.email) {
             try {
-              console.log('AuthProvider: Found existing session, fetching worker profile...');
-              let worker = await getCurrentWorker(session.user.email);
-              
-              if (!worker) {
-                console.log('AuthProvider: No worker found, attempting to create one...');
-                worker = await createWorkerForUser(session.user.email);
-              }
+              console.log('Found existing session, ensuring worker profile...');
+              const worker = await ensureWorkerProfile(session.user.email);
               
               if (worker) {
-                console.log('AuthProvider: Worker profile set:', worker);
+                console.log('Worker profile confirmed:', worker);
                 setCurrentWorker(worker);
               } else {
-                console.error('AuthProvider: Failed to create or find worker profile');
-                setError('Failed to set up your worker profile. Please try again or contact support.');
+                console.error('Failed to ensure worker profile exists');
+                setError('Could not set up your worker profile. Please try again.');
               }
             } catch (workerErr) {
-              console.error('AuthProvider: Error getting worker profile:', workerErr);
-              setError('Failed to load your profile. Please refresh or try again later.');
+              console.error('Error getting worker profile:', workerErr);
+              setError('Failed to load your profile. Please refresh and try again.');
             }
           }
         }
@@ -155,12 +137,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(session);
           setUser(session.user);
           
-          let worker = await getCurrentWorker(session.user.email);
-          
-          if (!worker) {
-            console.log('AuthProvider: Creating worker on auth state change');
-            worker = await createWorkerForUser(session.user.email);
-          }
+          console.log('Auth state change, ensuring worker profile...');
+          const worker = await ensureWorkerProfile(session.user.email);
           
           if (isActive) {
             setCurrentWorker(worker);
