@@ -51,7 +51,7 @@ function App() {
     }
   };
 
-  if (!showApp) {
+  if (!user) {
     return <LoginForm onSuccess={() => setShowApp(true)} />;
   }
 

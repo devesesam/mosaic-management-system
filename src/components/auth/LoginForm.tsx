@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Book as Roof } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -22,11 +23,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     try {
       if (isSignUp) {
         await signUp(email, password);
+        toast.success('Account created successfully. Please sign in.');
         setIsSubmitting(false);
       } else {
         const success = await signIn(email, password);
         console.log('LoginForm: Sign in result:', success);
         if (success) {
+          toast.success('Signed in successfully');
           onSuccess();
         } else {
           setIsSubmitting(false);
@@ -34,6 +37,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       }
     } catch (err) {
       console.error('LoginForm: Error during auth:', err);
+      toast.error('Authentication failed');
       setIsSubmitting(false);
     }
   };
