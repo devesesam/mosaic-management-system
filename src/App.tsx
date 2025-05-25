@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useAuth } from './context/AuthContext';
@@ -10,20 +10,15 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 function App() {
-  const { user, loading: authLoading, isAdmin, error: authError, currentWorker, signOut } = useAuth();
+  const { user, error: authError, isAdmin, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   
-  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
-    enabled: !!user
-  });
-  
-  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
-    enabled: !!user
-  });
+  const { jobs, addJob } = useJobs();
+  const { workers } = useWorkers();
 
   const handleNewJob = () => {
     if (!isAdmin) return;
@@ -60,39 +55,6 @@ function App() {
             className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
           >
             Return to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading spinner while fetching initial data
-  if (isJobsLoading || isWorkersLoading || authLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
-        <p className="text-gray-600">Loading calendar data...</p>
-      </div>
-    );
-  }
-
-  // Show error if there's any problem with the jobs or workers data
-  if (jobsError || workersError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-          <div className="flex justify-center text-red-500 mb-4">
-            <AlertTriangle size={48} />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Error Loading Data</h2>
-          <p className="text-gray-600 mb-6">
-            {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
-          >
-            Refresh Page
           </button>
         </div>
       </div>
