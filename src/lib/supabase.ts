@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
-// Initialize with empty strings first
 let supabaseUrl = '';
 let supabaseAnonKey = '';
 
@@ -10,7 +9,7 @@ try {
   supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase credentials in environment variables');
+    throw new Error('Missing Supabase credentials');
   }
 } catch (error) {
   console.error('Error loading Supabase credentials:', error);
@@ -18,132 +17,109 @@ try {
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
-// Helper function to check if Supabase is properly initialized
 export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
+// Add function to check auth status
+export const checkAuthStatus = async () => {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error('Auth check failed:', error);
+    return null;
+  }
+  return session;
+};
+
 export const getWorkers = async () => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
+    const session = await checkAuthStatus();
+    if (!session) {
+      console.error('getWorkers: No active session');
+      return [];
     }
 
-    console.log('getWorkers: Fetching workers from Supabase');
-    
-    // Debug: Test the connection first
-    try {
-      const { data: testData, error: testError } = await supabase
-        .from('workers')
-        .select('count(*)', { count: 'exact', head: true });
-        
-      console.log(`getWorkers: Connection test complete, found ${testData?.count || 0} workers`);
-      
-      if (testError) {
-        console.error('getWorkers: Connection test error:', testError);
-        throw testError;
-      }
-    } catch (testError) {
-      console.error('getWorkers: Connection test failed:', testError);
-      throw testError;
-    }
-    
-    // Actual data fetch with no caching
+    console.log('getWorkers: Fetching with auth:', {
+      user_id: session.user.id,
+      user_email: session.user.email
+    });
+
     const { data, error, status } = await supabase
       .from('workers')
       .select('*')
-      .order('name');
-    
+      .order('name')
+      .throwOnError();
+
     if (error) {
-      console.error('getWorkers: Error fetching workers:', error);
+      console.error('getWorkers: Query failed:', error);
       throw error;
     }
-    
-    if (!data || data.length === 0) {
-      console.warn('getWorkers: No workers found in database!');
-    } else {
-      console.log(`getWorkers: Successfully retrieved ${data.length} workers (HTTP status: ${status})`);
-      console.log('getWorkers: First worker:', data[0]);
-    }
-    
+
+    console.log('getWorkers: Success', {
+      count: data?.length || 0,
+      status,
+      first_worker: data?.[0]?.name
+    });
+
     return data || [];
   } catch (error) {
-    console.error('Error in getWorkers:', error);
+    console.error('getWorkers: Failed:', error);
     throw error;
   }
 };
 
 export const getJobs = async () => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
+    const session = await checkAuthStatus();
+    if (!session) {
+      console.error('getJobs: No active session');
+      return [];
     }
 
-    console.log('getJobs: Fetching all jobs');
-    
-    // Test connection first
-    try {
-      const { count, error: countError } = await supabase
-        .from('jobs')
-        .select('*', { count: 'exact', head: true });
-        
-      console.log(`getJobs: Connection test shows ${count} jobs available`);
-      
-      if (countError) {
-        console.error('getJobs: Connection test error:', countError);
-        throw countError;
-      }
-    } catch (testError) {
-      console.error('getJobs: Connection test failed:', testError);
-    }
-    
-    // Fetch jobs with no caching
-    const { data: jobs, error: jobsError, status: jobsStatus } = await supabase
+    console.log('getJobs: Fetching with auth:', {
+      user_id: session.user.id,
+      user_email: session.user.email
+    });
+
+    // First get all jobs
+    const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false })
       .throwOnError();
-    
+
     if (jobsError) {
-      console.error('Error fetching jobs:', jobsError);
+      console.error('getJobs: Jobs query failed:', jobsError);
       throw jobsError;
     }
 
-    console.log(`getJobs: Retrieved ${jobs?.length || 0} jobs (HTTP status: ${jobsStatus})`);
-    
-    // Get secondary worker assignments for each job
+    // Then get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*')
       .throwOnError();
 
     if (secondaryError) {
-      console.error('Error fetching secondary workers:', secondaryError);
+      console.error('getJobs: Secondary workers query failed:', secondaryError);
       throw secondaryError;
     }
 
-    console.log(`getJobs: Retrieved ${secondaryWorkers?.length || 0} secondary worker assignments`);
-
-    // Combine jobs with their secondary workers
     const jobsWithSecondaryWorkers = jobs.map(job => ({
       ...job,
       secondary_worker_ids: secondaryWorkers
-        ? secondaryWorkers
-            .filter(sw => sw.job_id === job.id)
-            .map(sw => sw.worker_id)
-        : []
+        .filter(sw => sw.job_id === job.id)
+        .map(sw => sw.worker_id)
     }));
-    
-    // Log sample data
-    if (jobsWithSecondaryWorkers.length > 0) {
-      console.log('getJobs: Sample job data:', jobsWithSecondaryWorkers[0]);
-    } else {
-      console.warn('getJobs: No jobs found in database!');
-    }
-    
-    return jobsWithSecondaryWorkers || [];
+
+    console.log('getJobs: Success', {
+      jobs_count: jobs.length,
+      secondary_assignments: secondaryWorkers.length,
+      first_job: jobs[0]?.address
+    });
+
+    return jobsWithSecondaryWorkers;
   } catch (error) {
-    console.error('Error in getJobs:', error);
+    console.error('getJobs: Failed:', error);
     throw error;
   }
 };
