@@ -629,3 +629,7 @@ export const checkRLSPolicies = async () => {
     throw error;
   }
 };
+
+export { getJobs, createJob, updateJob, deleteJob }
+
+export { getWorkers, createWorker, deleteWorker }
