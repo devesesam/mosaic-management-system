@@ -22,27 +22,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(false); // Start with loading false
+  const [loading, setLoading] = useState(false); // Default to not loading
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
     try {
-      // Clear all state
+      // First sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Then clear all state
       setSession(null);
       setUser(null);
       setCurrentWorker(null);
       setError(null);
 
-      // Clear local storage
+      // Forcefully remove any persistence
       localStorage.removeItem('supabase.auth.token');
-
-      // Sign out from Supabase
-      await supabase.auth.signOut();
+      localStorage.removeItem('sb-cyffwuakzfhemrafjpwv-auth-token');
+      
+      // Log the signout
+      console.log('AuthProvider: User signed out, state cleared');
     } catch (err) {
       console.error('Error signing out:', err);
     }
   };
+
+  // Check if there's an active session only when the component mounts
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        
+        // If there's an active session, we'll handle it in the auth state change listener
+        if (!data.session) {
+          // No session, make sure we're not in a loading state
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+        setLoading(false);
+      }
+    };
+    
+    checkSession();
+  }, []);
 
   useEffect(() => {
     console.log('AuthProvider: Setting up auth listener...');
@@ -53,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         await handleSignOut();
-      } else if (session?.user?.email) {
+      } else if (event === 'SIGNED_IN' && session?.user?.email) {
         try {
           // Set user state
           setSession(session);
