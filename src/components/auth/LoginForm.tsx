@@ -13,7 +13,7 @@ const LoginForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setError(null);
+    if (setError) setError(null);
     console.log('LoginForm: Form submitted, attempting', isSignUp ? 'signup' : 'signin');
     
     try {

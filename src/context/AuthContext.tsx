@@ -26,25 +26,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Reset all state and clear storage
   const handleSignOut = async () => {
-    setLoading(true);
     try {
       // Clear all state
       setSession(null);
       setUser(null);
       setCurrentWorker(null);
       setError(null);
-      
+
       // Clear local storage
       localStorage.clear();
-      
+
       // Sign out from Supabase
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Error signing out:', err);
       setError('Failed to sign out');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -86,40 +84,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('AuthProvider: Initializing auth...');
     let isActive = true; // To prevent setting state after unmount
-    
-    const initializeAuth = async () => {
-      try {
-        // Force logout on page load/refresh
-        await handleSignOut();
-      } catch (err) {
-        console.error('AuthProvider: Auth initialization error:', err);
-        if (isActive) {
-          setError('Failed to initialize authentication');
-          setLoading(false);
-        }
-      }
-    };
 
-    initializeAuth();
+    // Force sign out on mount
+    handleSignOut();
+    setLoading(false);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
-      
+
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         await handleSignOut();
+        if (isActive) setLoading(false);
       } else if (session) {
         try {
           if (isActive) {
             setSession(session);
             setUser(session.user);
           }
-          
+
           if (session.user.email) {
             try {
               console.log('AuthProvider: Fetching worker after auth state change for email:', session.user.email);
               let worker = await getCurrentWorker(session.user.email);
               console.log('AuthProvider: Worker found after auth state change:', !!worker);
-              
+
               if (!worker) {
                 console.warn('AuthProvider: No worker found for email after auth state change:', session.user.email);
                 worker = await createWorkerForUser(session.user);
@@ -129,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   console.error('AuthProvider: Failed to create worker record for user after auth state change');
                 }
               }
-              
+
               if (isActive) setCurrentWorker(worker);
             } catch (workerErr) {
               console.error('AuthProvider: Error fetching/creating worker after auth state change:', workerErr);
