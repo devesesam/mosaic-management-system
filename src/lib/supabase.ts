@@ -47,7 +47,8 @@ export const getWorkers = async () => {
       console.error('getWorkers: Connection test failed:', testError);
     }
     
-    const { data, error } = await supabase
+    // Actual data fetch
+    const { data, error, status } = await supabase
       .from('workers')
       .select('*')
       .order('name');
@@ -57,7 +58,7 @@ export const getWorkers = async () => {
       throw error;
     }
     
-    console.log(`getWorkers: Successfully retrieved ${data?.length || 0} workers`);
+    console.log(`getWorkers: Successfully retrieved ${data?.length || 0} workers (HTTP status: ${status})`);
     return data || [];
   } catch (error) {
     console.error('Error in getWorkers:', error);
@@ -161,7 +162,7 @@ export const getCurrentWorker = async (email: string) => {
       throw new Error('Failed to connect to database');
     }
     
-    const { data, error } = await supabase
+    const { data, error, status } = await supabase
       .from('workers')
       .select('*')
       .eq('email', email)
@@ -172,7 +173,7 @@ export const getCurrentWorker = async (email: string) => {
       throw error;
     }
     
-    console.log('getCurrentWorker: Worker data for email:', email, data);
+    console.log(`getCurrentWorker: Worker data for email: ${email}`, data, `(HTTP status: ${status})`);
     
     return data;
   } catch (error) {
@@ -205,7 +206,8 @@ export const getJobs = async () => {
       console.error('getJobs: Connection test failed:', testError);
     }
     
-    const { data: jobs, error: jobsError } = await supabase
+    // Fetch jobs with no filters - get everything
+    const { data: jobs, error: jobsError, status: jobsStatus } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
@@ -215,8 +217,9 @@ export const getJobs = async () => {
       throw jobsError;
     }
 
-    console.log(`getJobs: Retrieved ${jobs?.length || 0} jobs`);
+    console.log(`getJobs: Retrieved ${jobs?.length || 0} jobs (HTTP status: ${jobsStatus})`);
     
+    // Get secondary worker assignments for each job
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
@@ -228,6 +231,7 @@ export const getJobs = async () => {
 
     console.log(`getJobs: Retrieved ${secondaryWorkers?.length || 0} secondary worker assignments`);
 
+    // Combine jobs with their secondary workers
     const jobsWithSecondaryWorkers = jobs.map(job => ({
       ...job,
       secondary_worker_ids: secondaryWorkers
@@ -236,6 +240,11 @@ export const getJobs = async () => {
             .map(sw => sw.worker_id)
         : []
     }));
+    
+    // Log the first few jobs for debugging
+    if (jobsWithSecondaryWorkers.length > 0) {
+      console.log('getJobs: Sample job data:', jobsWithSecondaryWorkers[0]);
+    }
     
     return jobsWithSecondaryWorkers || [];
   } catch (error) {
@@ -530,6 +539,58 @@ export const runDatabaseDiagnostics = async (email: string) => {
     };
   } catch (error) {
     console.error('Error running diagnostics:', error);
+    throw error;
+  }
+};
+
+// Check RLS Policies
+export const checkRLSPolicies = async () => {
+  try {
+    console.log('Checking RLS policies...');
+    
+    // Try to read from workers table
+    const { data: workers, error: workersError } = await supabase
+      .from('workers')
+      .select('*')
+      .limit(5);
+    
+    if (workersError) {
+      console.error('RLS Check: Error reading workers:', workersError);
+    } else {
+      console.log(`RLS Check: Successfully read ${workers.length} workers`);
+    }
+    
+    // Try to read from jobs table
+    const { data: jobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('*')
+      .limit(5);
+    
+    if (jobsError) {
+      console.error('RLS Check: Error reading jobs:', jobsError);
+    } else {
+      console.log(`RLS Check: Successfully read ${jobs.length} jobs`);
+    }
+    
+    // Try to read secondary workers
+    const { data: secondaryWorkers, error: swError } = await supabase
+      .from('job_secondary_workers')
+      .select('*')
+      .limit(5);
+    
+    if (swError) {
+      console.error('RLS Check: Error reading job_secondary_workers:', swError);
+    } else {
+      console.log(`RLS Check: Successfully read ${secondaryWorkers.length} secondary worker assignments`);
+    }
+    
+    return {
+      canReadWorkers: !workersError,
+      canReadJobs: !jobsError,
+      canReadSecondaryWorkers: !swError
+    };
+  } catch (error) {
+    console.error('Error checking RLS policies:', error);
     throw error;
   }
 };

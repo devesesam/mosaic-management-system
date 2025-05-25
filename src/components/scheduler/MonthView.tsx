@@ -40,7 +40,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   
-  const { jobs, updateJob, deleteJob, fetchJobs } = useJobStore();
+  const { jobs, fetchJobs, updateJob, deleteJob } = useJobStore();
   const { isAdmin } = useAuth();
   
   const canEdit = isAdmin && !readOnly;
@@ -74,12 +74,22 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     }
   });
 
-  // Fetch jobs on component mount
+  // Force refresh jobs when component mounts
   useEffect(() => {
-    console.log('MonthView: Fetching jobs...');
+    console.log('MonthView: Component mounted - Forcing data refresh');
     fetchJobs();
   }, [fetchJobs]);
-
+  
+  // Also set up an interval to refresh data periodically
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      console.log('MonthView: Periodic data refresh');
+      fetchJobs();
+    }, 60000); // Refresh every minute
+    
+    return () => clearInterval(intervalId);
+  }, [fetchJobs]);
+  
   // Debug to check data loading
   useEffect(() => {
     console.log('MonthView: Jobs loaded:', jobs.length);
@@ -234,10 +244,10 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   const multiDayJobs = getMultiDayJobs();
 
   // Calculate max rows needed for each week (considering both single day and multi-day jobs)
-  const weekHeights = weeks.map((week, weekIdx) => {
+  const weekHeights = weeks.map((week, weekIndex) => {
     // First, get max row index of multi-day jobs in this week
     const multiDayRows = multiDayJobs
-      .filter(mj => mj.weekIdx === weekIdx)
+      .filter(mj => mj.weekIdx === weekIndex)
       .map(mj => mj.rowIdx);
     
     const maxMultiDayRow = multiDayRows.length > 0 ? Math.max(...multiDayRows) : -1;
@@ -343,9 +353,38 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       console.error('Error resizing job:', error);
     }
   };
+  
+  // Debug UI to show job data
+  const DebugPanel = () => (
+    <div className="p-3 bg-white border-b border-gray-200 text-sm text-gray-600">
+      <details>
+        <summary className="cursor-pointer font-medium">Debug Information</summary>
+        <div className="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
+          <div>
+            <strong>Jobs:</strong> {jobs.length} loaded ({unscheduledJobs.length} unscheduled)
+            {jobs.length > 0 && (
+              <ul className="ml-4 list-disc">
+                {jobs.slice(0, 3).map(j => (
+                  <li key={j.id}>{j.address} - {j.status}</li>
+                ))}
+                {jobs.length > 3 && <li>...and {jobs.length - 3} more</li>}
+              </ul>
+            )}
+          </div>
+          
+          <button 
+            onClick={() => fetchJobs()}
+            className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+          >
+            Refresh Jobs
+          </button>
+        </div>
+      </details>
+    </div>
+  );
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col">
       {/* Main calendar area with flex-1 to take remaining space */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Month navigation header */}
@@ -378,10 +417,13 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
           </button>
         </div>
         
+        {/* Debug panel */}
+        <DebugPanel />
+        
         {/* Debug information */}
         {jobs.length === 0 && (
           <div className="p-4 bg-yellow-50 border-b border-yellow-200">
-            <p className="text-yellow-800 font-medium">No jobs found in database.</p>
+            <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
           </div>
         )}
         

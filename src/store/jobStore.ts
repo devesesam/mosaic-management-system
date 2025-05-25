@@ -33,9 +33,11 @@ export const useJobStore = create<JobState>((set, get) => ({
       console.error('Error fetching jobs:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch jobs', 
-        loading: false,
-        jobs: [] 
+        loading: false
       });
+      
+      // Don't clear the jobs array if there was an error
+      // This prevents the UI from flickering if the fetch fails
     }
   },
   
@@ -68,11 +70,15 @@ export const useJobStore = create<JobState>((set, get) => ({
       const updatedJob = await updateJob(id, updates);
       console.log('jobStore: Job updated successfully:', updatedJob);
       
+      // Completely refresh job list to ensure consistency
+      const allJobs = await getJobs();
+      
       set((state) => ({
-        jobs: state.jobs.map((job) => (job.id === id ? { ...job, ...updatedJob } : job)),
+        jobs: allJobs,
         loading: false,
         error: null
       }));
+      
       return updatedJob;
     } catch (error) {
       console.error('Error updating job:', error);
@@ -89,8 +95,12 @@ export const useJobStore = create<JobState>((set, get) => ({
     
     try {
       await deleteJob(id);
+      
+      // Completely refresh job list to ensure consistency
+      const allJobs = await getJobs();
+      
       set((state) => ({
-        jobs: state.jobs.filter((job) => job.id !== id),
+        jobs: allJobs,
         loading: false,
         error: null
       }));

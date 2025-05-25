@@ -41,6 +41,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   // Initialize form with initial job data
   useEffect(() => {
     if (initialJob) {
+      console.log('JobForm: Initializing with job:', initialJob);
       setFormData({
         ...initialJob,
         secondary_worker_ids: initialJob.secondary_worker_ids || []
@@ -48,9 +49,16 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     }
   }, [initialJob]);
 
+  // Force refresh workers when form opens
   useEffect(() => {
+    console.log('JobForm: Fetching workers...');
     fetchWorkers();
   }, [fetchWorkers]);
+
+  // Debug workers data
+  useEffect(() => {
+    console.log(`JobForm: ${workers.length} workers available for assignment`);
+  }, [workers]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (readOnly) return;
@@ -93,6 +101,8 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (readOnly || isSubmitting) return;
+    
+    console.log('JobForm: Submitting job data:', formData);
     
     try {
       setIsSubmitting(true);
@@ -313,25 +323,31 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 Secondary Workers
               </label>
               <div className="mt-1 border rounded-md divide-y max-h-48 overflow-y-auto">
-                {availableSecondaryWorkers.map((worker) => (
-                  <label
-                    key={worker.id}
-                    className={`flex items-center px-3 py-2 hover:bg-gray-50 ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formData.secondary_worker_ids?.includes(worker.id) || false}
-                      onChange={() => handleSecondaryWorkerToggle(worker.id)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      disabled={readOnly}
-                    />
-                    <span className="ml-2 text-sm text-gray-700">
-                      {worker.name}
-                      {worker.role === 'viewer' ? ' (View Only)' : ''}
-                    </span>
-                  </label>
-                ))}
-                {availableSecondaryWorkers.length === 0 && (
+                {workers.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500 italic">
+                    No workers available. Add workers first.
+                  </div>
+                ) : (
+                  availableSecondaryWorkers.map((worker) => (
+                    <label
+                      key={worker.id}
+                      className={`flex items-center px-3 py-2 hover:bg-gray-50 ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.secondary_worker_ids?.includes(worker.id) || false}
+                        onChange={() => handleSecondaryWorkerToggle(worker.id)}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        disabled={readOnly}
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        {worker.name}
+                        {worker.role === 'viewer' ? ' (View Only)' : ''}
+                      </span>
+                    </label>
+                  ))
+                )}
+                {availableSecondaryWorkers.length === 0 && workers.length > 0 && (
                   <div className="px-3 py-2 text-sm text-gray-500 italic">
                     No workers available
                   </div>
