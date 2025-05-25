@@ -45,34 +45,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Function to ensure a worker profile exists for the current user
-  const ensureWorkerProfile = async (userEmail: string): Promise<Worker | null> => {
+  // Create a worker profile automatically if one doesn't exist
+  const createWorkerForUser = async (userEmail: string): Promise<Worker | null> => {
     if (!userEmail) {
       console.error('Cannot create worker record - email is missing');
       return null;
     }
 
     try {
-      console.log('Ensuring worker profile exists for:', userEmail);
+      console.log('Creating worker profile for:', userEmail);
       
-      // First, try to get the existing worker
-      let worker = await getCurrentWorker(userEmail);
+      // Create worker using upsert to handle both create and update cases
+      const { data, error } = await supabase
+        .from('workers')
+        .upsert(
+          { 
+            name: userEmail.split('@')[0],
+            email: userEmail,
+            role: 'admin'
+          },
+          { onConflict: 'email' }
+        )
+        .select()
+        .single();
       
-      // If no worker found, create one
-      if (!worker) {
-        console.log('No worker profile found, creating one...');
-        try {
-          worker = await createWorkerProfile(userEmail);
-          console.log('Worker profile created successfully:', worker);
-        } catch (createError) {
-          console.error('Failed to create worker profile:', createError);
-          throw new Error('Could not create worker profile');
-        }
+      if (error) {
+        console.error('Error creating worker profile:', error);
+        return null;
       }
       
-      return worker;
-    } catch (error) {
-      console.error('Error ensuring worker profile:', error);
+      console.log('Worker profile created/updated successfully:', data);
+      return data;
+    } catch (err) {
+      console.error('Error in createWorkerForUser:', err);
       return null;
     }
   };
@@ -80,73 +85,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('AuthProvider: Initializing auth...');
     let isActive = true;
-    let authTimeout: NodeJS.Timeout;
     
+    // Initial auth state - ensure signed out by default
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        await handleSignOut();
         
-        if (session?.user) {
-          setSession(session);
-          setUser(session.user);
-          
-          if (session.user.email) {
-            try {
-              console.log('Found existing session, ensuring worker profile...');
-              const worker = await ensureWorkerProfile(session.user.email);
-              
-              if (worker) {
-                console.log('Worker profile confirmed:', worker);
-                setCurrentWorker(worker);
-              } else {
-                console.error('Failed to ensure worker profile exists');
-                setError('Could not set up your worker profile. Please try again.');
-              }
-            } catch (workerErr) {
-              console.error('Error getting worker profile:', workerErr);
-              setError('Failed to load your profile. Please refresh and try again.');
-            }
-          }
+        if (isActive) {
+          setLoading(false);
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
         setError('Failed to initialize authentication');
-      } finally {
-        if (isActive) setLoading(false);
+        setLoading(false);
       }
     };
 
     initializeAuth();
 
-    // Set a timeout to prevent infinite loading
-    authTimeout = setTimeout(() => {
-      if (isActive && loading) {
-        console.warn('AuthProvider: Auth initialization timed out');
-        setLoading(false);
-        setError('Authentication timed out. Please refresh the page.');
-      }
-    }, 10000);
-
+    // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
 
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         await handleSignOut();
+        if (isActive) setLoading(false);
       } else if (session?.user?.email) {
         try {
           setSession(session);
           setUser(session.user);
           
-          console.log('Auth state change, ensuring worker profile...');
-          const worker = await ensureWorkerProfile(session.user.email);
+          // Get worker profile or create one if it doesn't exist
+          let worker = await getCurrentWorker(session.user.email);
+          
+          if (!worker) {
+            worker = await createWorkerForUser(session.user.email);
+          }
           
           if (isActive) {
             setCurrentWorker(worker);
+            setLoading(false);
           }
         } catch (err) {
           console.error('Error in auth state change:', err);
           setError('Failed to verify user permissions');
-        } finally {
           if (isActive) setLoading(false);
         }
       }
@@ -155,7 +137,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       isActive = false;
       subscription.unsubscribe();
-      clearTimeout(authTimeout);
     };
   }, []);
 

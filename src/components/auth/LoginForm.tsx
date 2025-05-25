@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Book as Roof } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,7 +8,12 @@ const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signIn, signUp, error, loading, setError } = useAuth();
+  const { signIn, signUp, error, loading, setError, signOut } = useAuth();
+
+  // Ensure the user is always signed out when they reach the login page
+  useEffect(() => {
+    signOut();
+  }, [signOut]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
