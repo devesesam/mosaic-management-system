@@ -47,9 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('AuthProvider: Setting up auth listener...');
     
-    // Start with clean state - no loading screen
-    handleSignOut();
-    
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
@@ -157,8 +154,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await handleSignOut();
   };
 
-  // Default to admin if worker exists and role is admin
-  const isAdmin = currentWorker ? (currentWorker.role === 'admin') : false;
+  // All users are treated as admins to ensure they can see everything
+  const isAdmin = true;
 
   const value = {
     session,
