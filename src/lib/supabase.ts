@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
-// Create Supabase client with error handling
+// Create Supabase client with better error handling and debugging
 let supabaseUrl = '';
 let supabaseAnonKey = '';
 
@@ -13,7 +13,7 @@ try {
     throw new Error('Missing Supabase credentials');
   }
   
-  console.log('Supabase URL:', supabaseUrl);
+  console.log('Supabase initialization with URL:', supabaseUrl);
 } catch (error) {
   console.error('Error loading Supabase credentials:', error);
 }
@@ -59,10 +59,12 @@ export const getWorkers = async () => {
     
     if (error) {
       console.error('ERROR ACCESSING WORKERS:', error);
+      console.log('Full error payload:', JSON.stringify(error, null, 2));
       return [];
     }
     
     console.log('SUCCESSFULLY LOADED WORKERS:', data?.length || 0);
+    console.log('Workers payload:', JSON.stringify(data, null, 2));
     return data || [];
   } catch (error) {
     console.error('CRITICAL ERROR IN getWorkers:', error);
@@ -87,8 +89,11 @@ export const getJobs = async () => {
     
     if (jobsError) {
       console.error('ERROR ACCESSING JOBS:', jobsError);
+      console.log('Full error payload:', JSON.stringify(jobsError, null, 2));
       return [];
     }
+
+    console.log('Jobs raw payload:', JSON.stringify(jobs, null, 2));
 
     // Get secondary workers if jobs were successfully fetched
     if (jobs && jobs.length > 0) {
@@ -101,7 +106,10 @@ export const getJobs = async () => {
 
       if (secondaryError) {
         console.error('Error fetching secondary workers:', secondaryError);
+        console.log('Secondary workers error payload:', JSON.stringify(secondaryError, null, 2));
         // Continue with empty secondary workers
+      } else {
+        console.log('Secondary workers payload:', JSON.stringify(secondaryWorkers, null, 2));
       }
 
       console.log('Loaded', secondaryWorkers?.length || 0, 'secondary worker assignments');
