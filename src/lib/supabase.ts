@@ -39,24 +39,24 @@ export const getWorkers = async () => {
       return [];
     }
 
-    // Use the emergency_get_workers function to bypass any RLS issues
+    // Try direct table access first (RLS is disabled)
     const { data, error } = await supabase
-      .rpc('emergency_get_workers');
+      .from('workers')
+      .select('*')
+      .order('name');
 
-    // If that fails, try direct table access
+    // If direct access fails, try the emergency function
     if (error) {
-      console.error('getWorkers: RPC failed, trying direct access:', error);
-      const { data: directData, error: directError } = await supabase
-        .from('workers')
-        .select('*')
-        .order('name');
+      console.error('getWorkers: Direct access failed, trying emergency function:', error);
+      const { data: emergencyData, error: emergencyError } = await supabase
+        .rpc('emergency_get_workers');
       
-      if (directError) {
-        console.error('getWorkers: Direct access failed:', directError);
-        throw directError;
+      if (emergencyError) {
+        console.error('getWorkers: Emergency function failed:', emergencyError);
+        throw emergencyError;
       }
       
-      return directData || [];
+      return emergencyData || [];
     }
 
     return data || [];
@@ -74,43 +74,43 @@ export const getJobs = async () => {
       return [];
     }
 
-    // Use the emergency_get_jobs function to bypass any RLS issues
+    // Try direct table access first (RLS is disabled)
     const { data: jobs, error: jobsError } = await supabase
-      .rpc('emergency_get_jobs');
+      .from('jobs')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    // If that fails, try direct table access
+    // If direct access fails, try the emergency function
     if (jobsError) {
-      console.error('getJobs: RPC failed, trying direct access:', jobsError);
-      const { data: directJobs, error: directJobsError } = await supabase
-        .from('jobs')
-        .select('*')
-        .order('created_at', { ascending: false });
+      console.error('getJobs: Direct access failed, trying emergency function:', jobsError);
+      const { data: emergencyJobs, error: emergencyJobsError } = await supabase
+        .rpc('emergency_get_jobs');
       
-      if (directJobsError) {
-        console.error('getJobs: Direct access failed:', directJobsError);
-        throw directJobsError;
+      if (emergencyJobsError) {
+        console.error('getJobs: Emergency function failed:', emergencyJobsError);
+        throw emergencyJobsError;
       }
       
-      jobs = directJobs;
+      jobs = emergencyJobs;
     }
 
-    // Use the emergency_get_secondary_workers function to bypass any RLS issues
+    // Get secondary worker assignments - try direct table access first
     const { data: secondaryWorkers, error: secondaryError } = await supabase
-      .rpc('emergency_get_secondary_workers');
+      .from('job_secondary_workers')
+      .select('*');
 
-    // If that fails, try direct table access
+    // If direct access fails, try the emergency function
     if (secondaryError) {
-      console.error('getJobs: Secondary RPC failed, trying direct access:', secondaryError);
-      const { data: directSecondary, error: directSecondaryError } = await supabase
-        .from('job_secondary_workers')
-        .select('*');
+      console.error('getJobs: Secondary direct access failed, trying emergency function:', secondaryError);
+      const { data: emergencySecondary, error: emergencySecondaryError } = await supabase
+        .rpc('emergency_get_secondary_workers');
       
-      if (directSecondaryError) {
-        console.error('getJobs: Secondary direct access failed:', directSecondaryError);
-        throw directSecondaryError;
+      if (emergencySecondaryError) {
+        console.error('getJobs: Secondary emergency function failed:', emergencySecondaryError);
+        throw emergencySecondaryError;
       }
       
-      secondaryWorkers = directSecondary;
+      secondaryWorkers = emergencySecondary;
     }
 
     const jobsWithSecondaryWorkers = jobs.map(job => ({
