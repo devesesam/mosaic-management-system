@@ -10,7 +10,7 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 function App() {
@@ -69,16 +69,6 @@ function App() {
             Return to Login
           </button>
         </div>
-      </div>
-    );
-  }
-
-  // Show loading spinner while fetching initial data
-  if (isJobsLoading || isWorkersLoading || authLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
-        <p className="text-gray-600">Loading calendar data...</p>
       </div>
     );
   }
