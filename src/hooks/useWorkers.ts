@@ -2,7 +2,17 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
+import { useJobStore } from './jobStore';
 import toast from 'react-hot-toast';
+
+interface WorkerState {
+  workers: Worker[];
+  loading: boolean;
+  error: string | null;
+  fetchWorkers: () => Promise<void>;
+  addWorker: (worker: Omit<Worker, 'id' | 'created_at'>) => Promise<Worker>;
+  deleteWorker: (id: string) => Promise<void>;
+}
 
 export function useWorkers({ enabled = true } = {}) {
   const queryClient = useQueryClient();

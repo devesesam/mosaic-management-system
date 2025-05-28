@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useAuth } from './context/AuthContext';
@@ -10,17 +10,17 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 
 function App() {
-  const { user, loading: authLoading, error: authError, currentWorker, signOut } = useAuth();
+  const { user, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
+  const { jobs, addJob, error: jobsError } = useJobs({
     enabled: !!user
   });
-  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
+  const { workers, error: workersError } = useWorkers({
     enabled: !!user
   });
 
@@ -37,7 +37,7 @@ function App() {
     }
   };
   
-  // Show login form if no user - immediately show this instead of loading screen
+  // Show login form if no user
   if (!user) {
     return <LoginForm />;
   }

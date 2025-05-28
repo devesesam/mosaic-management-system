@@ -21,7 +21,7 @@ export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// Check auth status
+// Add function to check auth status
 export const checkAuthStatus = async () => {
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error) {
@@ -33,31 +33,20 @@ export const checkAuthStatus = async () => {
 
 export const getWorkers = async () => {
   try {
-    const session = await checkAuthStatus();
-    if (!session) {
-      console.error('getWorkers: No active session');
-      return [];
-    }
-
-    // Try direct table access first (RLS is disabled)
     const { data, error } = await supabase
       .from('workers')
       .select('*')
       .order('name');
 
-    // If direct access fails, try the emergency function
     if (error) {
-      console.error('getWorkers: Direct access failed, trying emergency function:', error);
-      const { data: emergencyData, error: emergencyError } = await supabase
-        .rpc('emergency_get_workers');
-      
-      if (emergencyError) {
-        console.error('getWorkers: Emergency function failed:', emergencyError);
-        throw emergencyError;
-      }
-      
-      return emergencyData || [];
+      console.error('getWorkers: Query failed:', error);
+      throw error;
     }
+
+    console.log('getWorkers: Success', {
+      count: data?.length || 0,
+      first_worker: data?.[0]?.name
+    });
 
     return data || [];
   } catch (error) {
@@ -68,49 +57,25 @@ export const getWorkers = async () => {
 
 export const getJobs = async () => {
   try {
-    const session = await checkAuthStatus();
-    if (!session) {
-      console.error('getJobs: No active session');
-      return [];
-    }
-
-    // Try direct table access first (RLS is disabled)
+    // First get all jobs
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
 
-    // If direct access fails, try the emergency function
     if (jobsError) {
-      console.error('getJobs: Direct access failed, trying emergency function:', jobsError);
-      const { data: emergencyJobs, error: emergencyJobsError } = await supabase
-        .rpc('emergency_get_jobs');
-      
-      if (emergencyJobsError) {
-        console.error('getJobs: Emergency function failed:', emergencyJobsError);
-        throw emergencyJobsError;
-      }
-      
-      jobs = emergencyJobs;
+      console.error('getJobs: Jobs query failed:', jobsError);
+      throw jobsError;
     }
 
-    // Get secondary worker assignments - try direct table access first
+    // Then get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
 
-    // If direct access fails, try the emergency function
     if (secondaryError) {
-      console.error('getJobs: Secondary direct access failed, trying emergency function:', secondaryError);
-      const { data: emergencySecondary, error: emergencySecondaryError } = await supabase
-        .rpc('emergency_get_secondary_workers');
-      
-      if (emergencySecondaryError) {
-        console.error('getJobs: Secondary emergency function failed:', emergencySecondaryError);
-        throw emergencySecondaryError;
-      }
-      
-      secondaryWorkers = emergencySecondary;
+      console.error('getJobs: Secondary workers query failed:', secondaryError);
+      throw secondaryError;
     }
 
     const jobsWithSecondaryWorkers = jobs.map(job => ({
@@ -119,6 +84,12 @@ export const getJobs = async () => {
         .filter(sw => sw.job_id === job.id)
         .map(sw => sw.worker_id)
     }));
+
+    console.log('getJobs: Success', {
+      jobs_count: jobs.length,
+      secondary_assignments: secondaryWorkers.length,
+      first_job: jobs[0]?.address
+    });
 
     return jobsWithSecondaryWorkers;
   } catch (error) {
@@ -369,12 +340,24 @@ export const getCurrentWorker = async (email: string) => {
       throw error;
     }
     
+    if (!data) {
+      console.warn(`getCurrentWorker: No worker found for email: ${email}`);
+      try {
+        const newWorker = await createWorkerProfile(email);
+        console.log('getCurrentWorker: Created new worker:', newWorker);
+        return newWorker;
+      } catch (createError) {
+        console.error('getCurrentWorker: Failed to create worker:', createError);
+        return null;
+      }
+    }
+    
     console.log(`getCurrentWorker: Worker data for email: ${email}`, data);
     
     return data;
   } catch (error) {
     console.error('getCurrentWorker: Error in getCurrentWorker:', error);
-    throw error;
+    return null;
   }
 };
 
@@ -453,57 +436,6 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
     return data;
   } catch (error) {
     console.error('Error in ensureUserRecord:', error);
-    throw error;
-  }
-};
-
-export const checkRLSPolicies = async () => {
-  try {
-    console.log('Checking RLS policies...');
-    
-    // Try to read from workers table
-    const { data: workers, error: workersError } = await supabase
-      .from('workers')
-      .select('*')
-      .limit(5);
-    
-    if (workersError) {
-      console.error('RLS Check: Error reading workers:', workersError);
-    } else {
-      console.log(`RLS Check: Successfully read ${workers.length} workers`);
-    }
-    
-    // Try to read from jobs table
-    const { data: jobs, error: jobsError } = await supabase
-      .from('jobs')
-      .select('*')
-      .limit(5);
-    
-    if (jobsError) {
-      console.error('RLS Check: Error reading jobs:', jobsError);
-    } else {
-      console.log(`RLS Check: Successfully read ${jobs.length} jobs`);
-    }
-    
-    // Try to read secondary workers
-    const { data: secondaryWorkers, error: swError } = await supabase
-      .from('job_secondary_workers')
-      .select('*')
-      .limit(5);
-    
-    if (swError) {
-      console.error('RLS Check: Error reading job_secondary_workers:', swError);
-    } else {
-      console.log(`RLS Check: Successfully read ${secondaryWorkers.length} secondary worker assignments`);
-    }
-    
-    return {
-      canReadWorkers: !workersError,
-      canReadJobs: !jobsError,
-      canReadSecondaryWorkers: !swError
-    };
-  } catch (error) {
-    console.error('Error checking RLS policies:', error);
     throw error;
   }
 };

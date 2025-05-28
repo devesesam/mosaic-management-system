@@ -5,8 +5,7 @@ import {
   isSupabaseInitialized, 
   getCurrentWorker, 
   createWorkerProfile,
-  ensureUserRecord, 
-  checkRLSPolicies
+  ensureUserRecord
 } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
@@ -30,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -57,12 +56,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('AuthProvider: Found existing session');
           setUser(session.user);
           setSession(session);
-          await checkRLSPolicies();
         }
       } catch (err) {
         console.error('AuthProvider: Error getting session:', err);
-      } finally {
-        setLoading(false);
       }
     };
     
@@ -76,6 +72,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
         setSession(session);
+        
+        // Initialize worker profile in background
+        if (session.user.email) {
+          try {
+            const worker = await getCurrentWorker(session.user.email);
+            setCurrentWorker(worker || null);
+          } catch (err) {
+            console.error('Error fetching worker profile:', err);
+          }
+        }
       }
     });
 
@@ -83,27 +89,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []);
-
-  // We'll simplify this - just set the user as authenticated without requiring a worker profile
-  useEffect(() => {
-    if (user) {
-      setLoading(false);
-      // Still allow fetching a worker profile if it exists, but don't require it
-      const checkWorkerProfile = async () => {
-        try {
-          const worker = await getCurrentWorker(user.email);
-          if (worker) {
-            setCurrentWorker(worker);
-          }
-        } catch (err) {
-          console.error('Error checking worker profile:', err);
-          // Don't set an error - we want to continue even without a worker profile
-        }
-      };
-      
-      checkWorkerProfile();
-    }
-  }, [user]);
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
@@ -118,17 +103,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (signInError) {
         console.error('AuthProvider: Sign in error:', signInError);
         setError(signInError.message);
+        setLoading(false);
         return false;
       }
       
       console.log('AuthProvider: Sign in successful');
+      setLoading(false);
       return true;
     } catch (err) {
       console.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in');
-      return false;
-    } finally {
       setLoading(false);
+      return false;
     }
   };
 
