@@ -63,13 +63,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Try to get or create worker profile for this user
           if (session.user.email) {
             try {
+              console.log('AuthProvider: Getting worker profile for', session.user.email);
               const worker = await getCurrentWorker(session.user.email);
-              setCurrentWorker(worker);
               
-              // If no worker was found or created, try once more
-              if (!worker) {
+              if (worker) {
+                console.log('AuthProvider: Found worker profile:', worker);
+                setCurrentWorker(worker);
+              } else {
                 console.log('AuthProvider: No worker profile found, explicitly creating one');
                 const newWorker = await createWorkerProfile(session.user.email);
+                console.log('AuthProvider: Created worker profile:', newWorker);
                 setCurrentWorker(newWorker);
               }
               
@@ -101,14 +104,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Initialize worker profile in background
         if (session.user.email) {
           try {
+            console.log('AuthProvider: Getting worker profile for', session.user.email);
             const worker = await getCurrentWorker(session.user.email);
             
-            // If no worker was found, create one
-            if (!worker) {
-              const newWorker = await createWorkerProfile(session.user.email);
-              setCurrentWorker(newWorker);
-            } else {
+            if (worker) {
+              console.log('AuthProvider: Found worker profile:', worker);
               setCurrentWorker(worker);
+            } else {
+              console.log('AuthProvider: No worker profile found, creating one');
+              const newWorker = await createWorkerProfile(session.user.email);
+              console.log('AuthProvider: Created worker profile:', newWorker);
+              setCurrentWorker(newWorker);
             }
             
             // Also ensure user record exists
@@ -152,13 +158,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('AuthProvider: Fetching worker profile after sign in');
           const worker = await getCurrentWorker(email);
           
-          if (!worker) {
+          if (worker) {
+            console.log('AuthProvider: Found worker profile:', worker);
+            setCurrentWorker(worker);
+          } else {
             // Try to create worker profile
             console.log('AuthProvider: Creating worker profile after sign in');
             const newWorker = await createWorkerProfile(email);
+            console.log('AuthProvider: Created worker profile:', newWorker);
             setCurrentWorker(newWorker);
-          } else {
-            setCurrentWorker(worker);
           }
         } catch (err) {
           console.error('Error initializing worker profile:', err);

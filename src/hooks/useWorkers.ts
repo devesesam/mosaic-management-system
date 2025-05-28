@@ -7,35 +7,38 @@ import toast from 'react-hot-toast';
 export function useWorkers({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
+  // Make the query fetch only once and not continuously
   const { data: workers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['workers'],
     queryFn: getWorkers,
-    enabled,
-    staleTime: 1000 * 60 * 60, // 1 hour before data is considered stale
+    enabled: true, // Always enabled to fix data loading issues
+    staleTime: Infinity, // Don't refetch automatically
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
     retry: 3,
     retryDelay: 1000,
     onError: (error) => {
       console.error('useWorkers: Error fetching workers:', error);
-      toast.error('Failed to load workers');
+      toast.error('Failed to load workers. Please refresh the page.');
     }
   });
 
-  // Force fetch only once on mount
+  // Debug useEffect - log whenever the workers data changes
   React.useEffect(() => {
-    if (enabled) {
-      console.log('useWorkers: Initial fetch only');
-      refetch();
-    }
-  }, [enabled, refetch]);
+    console.log('useWorkers: Workers data loaded:', {
+      count: workers.length,
+      loading: isLoading,
+      error: error ? 'Error loading workers' : null,
+      first_worker: workers.length > 0 ? workers[0].name : 'No workers'
+    });
+  }, [workers, isLoading, error]);
 
   const addWorkerMutation = useMutation({
     mutationFn: (worker: Omit<Worker, 'id' | 'created_at'>) => {
       console.log('useWorkers: Adding worker:', worker);
       return createWorker(worker);
     },
-    onSuccess: (data) => {
-      console.log('useWorkers: Worker added successfully:', data);
+    onSuccess: () => {
+      console.log('useWorkers: Worker added successfully, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['workers'] });
       toast.success('Worker added successfully');
     },
@@ -46,7 +49,7 @@ export function useWorkers({ enabled = true } = {}) {
   });
 
   const deleteWorkerMutation = useMutation({
-    mutationFn: (id: string) => deleteWorker(id),
+    mutationFn: deleteWorker,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workers'] });
       toast.success('Worker deleted successfully');
@@ -57,21 +60,12 @@ export function useWorkers({ enabled = true } = {}) {
     },
   });
 
-  // Log data changes - only on first load or actual data changes
-  React.useEffect(() => {
-    console.log('useWorkers: Workers data loaded:', {
-      count: workers.length,
-      loading: isLoading,
-      error: error ? 'Error loading workers' : null,
-      first_worker: workers.length > 0 ? workers[0].name : 'No workers'
-    });
-  }, [workers, isLoading, error]);
-
   return {
     workers,
     isLoading,
     error,
     refetch,
+    // Use mutateAsync to get a promise that can be awaited
     addWorker: (worker: Omit<Worker, 'id' | 'created_at'>) => {
       return addWorkerMutation.mutateAsync(worker);
     },

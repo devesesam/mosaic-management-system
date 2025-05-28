@@ -33,77 +33,66 @@ export const checkAuthStatus = async () => {
 
 export const getWorkers = async () => {
   try {
-    // Fetch workers only once per call, not continuously
+    console.log('getWorkers: Starting fetch');
+    
+    // Direct DB access - no RLS filtering
     const { data, error } = await supabase
       .from('workers')
       .select('*')
       .order('name');
 
     if (error) {
-      console.error('getWorkers: Query failed:', error);
+      console.error('getWorkers: Error fetching workers:', error);
       return [];
     }
 
-    console.log('getWorkers: Success', {
-      count: data?.length || 0,
-      first_worker: data?.length > 0 ? data[0].name : 'No workers found'
-    });
-
+    console.log('getWorkers: Successfully fetched', data?.length || 0, 'workers');
     return data || [];
   } catch (error) {
-    console.error('getWorkers: Failed:', error);
-    // Return empty array instead of throwing to prevent UI errors
+    console.error('getWorkers: Unexpected error:', error);
     return [];
   }
 };
 
 export const getJobs = async () => {
   try {
-    // Fetch jobs only once per call, not continuously
+    console.log('getJobs: Starting fetch');
+    
+    // Direct DB access - no RLS filtering
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (jobsError) {
-      console.error('getJobs: Jobs query failed:', jobsError);
+      console.error('getJobs: Error fetching jobs:', jobsError);
       return [];
     }
 
-    console.log(`getJobs: Successfully fetched ${jobs?.length || 0} jobs`);
-
-    // Safe query for secondary workers
+    console.log('getJobs: Successfully fetched', jobs?.length || 0, 'jobs');
+    
+    // Get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
 
     if (secondaryError) {
-      console.error('getJobs: Secondary workers query failed:', secondaryError);
-      // Continue anyway, just won't have secondary workers
+      console.error('getJobs: Error fetching secondary workers:', secondaryError);
+      // Continue with empty secondary workers
     }
 
-    // Guard against null jobs
-    if (!jobs) {
-      console.warn('getJobs: No jobs found or null response');
-      return [];
-    }
-
-    const jobsWithSecondaryWorkers = jobs.map(job => ({
+    const jobsWithSecondaryWorkers = (jobs || []).map(job => ({
       ...job,
       secondary_worker_ids: (secondaryWorkers || [])
         .filter(sw => sw.job_id === job.id)
         .map(sw => sw.worker_id)
     }));
 
-    console.log('getJobs: Returning combined data:', {
-      total_jobs: jobsWithSecondaryWorkers.length,
-      first_job: jobsWithSecondaryWorkers.length > 0 ? jobsWithSecondaryWorkers[0].address : 'No jobs found'
-    });
-
+    console.log('getJobs: Final data ready with', jobsWithSecondaryWorkers.length, 'jobs');
+    
     return jobsWithSecondaryWorkers;
   } catch (error) {
-    console.error('getJobs: Failed:', error);
-    // Return empty array instead of throwing to prevent UI errors
+    console.error('getJobs: Unexpected error:', error);
     return [];
   }
 };
@@ -269,9 +258,15 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
       throw new Error('Worker name is required');
     }
     
+    // Make sure role is set to admin
+    const workerData = {
+      ...worker,
+      role: 'admin'
+    };
+    
     const { data, error } = await supabase
       .from('workers')
-      .insert([worker])
+      .insert([workerData])
       .select()
       .single();
 
@@ -284,7 +279,7 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
     return data;
   } catch (error) {
     console.error('Error in createWorker:', error);
-    throw error; // Make sure we're propagating the error
+    throw error;
   }
 };
 
@@ -320,9 +315,34 @@ export const deleteWorker = async (id: string) => {
     }
 
     console.log('deleteWorker: Deleting worker:', id);
-    const { error } = await supabase.rpc('delete_worker_with_jobs', {
-      worker_id: id
-    });
+    
+    // First update any jobs assigned to this worker
+    const { error: jobUpdateError } = await supabase
+      .from('jobs')
+      .update({ worker_id: null })
+      .eq('worker_id', id);
+      
+    if (jobUpdateError) {
+      console.error('Error updating jobs before worker deletion:', jobUpdateError);
+      throw jobUpdateError;
+    }
+    
+    // Delete secondary worker assignments
+    const { error: secondaryError } = await supabase
+      .from('job_secondary_workers')
+      .delete()
+      .eq('worker_id', id);
+      
+    if (secondaryError) {
+      console.error('Error deleting secondary worker assignments:', secondaryError);
+      throw secondaryError;
+    }
+    
+    // Finally delete the worker
+    const { error } = await supabase
+      .from('workers')
+      .delete()
+      .eq('id', id);
 
     if (error) {
       console.error('Error in deleteWorker:', error);
