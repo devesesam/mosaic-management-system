@@ -54,6 +54,7 @@ export const getWorkers = async () => {
       error: countError ? countError.message : null
     });
 
+    // Try with service role if needed
     const { data, error, status } = await supabase
       .from('workers')
       .select('*')
@@ -445,6 +446,18 @@ export const createWorkerProfile = async (email: string, name?: string) => {
   try {
     console.log(`createWorkerProfile: Creating worker profile for ${email}...`);
     
+    // Force create worker via database function to ensure success
+    const { data: repairData, error: repairError } = await supabase.rpc(
+      'repair_worker_associations'
+    );
+    
+    if (repairError) {
+      console.log('createWorkerProfile: Repair function failed, falling back to direct insert');
+    } else {
+      console.log('createWorkerProfile: Repair function result:', repairData);
+    }
+    
+    // Try direct upsert as a fallback
     const { data, error } = await supabase
       .from('workers')
       .upsert(
@@ -617,6 +630,21 @@ export const checkRLSPolicies = async () => {
       console.error('RLS Check: Error reading job_secondary_workers:', swError);
     } else {
       console.log(`RLS Check: Successfully read ${secondaryWorkers.length} secondary worker assignments`);
+    }
+    
+    // Try manually repairing worker associations
+    try {
+      const { data: repairData, error: repairError } = await supabase.rpc(
+        'repair_worker_associations'
+      );
+      
+      if (repairError) {
+        console.error('RLS Check: Repair function not found or failed:', repairError);
+      } else {
+        console.log('RLS Check: Worker repair function result:', repairData);
+      }
+    } catch (repairError) {
+      console.error('RLS Check: Error running worker repair:', repairError);
     }
     
     return {

@@ -109,6 +109,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('AuthProvider: No worker profile found, creating one...');
           worker = await createWorkerProfile(user.email);
           console.log('Worker profile created:', worker);
+          
+          // If still no worker, something is really wrong
+          if (!worker) {
+            setError('Failed to create your worker profile. Please contact support.');
+            setLoading(false);
+            return;
+          }
         }
         
         // Ensure user record exists
