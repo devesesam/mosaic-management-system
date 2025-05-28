@@ -110,7 +110,7 @@ const WeekView: React.FC<WeekViewProps> = () => {
     try {
       console.log('WeekView: Submitting worker:', workerData);
       
-      // The critical fix: make sure we're properly waiting for the worker to be added
+      // Wait for the worker to be added
       await addWorker(workerData);
       
       console.log('WeekView: Worker added successfully');

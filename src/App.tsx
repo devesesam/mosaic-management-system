@@ -17,18 +17,13 @@ function App() {
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs({
-    enabled: !!user
-  });
-  const { workers, error: workersError, refetch: refetchWorkers } = useWorkers({
-    enabled: !!user
-  });
+  const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs();
+  const { workers, error: workersError, refetch: refetchWorkers } = useWorkers();
 
-  // Single data load when user logs in
+  // Force data load when user is authenticated
   useEffect(() => {
     if (user) {
-      console.log('App: User authenticated, loading data once');
-      // Only fetch once after login
+      console.log('App: User authenticated, loading data');
       refetchJobs();
       refetchWorkers();
     }
@@ -109,12 +104,8 @@ function App() {
     );
   }
 
-  // Debug data
-  console.log('App render: Data stats', {
-    jobCount: jobs.length,
-    workerCount: workers.length,
-    currentWorker: currentWorker?.name || 'Unknown'
-  });
+  // Debug info
+  console.log('App: Rendering with', jobs.length, 'jobs and', workers.length, 'workers');
 
   return (
     <DndProvider backend={HTML5Backend}>

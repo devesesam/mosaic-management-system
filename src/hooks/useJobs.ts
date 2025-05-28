@@ -7,30 +7,28 @@ import toast from 'react-hot-toast';
 export function useJobs({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
-  // Make the query fetch only once and not continuously
+  // Simple query with no automatic refetching
   const { data: jobs = [], isLoading, error, refetch } = useQuery({
     queryKey: ['jobs'],
     queryFn: getJobs,
-    enabled: true, // Always enabled to fix data loading issues
+    enabled: true, // Always enabled
     staleTime: Infinity, // Don't refetch automatically
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
     retry: 3,
     retryDelay: 1000,
     onError: (error) => {
       console.error('useJobs: Error fetching jobs:', error);
-      toast.error('Failed to load jobs. Please refresh the page.');
+      toast.error('Failed to load jobs');
     }
   });
 
-  // Debug useEffect - log whenever the jobs data changes
+  // Debug logging when jobs data changes
   React.useEffect(() => {
-    console.log('useJobs: Jobs data loaded:', {
+    console.log('useJobs: Jobs data updated:', {
       count: jobs.length,
-      loading: isLoading,
-      error: error ? 'Error loading jobs' : null,
-      first_job: jobs.length > 0 ? jobs[0].address : 'No jobs'
+      firstJob: jobs.length > 0 ? jobs[0].address : 'No jobs'
     });
-  }, [jobs, isLoading, error]);
+  }, [jobs]);
 
   const addJobMutation = useMutation({
     mutationFn: (job: Omit<Job, 'id' | 'created_at'>) => createJob(job),

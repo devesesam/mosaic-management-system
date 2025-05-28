@@ -7,30 +7,28 @@ import toast from 'react-hot-toast';
 export function useWorkers({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
-  // Make the query fetch only once and not continuously
+  // Simple query with no automatic refetching
   const { data: workers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['workers'],
     queryFn: getWorkers,
-    enabled: true, // Always enabled to fix data loading issues
+    enabled: true, // Always enabled
     staleTime: Infinity, // Don't refetch automatically
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
     retry: 3,
     retryDelay: 1000,
     onError: (error) => {
       console.error('useWorkers: Error fetching workers:', error);
-      toast.error('Failed to load workers. Please refresh the page.');
+      toast.error('Failed to load workers');
     }
   });
 
-  // Debug useEffect - log whenever the workers data changes
+  // Debug logging when workers data changes
   React.useEffect(() => {
-    console.log('useWorkers: Workers data loaded:', {
+    console.log('useWorkers: Workers data updated:', {
       count: workers.length,
-      loading: isLoading,
-      error: error ? 'Error loading workers' : null,
-      first_worker: workers.length > 0 ? workers[0].name : 'No workers'
+      firstWorker: workers.length > 0 ? workers[0].name : 'No workers'
     });
-  }, [workers, isLoading, error]);
+  }, [workers]);
 
   const addWorkerMutation = useMutation({
     mutationFn: (worker: Omit<Worker, 'id' | 'created_at'>) => {
@@ -44,7 +42,7 @@ export function useWorkers({ enabled = true } = {}) {
     },
     onError: (error) => {
       console.error('Error adding worker:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to add worker');
+      toast.error('Failed to add worker');
     },
   });
 
@@ -65,10 +63,7 @@ export function useWorkers({ enabled = true } = {}) {
     isLoading,
     error,
     refetch,
-    // Use mutateAsync to get a promise that can be awaited
-    addWorker: (worker: Omit<Worker, 'id' | 'created_at'>) => {
-      return addWorkerMutation.mutateAsync(worker);
-    },
+    addWorker: addWorkerMutation.mutateAsync,
     deleteWorker: deleteWorkerMutation.mutate,
     isAddingWorker: addWorkerMutation.isPending,
     isDeletingWorker: deleteWorkerMutation.isPending,
