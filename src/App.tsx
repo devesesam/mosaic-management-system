@@ -10,15 +10,15 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
-import DebugPanel from './components/debug/DebugPanel';
+import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
+import DataDisplayModal from './components/debug/DataDisplayModal';
 
 function App() {
   const { user, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
+  const [showDataModal, setShowDataModal] = useState(false);
   const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs();
   const { workers, error: workersError, refetch: refetchWorkers } = useWorkers();
 
@@ -51,12 +51,12 @@ function App() {
     return () => clearInterval(interval);
   }, [user, refetchJobs, refetchWorkers]);
 
-  // Toggle debug panel with keyboard shortcut (Ctrl+Shift+D)
+  // Toggle data modal with keyboard shortcut (Ctrl+Shift+D)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
-        setShowDebug(prev => !prev);
+        setShowDataModal(prev => !prev);
       }
     };
     
@@ -115,25 +115,35 @@ function App() {
           <p className="text-gray-600 mb-6">
             {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
           </p>
-          <button
-            onClick={() => {
-              setIsRetrying(true);
-              refetchJobs();
-              refetchWorkers();
-              setTimeout(() => setIsRetrying(false), 1000);
-            }}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
-            disabled={isRetrying}
-          >
-            {isRetrying ? (
-              <>
-                <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              'Refresh Data'
-            )}
-          </button>
+          <div className="flex flex-col space-y-3">
+            <button
+              onClick={() => {
+                setIsRetrying(true);
+                refetchJobs();
+                refetchWorkers();
+                setTimeout(() => setIsRetrying(false), 1000);
+              }}
+              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
+              disabled={isRetrying}
+            >
+              {isRetrying ? (
+                <>
+                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                'Refresh Data'
+              )}
+            </button>
+            
+            <button
+              onClick={() => setShowDataModal(true)}
+              className="w-full py-2 px-4 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-md flex items-center justify-center"
+            >
+              <Database className="w-5 h-5 mr-2" />
+              View Raw Database Data
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -151,12 +161,21 @@ function App() {
           setActiveView={setActiveView}
         />
 
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden relative">
           {activeView === 'week' ? (
             <WeekView />
           ) : (
             <MonthView />
           )}
+          
+          {/* Floating button to show data modal */}
+          <button
+            onClick={() => setShowDataModal(true)}
+            className="absolute bottom-4 right-4 bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors z-10"
+            title="View Database Data"
+          >
+            <Database className="h-5 w-5 text-indigo-600" />
+          </button>
         </main>
 
         {isJobFormOpen && (
@@ -164,6 +183,10 @@ function App() {
             onClose={() => setIsJobFormOpen(false)}
             onSubmit={handleSubmitJob}
           />
+        )}
+
+        {showDataModal && (
+          <DataDisplayModal onClose={() => setShowDataModal(false)} />
         )}
 
         <Toaster 
@@ -179,12 +202,9 @@ function App() {
             },
           }}
         />
-
-        {/* Debug panel that can be toggled with Ctrl+Shift+D */}
-        {showDebug && <DebugPanel />}
       </div>
     </DndProvider>
   );
 }
 
-export default App
+export default App;
