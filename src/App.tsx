@@ -12,6 +12,7 @@ import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import SupabaseConnectionTest from './components/debug/SupabaseConnectionTest';
+import SupabaseDiagnostics from './components/debug/SupabaseDiagnostics';
 
 function App() {
   const { user, error: authError, currentWorker, signOut } = useAuth();
@@ -19,6 +20,7 @@ function App() {
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
   const [showDebug, setShowDebug] = useState(true); // Debug panel visibility
+  const [showDiagnostics, setShowDiagnostics] = useState(false); // Advanced diagnostics panel
   const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs();
   const { workers, error: workersError, refetch: refetchWorkers } = useWorkers();
 
@@ -70,12 +72,21 @@ function App() {
       <>
         <LoginForm />
         {showDebug && <SupabaseConnectionTest />}
-        <button 
-          onClick={() => setShowDebug(!showDebug)}
-          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
-        >
-          {showDebug ? 'Hide Debug' : 'Show Debug'}
-        </button>
+        {showDiagnostics && <SupabaseDiagnostics />}
+        <div className="fixed top-4 right-4 flex space-x-2 z-50">
+          <button 
+            onClick={() => setShowDebug(!showDebug)}
+            className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300"
+          >
+            {showDebug ? 'Hide Debug' : 'Show Debug'}
+          </button>
+          <button 
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="bg-blue-200 text-blue-800 px-3 py-1 rounded text-xs hover:bg-blue-300"
+          >
+            {showDiagnostics ? 'Hide Diagnostics' : 'Advanced Diagnostics'}
+          </button>
+        </div>
       </>
     );
   }
@@ -98,12 +109,21 @@ function App() {
           </button>
         </div>
         {showDebug && <SupabaseConnectionTest />}
-        <button 
-          onClick={() => setShowDebug(!showDebug)}
-          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
-        >
-          {showDebug ? 'Hide Debug' : 'Show Debug'}
-        </button>
+        {showDiagnostics && <SupabaseDiagnostics />}
+        <div className="fixed top-4 right-4 flex space-x-2 z-50">
+          <button 
+            onClick={() => setShowDebug(!showDebug)}
+            className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300"
+          >
+            {showDebug ? 'Hide Debug' : 'Show Debug'}
+          </button>
+          <button 
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="bg-blue-200 text-blue-800 px-3 py-1 rounded text-xs hover:bg-blue-300"
+          >
+            {showDiagnostics ? 'Hide Diagnostics' : 'Advanced Diagnostics'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -141,12 +161,21 @@ function App() {
           </button>
         </div>
         {showDebug && <SupabaseConnectionTest />}
-        <button 
-          onClick={() => setShowDebug(!showDebug)}
-          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
-        >
-          {showDebug ? 'Hide Debug' : 'Show Debug'}
-        </button>
+        {showDiagnostics && <SupabaseDiagnostics />}
+        <div className="fixed top-4 right-4 flex space-x-2 z-50">
+          <button 
+            onClick={() => setShowDebug(!showDebug)}
+            className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300"
+          >
+            {showDebug ? 'Hide Debug' : 'Show Debug'}
+          </button>
+          <button 
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="bg-blue-200 text-blue-800 px-3 py-1 rounded text-xs hover:bg-blue-300"
+          >
+            {showDiagnostics ? 'Hide Diagnostics' : 'Advanced Diagnostics'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -193,12 +222,21 @@ function App() {
         />
         
         {showDebug && <SupabaseConnectionTest />}
-        <button 
-          onClick={() => setShowDebug(!showDebug)}
-          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
-        >
-          {showDebug ? 'Hide Debug' : 'Show Debug'}
-        </button>
+        {showDiagnostics && <SupabaseDiagnostics />}
+        <div className="fixed top-4 right-4 flex space-x-2 z-50">
+          <button 
+            onClick={() => setShowDebug(!showDebug)}
+            className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300"
+          >
+            {showDebug ? 'Hide Debug' : 'Show Debug'}
+          </button>
+          <button 
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="bg-blue-200 text-blue-800 px-3 py-1 rounded text-xs hover:bg-blue-300"
+          >
+            {showDiagnostics ? 'Hide Diagnostics' : 'Advanced Diagnostics'}
+          </button>
+        </div>
       </div>
     </DndProvider>
   );
