@@ -58,7 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('AuthProvider: Found existing session');
           setUser(session.user);
           setSession(session);
+          // Run diagnostics on startup to check permissions
           await checkRLSPolicies();
+          await runDatabaseDiagnostics(session.user.email || '');
         }
       } catch (err) {
         console.error('AuthProvider: Error getting session:', err);
@@ -77,6 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
         setSession(session);
+        // Run diagnostics when user signs in
+        await checkRLSPolicies();
+        await runDatabaseDiagnostics(session.user.email || '');
       }
     });
 

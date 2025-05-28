@@ -81,23 +81,28 @@ export const getJobs = async () => {
       user_email: session.user.email
     });
 
-    // First get all jobs
-    const { data: jobs, error: jobsError } = await supabase
+    // First get all jobs - add debugging
+    console.log('getJobs: Attempting to fetch all jobs');
+    const { data: jobs, error: jobsError, status: jobsStatus } = await supabase
       .from('jobs')
       .select('*')
-      .order('created_at', { ascending: false })
-      .throwOnError();
+      .order('created_at', { ascending: false });
 
     if (jobsError) {
       console.error('getJobs: Jobs query failed:', jobsError);
       throw jobsError;
     }
 
+    console.log('getJobs: Jobs query response:', {
+      status: jobsStatus,
+      count: jobs?.length || 0,
+      first_job: jobs?.[0]?.address || 'none'
+    });
+
     // Then get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
-      .select('*')
-      .throwOnError();
+      .select('*');
 
     if (secondaryError) {
       console.error('getJobs: Secondary workers query failed:', secondaryError);
