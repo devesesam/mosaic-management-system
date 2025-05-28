@@ -55,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       // Call Supabase signOut API
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'global' });
       
       console.log('AuthProvider: Sign out complete');
     } catch (err) {
@@ -74,6 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('AuthProvider: Found existing session');
           setUser(session.user);
           setSession(session);
+          
+          // Test database access
           await checkRLSPolicies();
         } else {
           console.log('AuthProvider: No existing session found');
@@ -119,6 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setSession(null);
       
+      // Force signOut first to ensure clean state
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      // Now sign in
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
@@ -127,16 +133,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (signInError) {
         console.error('AuthProvider: Sign in error:', signInError);
         setError(signInError.message);
+        setUser(null);
+        setSession(null);
         return false;
       }
       
-      console.log('AuthProvider: Sign in successful');
+      console.log('AuthProvider: Sign in successful, user:', data.user?.email);
       setUser(data.user);
       setSession(data.session);
       return true;
     } catch (err) {
       console.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in');
+      setUser(null);
+      setSession(null);
       return false;
     } finally {
       setLoading(false);

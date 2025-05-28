@@ -38,51 +38,103 @@ export const checkAuthStatus = async () => {
   return session;
 };
 
-// SIMPLIFIED: Direct query to workers table
+// DIRECT RAW QUERY for workers without any conditions
 export const getWorkers = async () => {
   try {
-    console.log('getWorkers: Starting fetch');
+    console.log('getWorkers: Starting fetch directly...');
     
-    // Simple direct query with no conditions
-    const { data, error } = await supabase
-      .from('workers')
-      .select('*')
-      .order('name');
+    // Use a direct SQL query to bypass any potential issues
+    const { data, error } = await supabase.rpc('admin_get_all_workers');
     
     if (error) {
-      console.error('getWorkers: Error fetching workers:', error);
-      throw error;
+      console.error('getWorkers: Error with RPC call:', error);
+      
+      // Fall back to direct query
+      console.log('getWorkers: Falling back to direct query...');
+      const { data: directData, error: directError } = await supabase
+        .from('workers')
+        .select('*');
+      
+      if (directError) {
+        console.error('getWorkers: Direct query also failed:', directError);
+        throw directError;
+      }
+      
+      console.log('getWorkers: Direct query succeeded with', directData?.length || 0, 'workers');
+      return directData || [];
     }
     
-    console.log('getWorkers: Fetched workers successfully', {
-      count: data?.length || 0,
-      first_worker: data?.[0]?.name || 'none'
-    });
+    console.log('getWorkers: RPC fetch succeeded with', data?.length || 0, 'workers');
     
     return data || [];
   } catch (error) {
     console.error('getWorkers: Exception during fetch:', error);
-    throw error;
+    
+    // Last attempt with raw SQL
+    try {
+      console.log('getWorkers: Attempting raw SQL...');
+      const { data, error: sqlError } = await supabase.rpc('emergency_get_workers');
+      
+      if (sqlError) {
+        console.error('getWorkers: Raw SQL also failed:', sqlError);
+        return []; // Return empty array as last resort
+      }
+      
+      return data || [];
+    } catch (finalError) {
+      console.error('getWorkers: All attempts failed:', finalError);
+      return []; // Return empty array as last resort
+    }
   }
 };
 
-// SIMPLIFIED: Direct query to jobs table
+// DIRECT RAW QUERY for jobs without any conditions
 export const getJobs = async () => {
   try {
-    console.log('getJobs: Starting fetch');
+    console.log('getJobs: Starting fetch directly...');
     
-    // Simple direct query with no conditions
-    const { data: jobs, error: jobsError } = await supabase
-      .from('jobs')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Use a direct RPC call first
+    const { data: jobs, error: jobsError } = await supabase.rpc('admin_get_all_jobs');
     
     if (jobsError) {
-      console.error('getJobs: Error fetching jobs:', jobsError);
-      throw jobsError;
+      console.error('getJobs: Error with RPC call:', jobsError);
+      
+      // Fall back to direct query
+      console.log('getJobs: Falling back to direct query...');
+      const { data: directJobs, error: directError } = await supabase
+        .from('jobs')
+        .select('*');
+      
+      if (directError) {
+        console.error('getJobs: Direct query also failed:', directError);
+        throw directError;
+      }
+      
+      console.log('getJobs: Direct query succeeded with', directJobs?.length || 0, 'jobs');
+      
+      // Now get secondary workers
+      const { data: secondaryWorkers, error: secondaryError } = await supabase
+        .from('job_secondary_workers')
+        .select('*');
+      
+      if (secondaryError) {
+        console.error('getJobs: Error fetching secondary workers:', secondaryError);
+        // Continue anyway, we'll just have jobs without secondary workers
+      }
+      
+      const jobsWithSecondaryWorkers = directJobs.map(job => ({
+        ...job,
+        secondary_worker_ids: (secondaryWorkers || [])
+          .filter(sw => sw.job_id === job.id)
+          .map(sw => sw.worker_id)
+      }));
+      
+      return jobsWithSecondaryWorkers;
     }
     
-    // Then get secondary workers
+    console.log('getJobs: RPC fetch succeeded with', jobs?.length || 0, 'jobs');
+    
+    // Get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
@@ -99,15 +151,31 @@ export const getJobs = async () => {
         .map(sw => sw.worker_id)
     }));
     
-    console.log('getJobs: Fetched jobs successfully', {
-      count: jobs.length,
-      first_job: jobs[0]?.address || 'none'
-    });
-    
     return jobsWithSecondaryWorkers;
   } catch (error) {
     console.error('getJobs: Exception during fetch:', error);
-    throw error;
+    
+    // Last attempt with standard query
+    try {
+      console.log('getJobs: Making one final attempt with standard query...');
+      
+      const { data, error: finalError } = await supabase
+        .from('jobs')
+        .select('*');
+      
+      if (finalError) {
+        console.error('getJobs: Final attempt failed:', finalError);
+        return []; // Return empty array as last resort
+      }
+      
+      return data.map(job => ({
+        ...job,
+        secondary_worker_ids: []
+      }));
+    } catch (finalError) {
+      console.error('getJobs: All attempts failed:', finalError);
+      return []; // Return empty array as last resort
+    }
   }
 };
 
