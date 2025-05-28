@@ -23,7 +23,6 @@ import { useWorkerStore } from '../../store/workerStore';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
 
 interface WeekViewProps {
 }
@@ -36,7 +35,6 @@ const WeekView: React.FC<WeekViewProps> = () => {
   
   const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobStore();
   const { workers, fetchWorkers, addWorker } = useWorkerStore();
-  const { isAdmin } = useAuth();
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });

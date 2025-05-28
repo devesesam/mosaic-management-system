@@ -1,7 +1,6 @@
 import React from 'react';
-import { Book as Roof, LogOut, Plus, UserCheck } from 'lucide-react';
+import { Book as Roof, LogOut, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import toast from 'react-hot-toast';
 
 interface NavbarProps {
   onNewJob: () => void;
@@ -10,35 +9,7 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) => {
-  const { signOut, currentWorker, repairWorkerProfile, checkWorkerProfileStatus } = useAuth();
-
-  const handleWorkerCheck = async () => {
-    try {
-      const result = await checkWorkerProfileStatus();
-      if (result.success) {
-        toast.success('Worker profile is properly connected');
-      } else {
-        toast.error('Worker profile issue detected. Click the checkmark again to repair.');
-      }
-    } catch (error) {
-      toast.error('Failed to check worker profile');
-      console.error('Error checking worker profile:', error);
-    }
-  };
-
-  const handleWorkerRepair = async () => {
-    try {
-      const result = await repairWorkerProfile();
-      if (result.success) {
-        toast.success('Worker profile has been repaired');
-      } else {
-        toast.error('Failed to repair worker profile');
-      }
-    } catch (error) {
-      toast.error('Failed to repair worker profile');
-      console.error('Error repairing worker profile:', error);
-    }
-  };
+  const { signOut, user } = useAuth();
 
   return (
     <nav className="bg-[#0a2342] shadow-md">
@@ -48,18 +19,11 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) 
             <Roof className="h-8 w-8 text-white" />
             <span className="ml-2 text-white font-semibold text-lg">Tasman Roofing</span>
             
-            {currentWorker && (
+            {user && (
               <div className="ml-4 flex items-center">
                 <span className="text-white/70 text-sm mr-2">
-                  {currentWorker.name}
+                  {user.email}
                 </span>
-                <button 
-                  onClick={currentWorker ? handleWorkerCheck : handleWorkerRepair}
-                  className="text-white/70 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
-                  title="Check worker profile status"
-                >
-                  <UserCheck size={16} />
-                </button>
               </div>
             )}
           </div>
