@@ -204,10 +204,8 @@ const SupabaseConnectionTest = () => {
   }, []);
 
   return (
-    <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 max-w-md z-50 text-sm overflow-y-auto" style={{ maxHeight: '80vh' }}>
-      <h3 className="font-medium text-gray-800 mb-2">Supabase Connection Debug</h3>
-      
-      <div className="space-y-1 mb-3">
+    <div className="space-y-4">
+      <div className="space-y-1">
         <div className="flex justify-between">
           <span className="text-gray-600">Connected:</span>
           <span className={
@@ -245,7 +243,7 @@ const SupabaseConnectionTest = () => {
       </div>
       
       {status.workersData?.error && (
-        <div className="mb-3">
+        <div>
           <div className="text-red-600 font-medium">Workers Table Error:</div>
           <pre className="bg-red-50 p-2 rounded text-xs overflow-x-auto">
             {JSON.stringify(status.workersData.error, null, 2)}
@@ -254,7 +252,7 @@ const SupabaseConnectionTest = () => {
       )}
       
       {status.jobsData?.error && (
-        <div className="mb-3">
+        <div>
           <div className="text-red-600 font-medium">Jobs Table Error:</div>
           <pre className="bg-red-50 p-2 rounded text-xs overflow-x-auto">
             {JSON.stringify(status.jobsData.error, null, 2)}
@@ -263,7 +261,7 @@ const SupabaseConnectionTest = () => {
       )}
       
       {status.error && (
-        <div className="mb-3">
+        <div>
           <div className="text-red-600 font-medium">Connection Error:</div>
           <pre className="bg-red-50 p-2 rounded text-xs overflow-x-auto">
             {JSON.stringify(status.error, null, 2)}
@@ -273,7 +271,7 @@ const SupabaseConnectionTest = () => {
       
       {/* Display table list if available */}
       {status.tablesList && status.tablesList.length > 0 && (
-        <div className="mb-3">
+        <div>
           <div className="font-medium text-gray-700">Public Tables:</div>
           <ul className="list-disc pl-5 text-xs">
             {status.tablesList.map((table: any, index: number) => (
@@ -285,7 +283,7 @@ const SupabaseConnectionTest = () => {
       
       {/* Display worker columns if available */}
       {status.workersColumns && status.workersColumns.length > 0 && (
-        <div className="mb-3">
+        <div>
           <div className="font-medium text-gray-700">Workers Columns:</div>
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -310,7 +308,7 @@ const SupabaseConnectionTest = () => {
       
       {/* Display job columns if available */}
       {status.jobsColumns && status.jobsColumns.length > 0 && (
-        <div className="mb-3">
+        <div>
           <div className="font-medium text-gray-700">Jobs Columns:</div>
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -333,7 +331,7 @@ const SupabaseConnectionTest = () => {
         </div>
       )}
       
-      <div className="flex justify-between flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={checkConnection}
           disabled={status.loading}
@@ -368,13 +366,6 @@ const SupabaseConnectionTest = () => {
           className="bg-amber-600 text-white px-3 py-1 rounded text-xs hover:bg-amber-700"
         >
           Test Insert
-        </button>
-        
-        <button
-          onClick={() => console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL)}
-          className="bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300"
-        >
-          Log URL
         </button>
       </div>
     </div>
