@@ -94,8 +94,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const worker = await getCurrentWorker(user.email);
           if (worker) {
             setCurrentWorker(worker);
-          } else {
-            console.log('No worker profile found for this user, but continuing anyway');
           }
         } catch (err) {
           console.error('Error checking worker profile:', err);
