@@ -442,11 +442,12 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
 // Add a function to directly check if tables exist
 export const checkTablesExist = async () => {
   try {
-    // Test direct query to the pg_tables system view
+    // Test direct query to get table information
     const { data, error } = await supabase
-      .rpc('check_tables_exist', { 
-        table_names: ['workers', 'jobs', 'job_secondary_workers', 'users'] 
-      });
+      .from('information_schema.tables')
+      .select('table_name, table_schema')
+      .eq('table_schema', 'public')
+      .in('table_name', ['workers', 'jobs', 'job_secondary_workers', 'users']);
     
     if (error) {
       console.error('Error checking if tables exist:', error);

@@ -9,32 +9,63 @@ const SupabaseConnectionTest = () => {
     workersData?: any;
     jobsData?: any;
     lastChecked?: Date;
+    tablesInfo?: any;
+    tablesList?: any[];
+    workersColumns?: any[];
+    jobsColumns?: any[];
   }>({
     connected: false,
     loading: true
   });
 
+  // Direct check of database connection
   const checkConnection = async () => {
     setStatus(prev => ({ ...prev, loading: true }));
     
     try {
       console.log('Testing Supabase connection from component...');
       
-      // Test connection to workers table
+      // Test direct database query to ensure connection is working
+      const { data: healthCheck, error: healthError } = await supabase
+        .from('pg_stat_database')
+        .select('*')
+        .limit(1);
+      
+      if (healthError) {
+        console.error('Health check failed:', healthError);
+        setStatus({
+          connected: false,
+          loading: false,
+          error: healthError,
+          lastChecked: new Date()
+        });
+        return;
+      }
+      
+      // Test connection to workers table - simple direct query
       const workersResult = await supabase
         .from('workers')
-        .select('count')
+        .select('*')
         .limit(1);
       
-      // Test connection to jobs table
+      // Test connection to jobs table - simple direct query
       const jobsResult = await supabase
         .from('jobs')
-        .select('count')
+        .select('*')
         .limit(1);
       
-      // Check table structure
-      const { data: tableInfo } = await supabase
-        .rpc('get_table_info', { table_name: 'workers' });
+      // Try to get table info (without RPC)
+      const { data: tablesInfo, error: tablesError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_type', 'BASE TABLE');
+      
+      console.log('Connection test results:', {
+        workers: workersResult,
+        jobs: jobsResult,
+        tables: tablesInfo
+      });
       
       setStatus({
         connected: !workersResult.error && !jobsResult.error,
@@ -43,15 +74,17 @@ const SupabaseConnectionTest = () => {
           error: workersResult.error,
           status: workersResult.status,
           statusText: workersResult.statusText,
-          data: workersResult.data
+          data: workersResult.data,
+          count: workersResult.data?.length || 0
         },
         jobsData: {
           error: jobsResult.error,
           status: jobsResult.status,
           statusText: jobsResult.statusText,
-          data: jobsResult.data
+          data: jobsResult.data,
+          count: jobsResult.data?.length || 0
         },
-        tableInfo,
+        tablesInfo: tablesInfo || [],
         lastChecked: new Date()
       });
     } catch (error) {
@@ -65,29 +98,104 @@ const SupabaseConnectionTest = () => {
     }
   };
 
-  // List tables in database
+  // List tables in database - no RPC required
   const listTables = async () => {
     try {
+      console.log('Listing tables directly from information_schema...');
+      
       const { data, error } = await supabase
-        .rpc('list_tables');
+        .from('information_schema.tables')
+        .select('table_name, table_schema')
+        .eq('table_schema', 'public')
+        .eq('table_type', 'BASE TABLE');
       
       console.log('Tables in database:', data);
       console.log('List tables error:', error);
+      
+      if (error) {
+        console.error('Error listing tables:', error);
+        return;
+      }
+      
+      setStatus(prev => ({
+        ...prev,
+        tablesList: data
+      }));
     } catch (error) {
       console.error('Error listing tables:', error);
     }
   };
 
-  // Get table columns
+  // Get table columns - no RPC required
   const getTableColumns = async (table: string) => {
     try {
+      console.log(`Getting columns for ${table} directly from information_schema...`);
+      
       const { data, error } = await supabase
-        .rpc('get_table_columns', { table_name: table });
+        .from('information_schema.columns')
+        .select('column_name, data_type, is_nullable, column_default')
+        .eq('table_schema', 'public')
+        .eq('table_name', table)
+        .order('ordinal_position');
       
       console.log(`Columns for ${table}:`, data);
-      console.log('Get columns error:', error);
+      
+      if (error) {
+        console.error(`Error getting columns for ${table}:`, error);
+        return;
+      }
+      
+      if (table === 'workers') {
+        setStatus(prev => ({ ...prev, workersColumns: data }));
+      } else if (table === 'jobs') {
+        setStatus(prev => ({ ...prev, jobsColumns: data }));
+      }
     } catch (error) {
       console.error(`Error getting columns for ${table}:`, error);
+    }
+  };
+  
+  // Test a direct insert to verify write permissions
+  const testInsert = async () => {
+    try {
+      console.log('Testing write permissions with a direct insert...');
+      
+      // Generate a unique test name
+      const testName = `Test_${Date.now()}`;
+      
+      const { data, error } = await supabase
+        .from('workers')
+        .insert([
+          { name: testName, email: `${testName.toLowerCase()}@example.com`, role: 'admin' }
+        ])
+        .select();
+      
+      console.log('Insert test result:', { data, error });
+      
+      if (error) {
+        alert(`Insert failed: ${error.message}`);
+        return;
+      }
+      
+      // If insert succeeded, try to delete the test record
+      if (data && data.length > 0) {
+        const deleteResult = await supabase
+          .from('workers')
+          .delete()
+          .eq('id', data[0].id);
+        
+        console.log('Delete test result:', deleteResult);
+        
+        if (deleteResult.error) {
+          alert(`Insert succeeded but delete failed: ${deleteResult.error.message}`);
+          return;
+        }
+        
+        alert('Insert and delete test succeeded! Database write permissions are working.');
+      }
+    } catch (error) {
+      console.error('Error testing insert:', error);
+      alert(`Error testing insert: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -96,8 +204,8 @@ const SupabaseConnectionTest = () => {
   }, []);
 
   return (
-    <div className="fixed bottom-0 right-0 bg-white shadow-lg rounded-tl-lg p-4 max-w-md z-50 text-sm overflow-y-auto" style={{ maxHeight: '80vh' }}>
-      <h3 className="font-medium text-gray-800 mb-2">Supabase Connection Status</h3>
+    <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 max-w-md z-50 text-sm overflow-y-auto" style={{ maxHeight: '80vh' }}>
+      <h3 className="font-medium text-gray-800 mb-2">Supabase Connection Debug</h3>
       
       <div className="space-y-1 mb-3">
         <div className="flex justify-between">
@@ -114,7 +222,7 @@ const SupabaseConnectionTest = () => {
           <div className="flex justify-between">
             <span className="text-gray-600">Workers Table:</span>
             <span className={status.workersData.error ? 'text-red-600' : 'text-green-600'}>
-              {status.workersData.error ? 'Error' : 'OK'} ({status.workersData.status})
+              {status.workersData.error ? 'Error' : `OK (${status.workersData.count} rows)`}
             </span>
           </div>
         )}
@@ -123,7 +231,7 @@ const SupabaseConnectionTest = () => {
           <div className="flex justify-between">
             <span className="text-gray-600">Jobs Table:</span>
             <span className={status.jobsData.error ? 'text-red-600' : 'text-green-600'}>
-              {status.jobsData.error ? 'Error' : 'OK'} ({status.jobsData.status})
+              {status.jobsData.error ? 'Error' : `OK (${status.jobsData.count} rows)`}
             </span>
           </div>
         )}
@@ -163,6 +271,68 @@ const SupabaseConnectionTest = () => {
         </div>
       )}
       
+      {/* Display table list if available */}
+      {status.tablesList && status.tablesList.length > 0 && (
+        <div className="mb-3">
+          <div className="font-medium text-gray-700">Public Tables:</div>
+          <ul className="list-disc pl-5 text-xs">
+            {status.tablesList.map((table: any, index: number) => (
+              <li key={index}>{table.table_name}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
+      {/* Display worker columns if available */}
+      {status.workersColumns && status.workersColumns.length > 0 && (
+        <div className="mb-3">
+          <div className="font-medium text-gray-700">Workers Columns:</div>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="text-left p-1 border">Column</th>
+                <th className="text-left p-1 border">Type</th>
+                <th className="text-left p-1 border">Nullable</th>
+              </tr>
+            </thead>
+            <tbody>
+              {status.workersColumns.map((col: any, index: number) => (
+                <tr key={index}>
+                  <td className="p-1 border">{col.column_name}</td>
+                  <td className="p-1 border">{col.data_type}</td>
+                  <td className="p-1 border">{col.is_nullable === 'YES' ? 'Yes' : 'No'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      
+      {/* Display job columns if available */}
+      {status.jobsColumns && status.jobsColumns.length > 0 && (
+        <div className="mb-3">
+          <div className="font-medium text-gray-700">Jobs Columns:</div>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="text-left p-1 border">Column</th>
+                <th className="text-left p-1 border">Type</th>
+                <th className="text-left p-1 border">Nullable</th>
+              </tr>
+            </thead>
+            <tbody>
+              {status.jobsColumns.map((col: any, index: number) => (
+                <tr key={index}>
+                  <td className="p-1 border">{col.column_name}</td>
+                  <td className="p-1 border">{col.data_type}</td>
+                  <td className="p-1 border">{col.is_nullable === 'YES' ? 'Yes' : 'No'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      
       <div className="flex justify-between flex-wrap gap-2">
         <button
           onClick={checkConnection}
@@ -191,6 +361,13 @@ const SupabaseConnectionTest = () => {
           className="bg-indigo-600 text-white px-3 py-1 rounded text-xs hover:bg-indigo-700"
         >
           Job Columns
+        </button>
+        
+        <button
+          onClick={testInsert}
+          className="bg-amber-600 text-white px-3 py-1 rounded text-xs hover:bg-amber-700"
+        >
+          Test Insert
         </button>
         
         <button
