@@ -11,7 +11,7 @@ export function useJobs({ enabled = true } = {}) {
     queryKey: ['jobs'],
     queryFn: getJobs,
     enabled,
-    staleTime: 1000 * 30, // 30 seconds before refetching
+    staleTime: 1000 * 10, // 10 seconds before refetching
     refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: 1000,

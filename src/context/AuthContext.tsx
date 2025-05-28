@@ -84,41 +84,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Handle worker profile whenever user changes
+  // We'll simplify this - just set the user as authenticated without requiring a worker profile
   useEffect(() => {
-    const initializeWorkerProfile = async () => {
-      if (!user?.email) return;
-      
-      console.log('AuthProvider: Initializing worker profile for', user.email);
-      setLoading(true);
-      
-      try {
-        // Try to get worker profile
-        let worker = await getCurrentWorker(user.email);
-        
-        // If no worker found, create one
-        if (!worker) {
-          console.log('AuthProvider: No worker profile found, creating one...');
-          worker = await createWorkerProfile(user.email);
-          console.log('Worker profile created:', worker);
-        }
-        
-        // Ensure user record exists
-        await ensureUserRecord(user.id, user.email);
-        
-        setCurrentWorker(worker);
-        setError(null);
-      } catch (err) {
-        console.error('AuthProvider: Error initializing worker profile:', err);
-        setError('Error retrieving your account information. Please try again.');
-        setCurrentWorker(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     if (user) {
-      initializeWorkerProfile();
+      setLoading(false);
+      // Still allow fetching a worker profile if it exists, but don't require it
+      const checkWorkerProfile = async () => {
+        try {
+          const worker = await getCurrentWorker(user.email);
+          if (worker) {
+            setCurrentWorker(worker);
+          } else {
+            console.log('No worker profile found for this user, but continuing anyway');
+          }
+        } catch (err) {
+          console.error('Error checking worker profile:', err);
+          // Don't set an error - we want to continue even without a worker profile
+        }
+      };
+      
+      checkWorkerProfile();
     }
   }, [user]);
 

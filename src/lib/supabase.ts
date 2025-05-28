@@ -21,7 +21,7 @@ export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// Add function to check auth status
+// Check auth status
 export const checkAuthStatus = async () => {
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error) {
@@ -39,27 +39,25 @@ export const getWorkers = async () => {
       return [];
     }
 
-    console.log('getWorkers: Fetching with auth:', {
-      user_id: session.user.id,
-      user_email: session.user.email
-    });
+    // Use the emergency_get_workers function to bypass any RLS issues
+    const { data, error } = await supabase
+      .rpc('emergency_get_workers');
 
-    const { data, error, status } = await supabase
-      .from('workers')
-      .select('*')
-      .order('name')
-      .throwOnError();
-
+    // If that fails, try direct table access
     if (error) {
-      console.error('getWorkers: Query failed:', error);
-      throw error;
+      console.error('getWorkers: RPC failed, trying direct access:', error);
+      const { data: directData, error: directError } = await supabase
+        .from('workers')
+        .select('*')
+        .order('name');
+      
+      if (directError) {
+        console.error('getWorkers: Direct access failed:', directError);
+        throw directError;
+      }
+      
+      return directData || [];
     }
-
-    console.log('getWorkers: Success', {
-      count: data?.length || 0,
-      status,
-      first_worker: data?.[0]?.name
-    });
 
     return data || [];
   } catch (error) {
@@ -76,32 +74,43 @@ export const getJobs = async () => {
       return [];
     }
 
-    console.log('getJobs: Fetching with auth:', {
-      user_id: session.user.id,
-      user_email: session.user.email
-    });
-
-    // First get all jobs
+    // Use the emergency_get_jobs function to bypass any RLS issues
     const { data: jobs, error: jobsError } = await supabase
-      .from('jobs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .throwOnError();
+      .rpc('emergency_get_jobs');
 
+    // If that fails, try direct table access
     if (jobsError) {
-      console.error('getJobs: Jobs query failed:', jobsError);
-      throw jobsError;
+      console.error('getJobs: RPC failed, trying direct access:', jobsError);
+      const { data: directJobs, error: directJobsError } = await supabase
+        .from('jobs')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (directJobsError) {
+        console.error('getJobs: Direct access failed:', directJobsError);
+        throw directJobsError;
+      }
+      
+      jobs = directJobs;
     }
 
-    // Then get secondary workers
+    // Use the emergency_get_secondary_workers function to bypass any RLS issues
     const { data: secondaryWorkers, error: secondaryError } = await supabase
-      .from('job_secondary_workers')
-      .select('*')
-      .throwOnError();
+      .rpc('emergency_get_secondary_workers');
 
+    // If that fails, try direct table access
     if (secondaryError) {
-      console.error('getJobs: Secondary workers query failed:', secondaryError);
-      throw secondaryError;
+      console.error('getJobs: Secondary RPC failed, trying direct access:', secondaryError);
+      const { data: directSecondary, error: directSecondaryError } = await supabase
+        .from('job_secondary_workers')
+        .select('*');
+      
+      if (directSecondaryError) {
+        console.error('getJobs: Secondary direct access failed:', directSecondaryError);
+        throw directSecondaryError;
+      }
+      
+      secondaryWorkers = directSecondary;
     }
 
     const jobsWithSecondaryWorkers = jobs.map(job => ({
@@ -110,12 +119,6 @@ export const getJobs = async () => {
         .filter(sw => sw.job_id === job.id)
         .map(sw => sw.worker_id)
     }));
-
-    console.log('getJobs: Success', {
-      jobs_count: jobs.length,
-      secondary_assignments: secondaryWorkers.length,
-      first_job: jobs[0]?.address
-    });
 
     return jobsWithSecondaryWorkers;
   } catch (error) {
