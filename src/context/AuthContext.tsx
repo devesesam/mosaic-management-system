@@ -32,14 +32,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleSignOut = async () => {
     try {
       console.log('AuthProvider: Signing out user');
-      // Clear all state first
+      
+      // First, set loading state to prevent UI from continuing to show "signing in"
+      setLoading(true);
+      
+      // Clear all state before API call
       setSession(null);
       setUser(null);
       setError(null);
       
-      // Clear local storage and session storage
+      // Clear local storage and session storage explicitly
       localStorage.removeItem('supabase.auth.token');
       sessionStorage.removeItem('supabase.auth.token');
+      
+      // Additional cleanup for any other auth-related items
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('supabase.auth.')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('supabase.auth.')) {
+          sessionStorage.removeItem(key);
+        }
+      });
       
       // Call Supabase signOut
       await supabase.auth.signOut();
@@ -47,6 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('AuthProvider: Sign out complete');
     } catch (err) {
       console.error('Error signing out:', err);
+    } finally {
+      // Always ensure loading is set to false after sign out
+      setLoading(false);
     }
   };
 

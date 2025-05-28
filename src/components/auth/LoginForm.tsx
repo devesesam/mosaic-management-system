@@ -13,6 +13,12 @@ const LoginForm: React.FC = () => {
   // Ensure the user is always signed out when they reach the login page
   useEffect(() => {
     console.log('LoginForm: Ensuring user is signed out');
+    // Reset form fields
+    setEmail('');
+    setPassword('');
+    setIsSubmitting(false);
+    
+    // Call signOut to clear auth state
     signOut();
   }, [signOut]);
 
@@ -25,8 +31,12 @@ const LoginForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    
+    // Reset error state
     setError(null);
+    
+    // Set submitting state
+    setIsSubmitting(true);
 
     // Input validation
     if (!email) {
