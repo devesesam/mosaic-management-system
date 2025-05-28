@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Reset all state and clear storage
@@ -50,15 +50,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        console.log('AuthProvider: Initializing auth...');
+        setLoading(true);
+        
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
           console.log('AuthProvider: Found existing session');
           setUser(session.user);
           setSession(session);
+          
+          // Try to get or create worker profile for this user
+          if (session.user.email) {
+            try {
+              const worker = await getCurrentWorker(session.user.email);
+              setCurrentWorker(worker);
+              
+              // If no worker was found or created, try once more
+              if (!worker) {
+                console.log('AuthProvider: No worker profile found, explicitly creating one');
+                const newWorker = await createWorkerProfile(session.user.email);
+                setCurrentWorker(newWorker);
+              }
+              
+              // Also ensure user record exists
+              await ensureUserRecord(session.user.id, session.user.email);
+            } catch (err) {
+              console.error('Error getting/creating worker profile:', err);
+            }
+          }
         }
       } catch (err) {
         console.error('AuthProvider: Error getting session:', err);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -77,7 +102,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session.user.email) {
           try {
             const worker = await getCurrentWorker(session.user.email);
-            setCurrentWorker(worker || null);
+            
+            // If no worker was found, create one
+            if (!worker) {
+              const newWorker = await createWorkerProfile(session.user.email);
+              setCurrentWorker(newWorker);
+            } else {
+              setCurrentWorker(worker);
+            }
+            
+            // Also ensure user record exists
+            await ensureUserRecord(session.user.id, session.user.email);
           } catch (err) {
             console.error('Error fetching worker profile:', err);
           }
@@ -95,6 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     
     try {
+      console.log('AuthProvider: Attempting sign in for:', email);
+      
       const { error: signInError } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
@@ -112,13 +149,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Try to initialize worker profile right away
       if (email) {
         try {
+          console.log('AuthProvider: Fetching worker profile after sign in');
           const worker = await getCurrentWorker(email);
-          setCurrentWorker(worker || null);
           
           if (!worker) {
             // Try to create worker profile
+            console.log('AuthProvider: Creating worker profile after sign in');
             const newWorker = await createWorkerProfile(email);
             setCurrentWorker(newWorker);
+          } else {
+            setCurrentWorker(worker);
           }
         } catch (err) {
           console.error('Error initializing worker profile:', err);

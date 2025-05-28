@@ -12,7 +12,7 @@ export function useWorkers({ enabled = true } = {}) {
     queryFn: getWorkers,
     enabled,
     staleTime: 1000 * 5, // 5 seconds before refetching
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchInterval: 30000, // Refetch every 30 seconds
     refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: 1000,
@@ -49,6 +49,7 @@ export function useWorkers({ enabled = true } = {}) {
   // Force fetch on mount
   React.useEffect(() => {
     if (enabled) {
+      console.log('useWorkers: Forcing initial fetch');
       refetch();
     }
   }, [enabled, refetch]);
