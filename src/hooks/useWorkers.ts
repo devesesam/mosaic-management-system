@@ -11,7 +11,7 @@ export function useWorkers({ enabled = true } = {}) {
     queryKey: ['workers'],
     queryFn: getWorkers,
     enabled,
-    staleTime: 1000 * 5, // 5 seconds before refetching
+    staleTime: 1000 * 5, // 5 seconds before data is considered stale
     refetchInterval: 30000, // Refetch every 30 seconds
     refetchOnWindowFocus: true,
     retry: 3,
@@ -21,6 +21,14 @@ export function useWorkers({ enabled = true } = {}) {
       toast.error('Failed to load workers');
     }
   });
+
+  // Force fetch on mount
+  React.useEffect(() => {
+    if (enabled) {
+      console.log('useWorkers: Forcing initial fetch');
+      refetch();
+    }
+  }, [enabled, refetch]);
 
   const addWorkerMutation = useMutation({
     mutationFn: (worker: Omit<Worker, 'id' | 'created_at'>) => createWorker(worker),
@@ -45,14 +53,6 @@ export function useWorkers({ enabled = true } = {}) {
       toast.error('Failed to delete worker');
     },
   });
-
-  // Force fetch on mount
-  React.useEffect(() => {
-    if (enabled) {
-      console.log('useWorkers: Forcing initial fetch');
-      refetch();
-    }
-  }, [enabled, refetch]);
 
   // Log data changes
   React.useEffect(() => {

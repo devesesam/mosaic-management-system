@@ -11,7 +11,7 @@ export function useJobs({ enabled = true } = {}) {
     queryKey: ['jobs'],
     queryFn: getJobs,
     enabled,
-    staleTime: 1000 * 5, // 5 seconds before refetching
+    staleTime: 1000 * 5, // 5 seconds before data is considered stale
     refetchInterval: 30000, // Refetch every 30 seconds
     refetchOnWindowFocus: true,
     retry: 3,
@@ -21,6 +21,14 @@ export function useJobs({ enabled = true } = {}) {
       toast.error('Failed to load jobs');
     }
   });
+
+  // Force fetch on mount
+  React.useEffect(() => {
+    if (enabled) {
+      console.log('useJobs: Forcing initial fetch');
+      refetch();
+    }
+  }, [enabled, refetch]);
 
   const addJobMutation = useMutation({
     mutationFn: (job: Omit<Job, 'id' | 'created_at'>) => createJob(job),
@@ -58,14 +66,6 @@ export function useJobs({ enabled = true } = {}) {
       toast.error('Failed to delete job');
     },
   });
-
-  // Force fetch on mount
-  React.useEffect(() => {
-    if (enabled) {
-      console.log('useJobs: Forcing initial fetch');
-      refetch();
-    }
-  }, [enabled, refetch]);
 
   // Log data changes
   React.useEffect(() => {

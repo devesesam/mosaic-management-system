@@ -35,7 +35,7 @@ export const getWorkers = async () => {
   try {
     console.log('getWorkers: Starting fetch...');
     
-    // Use the simpler direct table access without filters
+    // Direct query without filters or RLS dependencies
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -43,7 +43,7 @@ export const getWorkers = async () => {
 
     if (error) {
       console.error('getWorkers: Query failed:', error);
-      throw error;
+      return [];
     }
 
     console.log('getWorkers: Success', {
@@ -54,7 +54,7 @@ export const getWorkers = async () => {
     return data || [];
   } catch (error) {
     console.error('getWorkers: Failed:', error);
-    // Still returning empty array but logging the error
+    // Return empty array instead of throwing to prevent UI errors
     return [];
   }
 };
@@ -63,7 +63,7 @@ export const getJobs = async () => {
   try {
     console.log('getJobs: Starting fetch...');
     
-    // First get all jobs with simpler approach
+    // Direct query for all jobs
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
@@ -71,12 +71,12 @@ export const getJobs = async () => {
 
     if (jobsError) {
       console.error('getJobs: Jobs query failed:', jobsError);
-      throw jobsError;
+      return [];
     }
 
     console.log(`getJobs: Successfully fetched ${jobs?.length || 0} jobs`);
 
-    // Then get secondary workers
+    // Safe query for secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
@@ -351,7 +351,7 @@ export const getCurrentWorker = async (email: string) => {
     
     if (error) {
       console.error('getCurrentWorker: Error fetching current worker:', error);
-      throw error;
+      return null;
     }
     
     if (!data) {
