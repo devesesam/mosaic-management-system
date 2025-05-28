@@ -2,10 +2,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { 
   supabase, 
-  isSupabaseInitialized, 
+  isSupabaseInitialized,
   checkRLSPolicies
 } from '../lib/supabase';
-import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
 interface AuthContextProps {
@@ -24,24 +23,20 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
 
-  // Reset all state and clear storage
+  // Clear all auth-related state and storage
   const handleSignOut = async () => {
     try {
-      console.log('AuthProvider: Signing out user');
+      console.log('AuthProvider: Starting sign out process');
       
-      // First, set loading state to prevent UI from continuing to show "signing in"
-      setLoading(true);
-      
-      // Clear all state before API call
+      // First clear all state
       setSession(null);
       setUser(null);
       setError(null);
       
-      // Clear local storage and session storage explicitly
+      // Clear local storage and session storage for any auth-related items
       localStorage.removeItem('supabase.auth.token');
       sessionStorage.removeItem('supabase.auth.token');
       
@@ -58,57 +53,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
       
-      // Call Supabase signOut
+      // Call Supabase signOut API
       await supabase.auth.signOut();
       
       console.log('AuthProvider: Sign out complete');
     } catch (err) {
-      console.error('Error signing out:', err);
-    } finally {
-      // Always ensure loading is set to false after sign out
-      setLoading(false);
+      console.error('Error during sign out:', err);
     }
   };
 
   // Initialize auth and set up listener
   useEffect(() => {
     const initializeAuth = async () => {
-      if (authInitialized) return;
-      
-      console.log('AuthProvider: Initializing auth');
-      setLoading(true);
-      
       try {
-        // Check for existing session
+        console.log('AuthProvider: Initializing auth state');
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-          console.log('AuthProvider: Found existing session for', session.user.email);
+          console.log('AuthProvider: Found existing session');
           setUser(session.user);
           setSession(session);
-          
-          // Run diagnostics on startup to check permissions
-          await checkRLSPolicies();
         } else {
           console.log('AuthProvider: No existing session found');
-          // Make sure state is cleared
           setUser(null);
           setSession(null);
+          // Make sure loading is false when no session
+          setLoading(false);
         }
       } catch (err) {
         console.error('AuthProvider: Error getting session:', err);
-        // Ensure state is cleared in case of error
         setUser(null);
         setSession(null);
-      } finally {
         setLoading(false);
-        setAuthInitialized(true);
       }
     };
     
     initializeAuth();
     
-    // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('AuthProvider: Auth state changed:', event);
 
@@ -119,29 +100,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('AuthProvider: User signed in:', session.user.email);
         setUser(session.user);
         setSession(session);
-        
-        // Run diagnostics when user signs in
-        await checkRLSPolicies();
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('AuthProvider: Token refreshed for', session.user.email);
-        setUser(session.user);
-        setSession(session);
       }
     });
 
     return () => {
-      console.log('AuthProvider: Cleaning up auth subscription');
       subscription.unsubscribe();
     };
-  }, [authInitialized]);
+  }, []);
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
     setLoading(true);
     
     try {
-      console.log('AuthProvider: Attempting sign in for', email);
-      
       // Clear existing state first
       setUser(null);
       setSession(null);
@@ -157,13 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      if (!data.user || !data.session) {
-        console.error('AuthProvider: Sign in succeeded but no user/session returned');
-        setError('Authentication failed. Please try again.');
-        return false;
-      }
-      
-      console.log('AuthProvider: Sign in successful for', email);
+      console.log('AuthProvider: Sign in successful');
       setUser(data.user);
       setSession(data.session);
       return true;
@@ -181,8 +146,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     
     try {
-      console.log('AuthProvider: Attempting sign up for', email);
-      
       const { error: signUpError } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -195,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('AuthProvider: Sign up error:', signUpError);
         setError(signUpError.message);
       } else {
-        console.log('AuthProvider: Sign up successful for', email);
+        console.log('AuthProvider: Sign up successful');
         setError('Account created. Please sign in.');
       }
     } catch (err) {

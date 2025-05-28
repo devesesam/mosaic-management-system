@@ -10,46 +10,30 @@ const LoginForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { signIn, signUp, error, loading, setError, signOut } = useAuth();
 
-  // Ensure the user is always signed out when they reach the login page
+  // Reset everything when the component mounts
   useEffect(() => {
-    console.log('LoginForm: Ensuring user is signed out');
-    // Reset form fields
+    // Reset form state completely
     setEmail('');
     setPassword('');
     setIsSubmitting(false);
+    setError(null);
     
-    // Call signOut to clear auth state
-    signOut();
-  }, [signOut]);
-
-  useEffect(() => {
-    // Show toast for any errors
-    if (error) {
-      toast.error(error);
-    }
-  }, [error]);
+    // Force sign out to ensure clean state
+    const clearAuth = async () => {
+      try {
+        await signOut();
+      } catch (err) {
+        console.error('Error clearing auth state:', err);
+      }
+    };
+    
+    clearAuth();
+  }, [signOut, setError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Reset error state
-    setError(null);
-    
-    // Set submitting state
     setIsSubmitting(true);
-
-    // Input validation
-    if (!email) {
-      setError('Email is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!password) {
-      setError('Password is required');
-      setIsSubmitting(false);
-      return;
-    }
+    setError(null);
 
     // Password validation for sign up
     if (isSignUp && password.length < 6) {
@@ -157,8 +141,8 @@ const LoginForm: React.FC = () => {
                 setIsSignUp(!isSignUp);
                 setError(null);
               }}
-              className="text-sm text-indigo-600 hover:text-indigo-500 font-medium focus:outline-none"
               disabled={isSubmitting || loading}
+              className="text-sm text-indigo-600 hover:text-indigo-500 font-medium focus:outline-none disabled:opacity-50"
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
