@@ -14,7 +14,31 @@ export function useJobs() {
       console.log('useJobs: Explicitly fetching jobs data');
       const result = await getJobs();
       console.log('useJobs: Got', result.length, 'jobs');
-      return result;
+      
+      // Ensure all jobs have the required fields for the calendar
+      const validatedJobs = result.map(job => ({
+        ...job,
+        // Convert dates to strings if they're not already
+        start_date: job.start_date ? job.start_date : null,
+        end_date: job.end_date ? job.end_date : null,
+        // Ensure other required fields
+        status: job.status || 'Awaiting Order',
+        tile_color: job.tile_color || '#3b82f6',
+        secondary_worker_ids: job.secondary_worker_ids || []
+      }));
+      
+      // Log the first job for debugging
+      if (validatedJobs.length > 0) {
+        console.log('useJobs: First job sample:', {
+          id: validatedJobs[0].id,
+          address: validatedJobs[0].address,
+          start_date: validatedJobs[0].start_date,
+          end_date: validatedJobs[0].end_date,
+          worker_id: validatedJobs[0].worker_id
+        });
+      }
+      
+      return validatedJobs;
     },
     enabled: true, // Always enabled regardless of auth state
     staleTime: Infinity, // Never consider data stale

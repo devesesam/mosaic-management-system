@@ -55,25 +55,49 @@ const WeekView: React.FC<WeekViewProps> = () => {
     fetchWorkers();
   }, [fetchJobs, fetchWorkers]);
   
+  // Debug log the jobs data
+  useEffect(() => {
+    if (jobs.length > 0) {
+      console.log('WeekView: Jobs loaded:', jobs.length);
+      console.log('WeekView: First job sample:', {
+        id: jobs[0].id,
+        address: jobs[0].address,
+        start_date: jobs[0].start_date,
+        end_date: jobs[0].end_date,
+        worker_id: jobs[0].worker_id
+      });
+    }
+  }, [jobs]);
+  
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
   
   // Get jobs for a worker on a specific day
   const getWorkerDayJobs = (workerId: string | null, day: Date) => {
     return jobs.filter(job => {
+      // Skip if worker doesn't match
       if (job.worker_id !== workerId) return false;
+      
+      // Skip if no start date
       if (!job.start_date) return false;
       
-      const jobStart = parseISO(job.start_date);
-      
-      if (job.end_date) {
-        const jobEnd = parseISO(job.end_date);
-        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
-               isSameDay(jobStart, day) || 
-               isSameDay(jobEnd, day);
+      try {
+        const jobStart = parseISO(job.start_date);
+        
+        // Handle jobs with end dates (multi-day jobs)
+        if (job.end_date) {
+          const jobEnd = parseISO(job.end_date);
+          return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
+                 isSameDay(jobStart, day) || 
+                 isSameDay(jobEnd, day);
+        }
+        
+        // For single-day jobs, just check the start date
+        return isSameDay(jobStart, day);
+      } catch (error) {
+        console.error('Error parsing job dates:', error, job);
+        return false;
       }
-      
-      return isSameDay(jobStart, day);
     });
   };
   
@@ -144,6 +168,11 @@ const WeekView: React.FC<WeekViewProps> = () => {
         updates.end_date = null;
       }
       
+      console.log('WeekView: Updating job with drop info:', {
+        job_id: job.id,
+        updates
+      });
+      
       await updateJob(job.id, updates);
       toast.success('Job updated successfully');
     } catch (error) {
@@ -154,8 +183,20 @@ const WeekView: React.FC<WeekViewProps> = () => {
 
   const handleJobResize = async (job: Job, days: number) => {
     try {
-      const startDate = job.start_date ? parseISO(job.start_date) : new Date();
+      if (!job.start_date) {
+        console.error('Cannot resize job without start_date');
+        return;
+      }
+      
+      const startDate = parseISO(job.start_date);
       const newEndDate = addDays(startDate, days - 1);
+      
+      console.log('WeekView: Resizing job:', {
+        job_id: job.id,
+        days,
+        start_date: job.start_date,
+        new_end_date: newEndDate.toISOString()
+      });
       
       await updateJob(job.id, {
         end_date: newEndDate.toISOString()

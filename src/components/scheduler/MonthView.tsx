@@ -40,6 +40,20 @@ const MonthView: React.FC<MonthViewProps> = () => {
   
   const { jobs, fetchJobs, updateJob, deleteJob } = useJobStore();
   
+  // Debug log the jobs data
+  useEffect(() => {
+    if (jobs.length > 0) {
+      console.log('MonthView: Jobs loaded:', jobs.length);
+      console.log('MonthView: First job sample:', {
+        id: jobs[0].id,
+        address: jobs[0].address,
+        start_date: jobs[0].start_date,
+        end_date: jobs[0].end_date,
+        worker_id: jobs[0].worker_id
+      });
+    }
+  }, [jobs]);
+  
   // Get start and end of week
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -85,20 +99,25 @@ const MonthView: React.FC<MonthViewProps> = () => {
       // If job has no start date, it can't be displayed on a specific day
       if (!job.start_date) return false;
       
-      const jobStart = parseISO(job.start_date);
-      
-      // If job has an end date, check if the day falls within the range
-      if (job.end_date) {
-        const jobEnd = parseISO(job.end_date);
+      try {
+        const jobStart = parseISO(job.start_date);
         
-        // Check if this day is within the job's date range
-        return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
-               isSameDay(jobStart, day) || 
-               isSameDay(jobEnd, day);
+        // If job has an end date, check if the day falls within the range
+        if (job.end_date) {
+          const jobEnd = parseISO(job.end_date);
+          
+          // Check if this day is within the job's date range
+          return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
+                 isSameDay(jobStart, day) || 
+                 isSameDay(jobEnd, day);
+        }
+        
+        // If no end date, just check if the day matches the start date
+        return isSameDay(jobStart, day);
+      } catch (error) {
+        console.error('Error parsing job dates:', error, job);
+        return false;
       }
-      
-      // If no end date, just check if the day matches the start date
-      return isSameDay(jobStart, day);
     });
   };
   
@@ -128,26 +147,42 @@ const MonthView: React.FC<MonthViewProps> = () => {
     const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
     
     // Get all multi-day jobs
-    const jobsWithDates = jobs.filter(job => 
-      job.start_date && job.end_date && 
-      !isSameDay(parseISO(job.start_date), parseISO(job.end_date)) && 
-      // Only include jobs that would be visible in the current month view
-      (
-        isWithinRange(parseISO(job.start_date), calendarStart, calendarEnd) ||
-        isWithinRange(parseISO(job.end_date), calendarStart, calendarEnd) ||
-        (isBefore(parseISO(job.start_date), calendarStart) && isAfter(parseISO(job.end_date), calendarEnd))
-      )
-    ).sort((a, b) => {
-      // Sort primarily by start date (earlier first)
-      const startA = parseISO(a.start_date!);
-      const startB = parseISO(b.start_date!);
-      const startCompare = startA.getTime() - startB.getTime();
-      if (startCompare !== 0) return startCompare;
+    const jobsWithDates = jobs.filter(job => {
+      if (!job.start_date || !job.end_date) return false;
       
-      // If start dates are the same, sort by duration (longer jobs first)
-      const endA = parseISO(a.end_date!);
-      const endB = parseISO(b.end_date!);
-      return differenceInDays(endB, startB) - differenceInDays(endA, startA);
+      try {
+        const startDate = parseISO(job.start_date);
+        const endDate = parseISO(job.end_date);
+        
+        // Check if this is a multi-day job that's visible in current month
+        return (
+          !isSameDay(startDate, endDate) && 
+          (
+            isWithinRange(startDate, calendarStart, calendarEnd) ||
+            isWithinRange(endDate, calendarStart, calendarEnd) ||
+            (isBefore(startDate, calendarStart) && isAfter(endDate, calendarEnd))
+          )
+        );
+      } catch (error) {
+        console.error('Error parsing job dates:', error, job);
+        return false;
+      }
+    }).sort((a, b) => {
+      try {
+        // Sort primarily by start date (earlier first)
+        const startA = parseISO(a.start_date!);
+        const startB = parseISO(b.start_date!);
+        const startCompare = startA.getTime() - startB.getTime();
+        if (startCompare !== 0) return startCompare;
+        
+        // If start dates are the same, sort by duration (longer jobs first)
+        const endA = parseISO(a.end_date!);
+        const endB = parseISO(b.end_date!);
+        return differenceInDays(endB, startB) - differenceInDays(endA, startA);
+      } catch (error) {
+        console.error('Error sorting jobs:', error, { a, b });
+        return 0;
+      }
     });
     
     // Initialize row assignments for each week
@@ -157,63 +192,67 @@ const MonthView: React.FC<MonthViewProps> = () => {
     
     // Process each multi-day job
     jobsWithDates.forEach(job => {
-      const startDate = parseISO(job.start_date!);
-      const endDate = parseISO(job.end_date!);
-      
-      // For each week, check if the job spans days within that week
-      weeks.forEach((week, weekIdx) => {
-        const weekStart = week[0];
-        const weekEnd = week[6];
+      try {
+        const startDate = parseISO(job.start_date!);
+        const endDate = parseISO(job.end_date!);
         
-        // Skip if job is completely outside this week
-        if (isBefore(endDate, weekStart) || isAfter(startDate, weekEnd)) {
-          return;
-        }
-        
-        // Find start and end column within this week
-        let startCol = 0;
-        let endCol = 6;
-        
-        // Adjust start column if job starts during or after this week
-        if (isAfter(startDate, weekStart) || isSameDay(startDate, weekStart)) {
-          for (let i = 0; i < 7; i++) {
-            if (isSameDay(week[i], startDate) || (i > 0 && isBefore(week[i-1], startDate) && isAfter(week[i], startDate))) {
-              startCol = i;
-              break;
+        // For each week, check if the job spans days within that week
+        weeks.forEach((week, weekIdx) => {
+          const weekStart = week[0];
+          const weekEnd = week[6];
+          
+          // Skip if job is completely outside this week
+          if (isBefore(endDate, weekStart) || isAfter(startDate, weekEnd)) {
+            return;
+          }
+          
+          // Find start and end column within this week
+          let startCol = 0;
+          let endCol = 6;
+          
+          // Adjust start column if job starts during or after this week
+          if (isAfter(startDate, weekStart) || isSameDay(startDate, weekStart)) {
+            for (let i = 0; i < 7; i++) {
+              if (isSameDay(week[i], startDate) || (i > 0 && isBefore(week[i-1], startDate) && isAfter(week[i], startDate))) {
+                startCol = i;
+                break;
+              }
             }
           }
-        }
-        
-        // Adjust end column if job ends during this week
-        if (isBefore(endDate, weekEnd) || isSameDay(endDate, weekEnd)) {
-          for (let i = 6; i >= 0; i--) {
-            if (isSameDay(week[i], endDate) || (i < 6 && isAfter(week[i+1], endDate) && isBefore(week[i], endDate))) {
-              endCol = i;
-              break;
+          
+          // Adjust end column if job ends during this week
+          if (isBefore(endDate, weekEnd) || isSameDay(endDate, weekEnd)) {
+            for (let i = 6; i >= 0; i--) {
+              if (isSameDay(week[i], endDate) || (i < 6 && isAfter(week[i+1], endDate) && isBefore(week[i], endDate))) {
+                endCol = i;
+                break;
+              }
             }
           }
-        }
-        
-        // Find an available row in this week
-        let rowIdx = 0;
-        while (isRowOccupied(rowAssignments[weekIdx], rowIdx, startCol, endCol)) {
-          rowIdx++;
-        }
-        
-        // Mark this row as occupied for these columns
-        for (let col = startCol; col <= endCol; col++) {
-          rowAssignments[weekIdx][col].push(rowIdx);
-        }
-        
-        // Add this segment to our list
-        multiDayJobs.push({
-          job,
-          startCol,
-          endCol,
-          weekIdx,
-          rowIdx
+          
+          // Find an available row in this week
+          let rowIdx = 0;
+          while (isRowOccupied(rowAssignments[weekIdx], rowIdx, startCol, endCol)) {
+            rowIdx++;
+          }
+          
+          // Mark this row as occupied for these columns
+          for (let col = startCol; col <= endCol; col++) {
+            rowAssignments[weekIdx][col].push(rowIdx);
+          }
+          
+          // Add this segment to our list
+          multiDayJobs.push({
+            job,
+            startCol,
+            endCol,
+            weekIdx,
+            rowIdx
+          });
         });
-      });
+      } catch (error) {
+        console.error('Error processing multi-day job:', error, job);
+      }
     });
     
     return multiDayJobs;
@@ -257,11 +296,17 @@ const MonthView: React.FC<MonthViewProps> = () => {
 
       // Calculate end date based on original duration
       if (job.start_date && job.end_date) {
-        const originalDuration = differenceInDays(
-          parseISO(job.end_date),
-          parseISO(job.start_date)
-        );
-        updates.end_date = addDays(date, originalDuration).toISOString();
+        try {
+          const originalDuration = differenceInDays(
+            parseISO(job.end_date),
+            parseISO(job.start_date)
+          );
+          updates.end_date = addDays(date, originalDuration).toISOString();
+        } catch (error) {
+          console.error('Error calculating job duration:', error, job);
+          // If we can't calculate duration, make it a single-day job
+          updates.end_date = date.toISOString();
+        }
       } else {
         // If it's a new job or didn't have dates before, make it a single-day job
         updates.end_date = date.toISOString();
@@ -307,7 +352,12 @@ const MonthView: React.FC<MonthViewProps> = () => {
     try {
       console.log('MonthView: Handling job resize:', { job_id: job.id, days });
       
-      const startDate = job.start_date ? parseISO(job.start_date) : new Date();
+      if (!job.start_date) {
+        console.error('Cannot resize job without start_date');
+        return;
+      }
+      
+      const startDate = parseISO(job.start_date);
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
       
       await updateJob(job.id, {

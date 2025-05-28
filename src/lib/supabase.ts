@@ -64,7 +64,9 @@ export const getWorkers = async () => {
     }
     
     console.log('SUCCESSFULLY LOADED WORKERS:', data?.length || 0);
-    console.log('Workers payload:', JSON.stringify(data, null, 2));
+    if (data && data.length > 0) {
+      console.log('First worker sample:', JSON.stringify(data[0], null, 2));
+    }
     return data || [];
   } catch (error) {
     console.error('CRITICAL ERROR IN getWorkers:', error);
@@ -93,12 +95,26 @@ export const getJobs = async () => {
       return [];
     }
 
-    console.log('Jobs raw payload:', JSON.stringify(jobs, null, 2));
+    // Ensure correct date formatting and defaults for calendar display
+    const processedJobs = (jobs || []).map(job => ({
+      ...job,
+      // Ensure dates are in ISO format with timezone if they exist
+      start_date: job.start_date || null,
+      end_date: job.end_date || null,
+      // Default status if missing
+      status: job.status || 'Awaiting Order',
+      // Default color if missing
+      tile_color: job.tile_color || '#3b82f6'
+    }));
+
+    console.log('Processed jobs sample:', 
+      processedJobs.length > 0 ? 
+      JSON.stringify(processedJobs[0], null, 2) : 
+      'No jobs found');
 
     // Get secondary workers if jobs were successfully fetched
-    if (jobs && jobs.length > 0) {
-      console.log('Getting secondary workers for', jobs.length, 'jobs');
-      console.log('Executing: supabase.from("job_secondary_workers").select("*")');
+    if (processedJobs.length > 0) {
+      console.log('Getting secondary workers for', processedJobs.length, 'jobs');
       
       const { data: secondaryWorkers, error: secondaryError } = await supabase
         .from('job_secondary_workers')
@@ -106,13 +122,12 @@ export const getJobs = async () => {
 
       if (secondaryError) {
         console.error('Error fetching secondary workers:', secondaryError);
-        console.log('Secondary workers error payload:', JSON.stringify(secondaryError, null, 2));
         // Continue with empty secondary workers
       } else {
-        console.log('Secondary workers payload:', JSON.stringify(secondaryWorkers, null, 2));
+        console.log('Loaded', secondaryWorkers?.length || 0, 'secondary worker assignments');
       }
 
-      const jobsWithSecondaryWorkers = jobs.map(job => ({
+      const jobsWithSecondaryWorkers = processedJobs.map(job => ({
         ...job,
         secondary_worker_ids: (secondaryWorkers || [])
           .filter(sw => sw.job_id === job.id)
@@ -120,6 +135,20 @@ export const getJobs = async () => {
       }));
 
       console.log('SUCCESSFULLY LOADED JOBS:', jobsWithSecondaryWorkers.length);
+      
+      // Log detailed sample of first job with dates for debugging
+      if (jobsWithSecondaryWorkers.length > 0) {
+        const sampleJob = jobsWithSecondaryWorkers[0];
+        console.log('Sample job with dates:', {
+          id: sampleJob.id,
+          address: sampleJob.address,
+          start_date: sampleJob.start_date,
+          end_date: sampleJob.end_date,
+          worker_id: sampleJob.worker_id,
+          secondary_workers: sampleJob.secondary_worker_ids
+        });
+      }
+      
       return jobsWithSecondaryWorkers;
     }
     
