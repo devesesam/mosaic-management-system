@@ -263,6 +263,12 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
     }
 
     console.log('createWorker: Creating worker:', worker);
+    
+    // Validate required fields
+    if (!worker.name) {
+      throw new Error('Worker name is required');
+    }
+    
     const { data, error } = await supabase
       .from('workers')
       .insert([worker])
@@ -278,7 +284,7 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
     return data;
   } catch (error) {
     console.error('Error in createWorker:', error);
-    throw error;
+    throw error; // Make sure we're propagating the error
   }
 };
 
