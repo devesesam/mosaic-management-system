@@ -48,29 +48,12 @@ const WeekView: React.FC<WeekViewProps> = () => {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
   
-  // Force data refresh every time the component mounts
+  // One-time data fetch when component mounts
   useEffect(() => {
+    console.log('WeekView: Initial data load');
     fetchJobs();
     fetchWorkers();
   }, [fetchJobs, fetchWorkers]);
-  
-  // Also set up an interval to refresh data periodically
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetchJobs();
-      fetchWorkers();
-    }, 60000); // Refresh every minute
-    
-    return () => clearInterval(intervalId);
-  }, [fetchJobs, fetchWorkers]);
-  
-  // Log basic data stats without full objects
-  useEffect(() => {
-    console.log('WeekView: Data loaded:', {
-      workerCount: workers.length,
-      jobCount: jobs.length
-    });
-  }, [jobs, workers]);
   
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);

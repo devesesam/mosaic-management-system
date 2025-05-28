@@ -11,9 +11,8 @@ export function useWorkers({ enabled = true } = {}) {
     queryKey: ['workers'],
     queryFn: getWorkers,
     enabled,
-    staleTime: 1000 * 5, // 5 seconds before data is considered stale
-    refetchInterval: 30000, // Refetch every 30 seconds
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 60, // 1 hour before data is considered stale
+    refetchOnWindowFocus: false, // Don't refetch when window gains focus
     retry: 3,
     retryDelay: 1000,
     onError: (error) => {
@@ -22,10 +21,10 @@ export function useWorkers({ enabled = true } = {}) {
     }
   });
 
-  // Force fetch on mount
+  // Force fetch only once on mount
   React.useEffect(() => {
     if (enabled) {
-      console.log('useWorkers: Forcing initial fetch');
+      console.log('useWorkers: Initial fetch only');
       refetch();
     }
   }, [enabled, refetch]);
@@ -54,9 +53,9 @@ export function useWorkers({ enabled = true } = {}) {
     },
   });
 
-  // Log data changes
+  // Log data changes - only on first load or actual data changes
   React.useEffect(() => {
-    console.log('useWorkers: Workers data updated:', {
+    console.log('useWorkers: Workers data loaded:', {
       count: workers.length,
       loading: isLoading,
       error: error ? 'Error loading workers' : null,

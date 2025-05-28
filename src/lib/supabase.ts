@@ -33,9 +33,7 @@ export const checkAuthStatus = async () => {
 
 export const getWorkers = async () => {
   try {
-    console.log('getWorkers: Starting fetch...');
-    
-    // Direct query without filters or RLS dependencies
+    // Fetch workers only once per call, not continuously
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -61,9 +59,7 @@ export const getWorkers = async () => {
 
 export const getJobs = async () => {
   try {
-    console.log('getJobs: Starting fetch...');
-    
-    // Direct query for all jobs
+    // Fetch jobs only once per call, not continuously
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')

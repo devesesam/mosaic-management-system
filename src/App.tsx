@@ -24,10 +24,11 @@ function App() {
     enabled: !!user
   });
 
-  // Force data refresh when user logs in
+  // Single data load when user logs in
   useEffect(() => {
     if (user) {
-      console.log('App: User authenticated, forcing data refresh');
+      console.log('App: User authenticated, loading data once');
+      // Only fetch once after login
       refetchJobs();
       refetchWorkers();
     }

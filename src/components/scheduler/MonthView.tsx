@@ -40,6 +40,7 @@ const MonthView: React.FC<MonthViewProps> = () => {
   
   const { jobs, fetchJobs, updateJob, deleteJob } = useJobStore();
   
+  // Get start and end of week
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   
@@ -69,29 +70,11 @@ const MonthView: React.FC<MonthViewProps> = () => {
     }
   });
 
-  // Force refresh jobs when component mounts
+  // One-time load of jobs when component mounts
   useEffect(() => {
-    console.log('MonthView: Component mounted - Forcing data refresh');
+    console.log('MonthView: Initial data load');
     fetchJobs();
   }, [fetchJobs]);
-  
-  // Also set up an interval to refresh data periodically
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      console.log('MonthView: Periodic data refresh');
-      fetchJobs();
-    }, 60000); // Refresh every minute
-    
-    return () => clearInterval(intervalId);
-  }, [fetchJobs]);
-  
-  // Debug to check data loading
-  useEffect(() => {
-    console.log('MonthView: Jobs loaded:', jobs.length);
-    if (jobs.length > 0) {
-      console.log('MonthView: Sample job:', jobs[0]);
-    }
-  }, [jobs]);
 
   // Get unscheduled jobs (no date and no worker)
   const unscheduledJobs = jobs.filter(job => !job.start_date && !job.worker_id);
@@ -286,7 +269,6 @@ const MonthView: React.FC<MonthViewProps> = () => {
       
       console.log('MonthView: Updating job with:', updates);
       await updateJob(job.id, updates);
-      await fetchJobs(); // Refresh jobs after update
       toast.success('Job scheduled');
     } catch (error) {
       toast.error('Failed to schedule job');
@@ -298,7 +280,6 @@ const MonthView: React.FC<MonthViewProps> = () => {
     try {
       if (selectedJob) {
         await updateJob(selectedJob.id, jobData);
-        await fetchJobs(); // Refresh jobs after update
         toast.success('Job updated successfully');
       }
       setIsJobFormOpen(false);
@@ -312,7 +293,6 @@ const MonthView: React.FC<MonthViewProps> = () => {
   const handleDeleteJob = async (id: string) => {
     try {
       await deleteJob(id);
-      await fetchJobs(); // Refresh jobs after delete
       toast.success('Job deleted successfully');
       setIsJobFormOpen(false);
       setSelectedJob(null);
@@ -333,42 +313,12 @@ const MonthView: React.FC<MonthViewProps> = () => {
       await updateJob(job.id, {
         end_date: newEndDate.toISOString()
       });
-      await fetchJobs(); // Refresh jobs after update
       toast.success('Job duration updated');
     } catch (error) {
       toast.error('Failed to update job duration');
       console.error('Error resizing job:', error);
     }
   };
-  
-  // Debug UI to show job data
-  const DebugPanel = () => (
-    <div className="p-3 bg-white border-b border-gray-200 text-sm text-gray-600">
-      <details>
-        <summary className="cursor-pointer font-medium">Debug Information</summary>
-        <div className="mt-2 p-3 bg-gray-50 rounded-md space-y-2">
-          <div>
-            <strong>Jobs:</strong> {jobs.length} loaded ({unscheduledJobs.length} unscheduled)
-            {jobs.length > 0 && (
-              <ul className="ml-4 list-disc">
-                {jobs.slice(0, 3).map(j => (
-                  <li key={j.id}>{j.address} - {j.status}</li>
-                ))}
-                {jobs.length > 3 && <li>...and {jobs.length - 3} more</li>}
-              </ul>
-            )}
-          </div>
-          
-          <button 
-            onClick={() => fetchJobs()}
-            className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
-          >
-            Refresh Jobs
-          </button>
-        </div>
-      </details>
-    </div>
-  );
 
   return (
     <div className="flex h-full flex-col">
@@ -403,9 +353,6 @@ const MonthView: React.FC<MonthViewProps> = () => {
             Today
           </button>
         </div>
-        
-        {/* Debug panel */}
-        <DebugPanel />
         
         {/* Debug information */}
         {jobs.length === 0 && (
