@@ -11,7 +11,7 @@ import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
-import DataDisplayModal from './components/debug/DataDisplayModal';
+import DirectDataFetcher from './components/debug/DirectDataFetcher';
 
 function App() {
   const { user, error: authError, currentWorker, signOut } = useAuth();
@@ -186,7 +186,7 @@ function App() {
         )}
 
         {showDataModal && (
-          <DataDisplayModal onClose={() => setShowDataModal(false)} />
+          <DirectDataFetcher onClose={() => setShowDataModal(false)} />
         )}
 
         <Toaster 
