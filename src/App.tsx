@@ -10,30 +10,19 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, RefreshCw, Bug } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { AlertTriangle } from 'lucide-react';
 
 function App() {
-  const { user, error: authError, signOut } = useAuth();
+  const { user, loading: authLoading, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
-  
-  const { 
-    jobs, 
-    addJob, 
-    error: jobsError, 
-    refetch: refetchJobs,
-    isRefetching: isRefetchingJobs
-  } = useJobs();
-  
-  const { 
-    workers, 
-    error: workersError, 
-    refetch: refetchWorkers,
-    isRefetching: isRefetchingWorkers
-  } = useWorkers();
+  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
+    enabled: !!user && !!currentWorker
+  });
+  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
+    enabled: !!user && !!currentWorker
+  });
 
   const handleNewJob = () => {
     setIsJobFormOpen(true);
@@ -48,26 +37,15 @@ function App() {
     }
   };
   
-  // Force refresh data when user logs in and periodically
   useEffect(() => {
-    if (user) {
-      console.log('App: User authenticated, forcing data refresh');
-      // Force immediate data refresh
-      refetchJobs();
-      refetchWorkers();
-      
-      // Set up periodic refresh
-      const interval = setInterval(() => {
-        console.log('App: Periodic data refresh');
-        refetchJobs();
-        refetchWorkers();
-      }, 30000); // Every 30 seconds
-      
-      return () => clearInterval(interval);
+    if (user && !currentWorker) {
+      console.log('App: User authenticated but no worker profile found');
+    } else if (user && currentWorker) {
+      console.log('App: User authenticated with worker profile:', currentWorker);
     }
-  }, [user, refetchJobs, refetchWorkers]);
+  }, [user, currentWorker]);
 
-  // Show login form if no user
+  // Show login form if no user - immediately show this instead of loading screen
   if (!user) {
     return <LoginForm />;
   }
@@ -93,6 +71,21 @@ function App() {
     );
   }
 
+  // Show loading spinner while fetching initial data
+  if (user && currentWorker && (isJobsLoading || isWorkersLoading || authLoading)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 text-indigo-600 animate-spin mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <p className="text-gray-600">Loading calendar data...</p>
+      </div>
+    );
+  }
+
   // Show error if there's any problem with the jobs or workers data
   if (jobsError || workersError) {
     return (
@@ -102,26 +95,14 @@ function App() {
             <AlertTriangle size={48} />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Error Loading Data</h2>
-          <p className="text-gray-600 mb-6 text-center">
-            {jobsError?.message || workersError?.message || 'Failed to load data. Please try again.'}
+          <p className="text-gray-600 mb-6">
+            {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
           </p>
           <button
-            onClick={() => {
-              setIsRetrying(true);
-              Promise.all([refetchJobs(), refetchWorkers()])
-                .finally(() => setIsRetrying(false));
-            }}
-            disabled={isRetrying}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
+            onClick={() => window.location.reload()}
+            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
           >
-            {isRetrying ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Retrying...
-              </>
-            ) : (
-              'Retry Loading Data'
-            )}
+            Refresh Page
           </button>
         </div>
       </div>
@@ -136,74 +117,6 @@ function App() {
           activeView={activeView}
           setActiveView={setActiveView}
         />
-
-        {/* Debug Panel */}
-        <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowDebug(!showDebug)}
-              className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600"
-            >
-              <Bug size={16} />
-              <span>Debug</span>
-            </button>
-            
-            <div className="text-sm">
-              <span className="mr-4">Workers: {workers.length}</span>
-              <span>Jobs: {jobs.length}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              setIsRetrying(true);
-              Promise.all([refetchJobs(), refetchWorkers()])
-                .finally(() => {
-                  setIsRetrying(false);
-                  toast.success('Data refreshed');
-                });
-            }}
-            disabled={isRetrying || isRefetchingJobs || isRefetchingWorkers}
-            className="flex items-center space-x-1 px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm"
-          >
-            <RefreshCw size={14} className={isRetrying || isRefetchingJobs || isRefetchingWorkers ? 'animate-spin' : ''} />
-            <span>Refresh Data</span>
-          </button>
-        </div>
-
-        {/* Debug Information */}
-        {showDebug && (
-          <div className="bg-gray-900 text-white p-4 overflow-auto max-h-64">
-            <div className="mb-3">
-              <h3 className="text-lg font-semibold mb-1">Workers ({workers.length})</h3>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                {workers.map(worker => (
-                  <div key={worker.id} className="bg-gray-800 p-2 rounded">
-                    <div className="font-medium">{worker.name}</div>
-                    <div className="opacity-70">{worker.email}</div>
-                    <div className="opacity-70">ID: {worker.id.substring(0, 8)}...</div>
-                  </div>
-                ))}
-                {workers.length === 0 && <div className="text-red-400">No workers found</div>}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-1">Jobs ({jobs.length})</h3>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                {jobs.slice(0, 6).map(job => (
-                  <div key={job.id} className="bg-gray-800 p-2 rounded">
-                    <div className="font-medium">{job.address}</div>
-                    <div className="opacity-70">{job.customer_name || 'No customer'}</div>
-                    <div className="opacity-70">Worker: {job.worker_id ? workers.find(w => w.id === job.worker_id)?.name || 'Unknown' : 'None'}</div>
-                  </div>
-                ))}
-                {jobs.length > 6 && <div className="opacity-70">...and {jobs.length - 6} more</div>}
-                {jobs.length === 0 && <div className="text-red-400">No jobs found</div>}
-              </div>
-            </div>
-          </div>
-        )}
 
         <main className="flex-1 overflow-hidden">
           {activeView === 'week' ? (

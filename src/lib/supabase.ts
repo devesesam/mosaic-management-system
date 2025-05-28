@@ -15,20 +15,13 @@ try {
   console.error('Error loading Supabase credentials:', error);
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'supabase.auth.token'
-  }
-});
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// Simple function to check auth status
+// Add function to check auth status
 export const checkAuthStatus = async () => {
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error) {
@@ -38,144 +31,96 @@ export const checkAuthStatus = async () => {
   return session;
 };
 
-// DIRECT RAW QUERY for workers without any conditions
 export const getWorkers = async () => {
   try {
-    console.log('getWorkers: Starting fetch directly...');
-    
-    // Use a direct SQL query to bypass any potential issues
-    const { data, error } = await supabase.rpc('admin_get_all_workers');
-    
-    if (error) {
-      console.error('getWorkers: Error with RPC call:', error);
-      
-      // Fall back to direct query
-      console.log('getWorkers: Falling back to direct query...');
-      const { data: directData, error: directError } = await supabase
-        .from('workers')
-        .select('*');
-      
-      if (directError) {
-        console.error('getWorkers: Direct query also failed:', directError);
-        throw directError;
-      }
-      
-      console.log('getWorkers: Direct query succeeded with', directData?.length || 0, 'workers');
-      return directData || [];
+    const session = await checkAuthStatus();
+    if (!session) {
+      console.error('getWorkers: No active session');
+      return [];
     }
-    
-    console.log('getWorkers: RPC fetch succeeded with', data?.length || 0, 'workers');
-    
+
+    console.log('getWorkers: Fetching with auth:', {
+      user_id: session.user.id,
+      user_email: session.user.email
+    });
+
+    const { data, error, status } = await supabase
+      .from('workers')
+      .select('*')
+      .order('name')
+      .throwOnError();
+
+    if (error) {
+      console.error('getWorkers: Query failed:', error);
+      throw error;
+    }
+
+    console.log('getWorkers: Success', {
+      count: data?.length || 0,
+      status,
+      first_worker: data?.[0]?.name
+    });
+
     return data || [];
   } catch (error) {
-    console.error('getWorkers: Exception during fetch:', error);
-    
-    // Last attempt with raw SQL
-    try {
-      console.log('getWorkers: Attempting raw SQL...');
-      const { data, error: sqlError } = await supabase.rpc('emergency_get_workers');
-      
-      if (sqlError) {
-        console.error('getWorkers: Raw SQL also failed:', sqlError);
-        return []; // Return empty array as last resort
-      }
-      
-      return data || [];
-    } catch (finalError) {
-      console.error('getWorkers: All attempts failed:', finalError);
-      return []; // Return empty array as last resort
-    }
+    console.error('getWorkers: Failed:', error);
+    throw error;
   }
 };
 
-// DIRECT RAW QUERY for jobs without any conditions
 export const getJobs = async () => {
   try {
-    console.log('getJobs: Starting fetch directly...');
-    
-    // Use a direct RPC call first
-    const { data: jobs, error: jobsError } = await supabase.rpc('admin_get_all_jobs');
-    
-    if (jobsError) {
-      console.error('getJobs: Error with RPC call:', jobsError);
-      
-      // Fall back to direct query
-      console.log('getJobs: Falling back to direct query...');
-      const { data: directJobs, error: directError } = await supabase
-        .from('jobs')
-        .select('*');
-      
-      if (directError) {
-        console.error('getJobs: Direct query also failed:', directError);
-        throw directError;
-      }
-      
-      console.log('getJobs: Direct query succeeded with', directJobs?.length || 0, 'jobs');
-      
-      // Now get secondary workers
-      const { data: secondaryWorkers, error: secondaryError } = await supabase
-        .from('job_secondary_workers')
-        .select('*');
-      
-      if (secondaryError) {
-        console.error('getJobs: Error fetching secondary workers:', secondaryError);
-        // Continue anyway, we'll just have jobs without secondary workers
-      }
-      
-      const jobsWithSecondaryWorkers = directJobs.map(job => ({
-        ...job,
-        secondary_worker_ids: (secondaryWorkers || [])
-          .filter(sw => sw.job_id === job.id)
-          .map(sw => sw.worker_id)
-      }));
-      
-      return jobsWithSecondaryWorkers;
+    const session = await checkAuthStatus();
+    if (!session) {
+      console.error('getJobs: No active session');
+      return [];
     }
-    
-    console.log('getJobs: RPC fetch succeeded with', jobs?.length || 0, 'jobs');
-    
-    // Get secondary workers
+
+    console.log('getJobs: Fetching with auth:', {
+      user_id: session.user.id,
+      user_email: session.user.email
+    });
+
+    // First get all jobs
+    const { data: jobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .throwOnError();
+
+    if (jobsError) {
+      console.error('getJobs: Jobs query failed:', jobsError);
+      throw jobsError;
+    }
+
+    // Then get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
-      .select('*');
-    
+      .select('*')
+      .throwOnError();
+
     if (secondaryError) {
-      console.error('getJobs: Error fetching secondary workers:', secondaryError);
-      // Continue anyway, we'll just have jobs without secondary workers
+      console.error('getJobs: Secondary workers query failed:', secondaryError);
+      throw secondaryError;
     }
-    
+
     const jobsWithSecondaryWorkers = jobs.map(job => ({
       ...job,
-      secondary_worker_ids: (secondaryWorkers || [])
+      secondary_worker_ids: secondaryWorkers
         .filter(sw => sw.job_id === job.id)
         .map(sw => sw.worker_id)
     }));
-    
+
+    console.log('getJobs: Success', {
+      jobs_count: jobs.length,
+      secondary_assignments: secondaryWorkers.length,
+      first_job: jobs[0]?.address
+    });
+
     return jobsWithSecondaryWorkers;
   } catch (error) {
-    console.error('getJobs: Exception during fetch:', error);
-    
-    // Last attempt with standard query
-    try {
-      console.log('getJobs: Making one final attempt with standard query...');
-      
-      const { data, error: finalError } = await supabase
-        .from('jobs')
-        .select('*');
-      
-      if (finalError) {
-        console.error('getJobs: Final attempt failed:', finalError);
-        return []; // Return empty array as last resort
-      }
-      
-      return data.map(job => ({
-        ...job,
-        secondary_worker_ids: []
-      }));
-    } catch (finalError) {
-      console.error('getJobs: All attempts failed:', finalError);
-      return []; // Return empty array as last resort
-    }
+    console.error('getJobs: Failed:', error);
+    throw error;
   }
 };
 
@@ -398,6 +343,113 @@ export const deleteWorker = async (id: string) => {
     return true;
   } catch (error) {
     console.error('Error in deleteWorker:', error);
+    throw error;
+  }
+};
+
+export const getCurrentWorker = async (email: string) => {
+  try {
+    if (!isSupabaseInitialized()) {
+      throw new Error('Supabase is not properly initialized');
+    }
+
+    console.log('getCurrentWorker: Fetching worker for email:', email);
+    
+    const { data, error } = await supabase
+      .from('workers')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('getCurrentWorker: Error fetching current worker:', error);
+      throw error;
+    }
+    
+    console.log(`getCurrentWorker: Worker data for email: ${email}`, data);
+    
+    return data;
+  } catch (error) {
+    console.error('getCurrentWorker: Error in getCurrentWorker:', error);
+    throw error;
+  }
+};
+
+export const createWorkerProfile = async (email: string, name?: string) => {
+  try {
+    console.log(`createWorkerProfile: Creating worker profile for ${email}...`);
+    
+    const { data, error } = await supabase
+      .from('workers')
+      .upsert(
+        {
+          name: name || email.split('@')[0],
+          email: email,
+          role: 'admin'
+        },
+        { 
+          onConflict: 'email',
+          ignoreDuplicates: false
+        }
+      )
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Failed to create worker profile:', error);
+      throw error;
+    }
+    
+    console.log('Worker profile created/updated:', data);
+    return data;
+  } catch (error) {
+    console.error('Error creating worker profile:', error);
+    throw error;
+  }
+};
+
+export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
+  try {
+    console.log(`ensureUserRecord: Ensuring user record for ${email}...`);
+    
+    // First check if the user already exists
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authUserId)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "Row not found" which is expected
+      console.error('Error checking if user exists:', checkError);
+    }
+    
+    if (existingUser) {
+      console.log('User record already exists:', existingUser);
+      return existingUser;
+    }
+    
+    // If not, create the user record
+    console.log('Creating new user record with ID:', authUserId);
+    const { data, error } = await supabase
+      .from('users')
+      .insert([{
+        id: authUserId,
+        name: name || email.split('@')[0],
+        email: email,
+        role: 'admin'
+      }])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating user record:', error);
+      throw error;
+    }
+    
+    console.log('User record created successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in ensureUserRecord:', error);
     throw error;
   }
 };

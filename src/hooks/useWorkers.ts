@@ -7,17 +7,10 @@ import toast from 'react-hot-toast';
 export function useWorkers({ enabled = true } = {}) {
   const queryClient = useQueryClient();
 
-  const { 
-    data: workers = [], 
-    isLoading, 
-    error, 
-    refetch, 
-    isRefetching,
-    dataUpdatedAt
-  } = useQuery({
+  const { data: workers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['workers'],
     queryFn: getWorkers,
-    enabled: true, // Always enabled, ignore the parameter
+    enabled,
     staleTime: 1000 * 30, // 30 seconds before refetching
     refetchOnWindowFocus: true,
     retry: 3,
@@ -57,20 +50,13 @@ export function useWorkers({ enabled = true } = {}) {
     console.log('useWorkers: Workers data updated:', {
       count: workers.length,
       loading: isLoading,
-      error: error ? 'Error loading workers' : null,
-      dataUpdatedAt: dataUpdatedAt ? new Date(dataUpdatedAt).toISOString() : null
+      error: error ? 'Error loading workers' : null
     });
-  }, [workers, isLoading, error, dataUpdatedAt]);
-
-  // Force refetch on mount
-  React.useEffect(() => {
-    refetch();
-  }, [refetch]);
+  }, [workers, isLoading, error]);
 
   return {
     workers,
     isLoading,
-    isRefetching,
     error,
     refetch,
     addWorker: addWorkerMutation.mutate,

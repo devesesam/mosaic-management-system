@@ -9,7 +9,7 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) => {
-  const { signOut, user } = useAuth();
+  const { signOut, currentWorker } = useAuth();
 
   return (
     <nav className="bg-[#0a2342] shadow-md">
@@ -19,10 +19,10 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) 
             <Roof className="h-8 w-8 text-white" />
             <span className="ml-2 text-white font-semibold text-lg">Tasman Roofing</span>
             
-            {user && (
+            {currentWorker && (
               <div className="ml-4 flex items-center">
                 <span className="text-white/70 text-sm mr-2">
-                  {user.email}
+                  {currentWorker.name}
                 </span>
               </div>
             )}
