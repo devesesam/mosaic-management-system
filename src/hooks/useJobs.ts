@@ -11,7 +11,8 @@ export function useJobs({ enabled = true } = {}) {
     queryKey: ['jobs'],
     queryFn: getJobs,
     enabled,
-    staleTime: 1000 * 10, // 10 seconds before refetching
+    staleTime: 1000 * 5, // 5 seconds before refetching
+    refetchInterval: 10000, // Refetch every 10 seconds
     refetchOnWindowFocus: true,
     retry: 3,
     retryDelay: 1000,
@@ -58,12 +59,20 @@ export function useJobs({ enabled = true } = {}) {
     },
   });
 
+  // Force fetch on mount
+  React.useEffect(() => {
+    if (enabled) {
+      refetch();
+    }
+  }, [enabled, refetch]);
+
   // Log data changes
   React.useEffect(() => {
     console.log('useJobs: Jobs data updated:', {
       count: jobs.length,
       loading: isLoading,
-      error: error ? 'Error loading jobs' : null
+      error: error ? 'Error loading jobs' : null,
+      first_job: jobs.length > 0 ? jobs[0].address : 'No jobs'
     });
   }, [jobs, isLoading, error]);
 

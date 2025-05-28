@@ -108,6 +108,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       console.log('AuthProvider: Sign in successful');
+      
+      // Try to initialize worker profile right away
+      if (email) {
+        try {
+          const worker = await getCurrentWorker(email);
+          setCurrentWorker(worker || null);
+          
+          if (!worker) {
+            // Try to create worker profile
+            const newWorker = await createWorkerProfile(email);
+            setCurrentWorker(newWorker);
+          }
+        } catch (err) {
+          console.error('Error initializing worker profile:', err);
+        }
+      }
+      
       setLoading(false);
       return true;
     } catch (err) {

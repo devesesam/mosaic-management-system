@@ -10,19 +10,28 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 function App() {
   const { user, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  const { jobs, addJob, error: jobsError } = useJobs({
+  const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs({
     enabled: !!user
   });
-  const { workers, error: workersError } = useWorkers({
+  const { workers, error: workersError, refetch: refetchWorkers } = useWorkers({
     enabled: !!user
   });
+
+  // Force data refresh when user logs in
+  useEffect(() => {
+    if (user) {
+      console.log('App: User authenticated, forcing data refresh');
+      refetchJobs();
+      refetchWorkers();
+    }
+  }, [user, refetchJobs, refetchWorkers]);
 
   const handleNewJob = () => {
     setIsJobFormOpen(true);
@@ -76,15 +85,35 @@ function App() {
             {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
           </p>
           <button
-            onClick={() => window.location.reload()}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+            onClick={() => {
+              setIsRetrying(true);
+              refetchJobs();
+              refetchWorkers();
+              setTimeout(() => setIsRetrying(false), 1000);
+            }}
+            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
+            disabled={isRetrying}
           >
-            Refresh Page
+            {isRetrying ? (
+              <>
+                <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              'Refresh Data'
+            )}
           </button>
         </div>
       </div>
     );
   }
+
+  // Debug data
+  console.log('App render: Data stats', {
+    jobCount: jobs.length,
+    workerCount: workers.length,
+    currentWorker: currentWorker?.name || 'Unknown'
+  });
 
   return (
     <DndProvider backend={HTML5Backend}>

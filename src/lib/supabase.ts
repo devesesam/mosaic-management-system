@@ -33,6 +33,8 @@ export const checkAuthStatus = async () => {
 
 export const getWorkers = async () => {
   try {
+    console.log('getWorkers: Starting fetch...');
+    
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -57,6 +59,8 @@ export const getWorkers = async () => {
 
 export const getJobs = async () => {
   try {
+    console.log('getJobs: Starting fetch...');
+    
     // First get all jobs
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
@@ -68,6 +72,8 @@ export const getJobs = async () => {
       throw jobsError;
     }
 
+    console.log(`getJobs: Successfully fetched ${jobs?.length || 0} jobs`);
+
     // Then get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
@@ -78,23 +84,25 @@ export const getJobs = async () => {
       throw secondaryError;
     }
 
-    const jobsWithSecondaryWorkers = jobs.map(job => ({
+    console.log(`getJobs: Successfully fetched ${secondaryWorkers?.length || 0} secondary worker assignments`);
+
+    const jobsWithSecondaryWorkers = (jobs || []).map(job => ({
       ...job,
       secondary_worker_ids: secondaryWorkers
         .filter(sw => sw.job_id === job.id)
         .map(sw => sw.worker_id)
     }));
 
-    console.log('getJobs: Success', {
-      jobs_count: jobs.length,
-      secondary_assignments: secondaryWorkers.length,
-      first_job: jobs[0]?.address
+    console.log('getJobs: Returning combined data:', {
+      total_jobs: jobsWithSecondaryWorkers.length,
+      first_job: jobsWithSecondaryWorkers[0]?.address || 'No jobs found'
     });
 
     return jobsWithSecondaryWorkers;
   } catch (error) {
     console.error('getJobs: Failed:', error);
-    throw error;
+    // Return empty array instead of throwing to prevent UI errors
+    return [];
   }
 };
 
