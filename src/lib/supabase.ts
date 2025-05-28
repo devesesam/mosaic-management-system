@@ -44,11 +44,20 @@ export const getWorkers = async () => {
       user_email: session.user.email
     });
 
+    // Direct debug query to verify database access
+    const { count: workerCount, error: countError } = await supabase
+      .from('workers')
+      .select('*', { count: 'exact', head: true });
+      
+    console.log('getWorkers: Database check -', {
+      total_count: workerCount,
+      error: countError ? countError.message : null
+    });
+
     const { data, error, status } = await supabase
       .from('workers')
       .select('*')
-      .order('name')
-      .throwOnError();
+      .order('name');
 
     if (error) {
       console.error('getWorkers: Query failed:', error);
@@ -58,7 +67,7 @@ export const getWorkers = async () => {
     console.log('getWorkers: Success', {
       count: data?.length || 0,
       status,
-      first_worker: data?.[0]?.name
+      first_worker: data?.[0]?.name || 'none'
     });
 
     return data || [];
@@ -79,6 +88,16 @@ export const getJobs = async () => {
     console.log('getJobs: Fetching with auth:', {
       user_id: session.user.id,
       user_email: session.user.email
+    });
+
+    // Direct debug query to verify database access
+    const { count: jobCount, error: countError } = await supabase
+      .from('jobs')
+      .select('*', { count: 'exact', head: true });
+      
+    console.log('getJobs: Database check -', {
+      total_count: jobCount,
+      error: countError ? countError.message : null
     });
 
     // First get all jobs - add debugging
@@ -119,7 +138,7 @@ export const getJobs = async () => {
     console.log('getJobs: Success', {
       jobs_count: jobs.length,
       secondary_assignments: secondaryWorkers.length,
-      first_job: jobs[0]?.address
+      first_job: jobs[0]?.address || 'none'
     });
 
     return jobsWithSecondaryWorkers;
