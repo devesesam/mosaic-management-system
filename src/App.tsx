@@ -17,10 +17,10 @@ function App() {
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError } = useJobs({
+  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError, refetch: refetchJobs } = useJobs({
     enabled: !!user && !!currentWorker
   });
-  const { workers, isLoading: isWorkersLoading, error: workersError } = useWorkers({
+  const { workers, isLoading: isWorkersLoading, error: workersError, refetch: refetchWorkers } = useWorkers({
     enabled: !!user && !!currentWorker
   });
 
@@ -42,8 +42,11 @@ function App() {
       console.log('App: User authenticated but no worker profile found');
     } else if (user && currentWorker) {
       console.log('App: User authenticated with worker profile:', currentWorker);
+      // Force data refresh when worker profile is available
+      refetchJobs();
+      refetchWorkers();
     }
-  }, [user, currentWorker]);
+  }, [user, currentWorker, refetchJobs, refetchWorkers]);
 
   // Show login form if no user - immediately show this instead of loading screen
   if (!user) {
@@ -94,10 +97,22 @@ function App() {
             {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
           </p>
           <button
-            onClick={() => window.location.reload()}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+            onClick={() => {
+              setIsRetrying(true);
+              Promise.all([refetchJobs(), refetchWorkers()])
+                .finally(() => setIsRetrying(false));
+            }}
+            disabled={isRetrying}
+            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
           >
-            Refresh Page
+            {isRetrying ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Retrying...
+              </>
+            ) : (
+              'Retry Loading Data'
+            )}
           </button>
         </div>
       </div>

@@ -54,7 +54,23 @@ export const getWorkers = async () => {
       error: countError ? countError.message : null
     });
 
-    // Try with service role if needed
+    // Try using the admin function first (bypasses RLS)
+    console.log('getWorkers: Attempting to use admin function');
+    const { data: adminData, error: adminError } = await supabase
+      .rpc('admin_get_all_workers');
+
+    if (!adminError && adminData && adminData.length > 0) {
+      console.log('getWorkers: Success using admin function', {
+        count: adminData.length,
+        first_worker: adminData[0]?.name || 'none'
+      });
+      return adminData;
+    } else if (adminError) {
+      console.log('getWorkers: Admin function failed:', adminError.message);
+    }
+
+    // Fall back to regular query
+    console.log('getWorkers: Falling back to regular query');
     const { data, error, status } = await supabase
       .from('workers')
       .select('*')
@@ -100,6 +116,37 @@ export const getJobs = async () => {
       total_count: jobCount,
       error: countError ? countError.message : null
     });
+
+    // Try using the admin function first (bypasses RLS)
+    console.log('getJobs: Attempting to use admin function');
+    const { data: adminData, error: adminError } = await supabase
+      .rpc('admin_get_all_jobs');
+
+    if (!adminError && adminData && adminData.length > 0) {
+      console.log('getJobs: Success using admin function', {
+        count: adminData.length,
+        first_job: adminData[0]?.address || 'none'
+      });
+      
+      // Get secondary workers using admin function
+      const { data: adminSecondaryData, error: adminSecondaryError } = await supabase
+        .rpc('admin_get_all_secondary_workers');
+        
+      if (adminSecondaryError) {
+        console.error('getJobs: Admin secondary workers query failed:', adminSecondaryError);
+      }
+      
+      const jobsWithSecondaryWorkers = adminData.map(job => ({
+        ...job,
+        secondary_worker_ids: (adminSecondaryError ? [] : adminSecondaryData || [])
+          .filter((sw: any) => sw.job_id === job.id)
+          .map((sw: any) => sw.worker_id)
+      }));
+      
+      return jobsWithSecondaryWorkers;
+    } else if (adminError) {
+      console.log('getJobs: Admin function failed:', adminError.message);
+    }
 
     // First get all jobs - add debugging
     console.log('getJobs: Attempting to fetch all jobs');
