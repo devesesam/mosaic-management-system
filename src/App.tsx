@@ -20,13 +20,33 @@ function App() {
   const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs();
   const { workers, error: workersError, refetch: refetchWorkers } = useWorkers();
 
-  // Force data load when user is authenticated
+  // Force immediate data load when component mounts or user changes
   useEffect(() => {
+    console.log('App: Initial data load or user changed -', user ? 'User logged in' : 'No user');
+    
     if (user) {
-      console.log('App: User authenticated, loading data');
+      // Delay slightly to ensure auth is fully processed
+      const timer = setTimeout(() => {
+        console.log('App: Triggering data fetch');
+        refetchJobs();
+        refetchWorkers();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, refetchJobs, refetchWorkers]);
+
+  // Set up periodic refresh
+  useEffect(() => {
+    if (!user) return;
+    
+    const interval = setInterval(() => {
+      console.log('App: Periodic data refresh');
       refetchJobs();
       refetchWorkers();
-    }
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(interval);
   }, [user, refetchJobs, refetchWorkers]);
 
   const handleNewJob = () => {

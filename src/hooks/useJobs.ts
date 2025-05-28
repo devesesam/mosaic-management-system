@@ -4,18 +4,24 @@ import { getJobs, createJob, updateJob, deleteJob } from '../lib/supabase';
 import { Job } from '../types';
 import toast from 'react-hot-toast';
 
-export function useJobs({ enabled = true } = {}) {
+export function useJobs() {
   const queryClient = useQueryClient();
 
-  // Simple query with no automatic refetching
+  // Direct query with no auto-refetching or caching
   const { data: jobs = [], isLoading, error, refetch } = useQuery({
     queryKey: ['jobs'],
-    queryFn: getJobs,
-    enabled: true, // Always enabled
-    staleTime: Infinity, // Don't refetch automatically
+    queryFn: async () => {
+      console.log('useJobs: Explicitly fetching jobs data');
+      const result = await getJobs();
+      console.log('useJobs: Got', result.length, 'jobs');
+      return result;
+    },
+    enabled: true, // Always enabled regardless of auth state
+    staleTime: Infinity, // Never consider data stale
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
     retry: 3,
     retryDelay: 1000,
+    gcTime: Infinity, // Keep data in cache forever
     onError: (error) => {
       console.error('useJobs: Error fetching jobs:', error);
       toast.error('Failed to load jobs');

@@ -24,9 +24,11 @@ export const useJobStore = create<JobState>((set, get) => ({
   
   fetchJobs: async () => {
     set({ loading: true, error: null });
+    console.log('jobStore: Fetching jobs');
     
     try {
       const jobs = await getJobs();
+      console.log('jobStore: Fetched', jobs.length, 'jobs');
       set({ jobs, loading: false, error: null });
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -42,11 +44,17 @@ export const useJobStore = create<JobState>((set, get) => ({
     
     try {
       const newJob = await createJob(jobData);
+      
+      // Update local state immediately
       set((state) => ({ 
         jobs: [newJob, ...state.jobs],
         loading: false,
         error: null
       }));
+      
+      // Then refresh all jobs to ensure consistency
+      get().fetchJobs();
+      
       return newJob;
     } catch (error) {
       console.error('Error adding job:', error);
@@ -64,11 +72,15 @@ export const useJobStore = create<JobState>((set, get) => ({
     try {
       const updatedJob = await updateJob(id, updates);
       
+      // Update local state immediately
       set((state) => ({
         jobs: state.jobs.map(job => job.id === id ? updatedJob : job),
         loading: false,
         error: null
       }));
+      
+      // Then refresh all jobs to ensure consistency
+      get().fetchJobs();
       
       return updatedJob;
     } catch (error) {
@@ -86,11 +98,16 @@ export const useJobStore = create<JobState>((set, get) => ({
     
     try {
       await deleteJob(id);
+      
+      // Update local state
       set((state) => ({
         jobs: state.jobs.filter(job => job.id !== id),
         loading: false,
         error: null
       }));
+      
+      // Then refresh all jobs to ensure consistency
+      get().fetchJobs();
     } catch (error) {
       console.error('Error deleting job:', error);
       set({ 
@@ -108,6 +125,8 @@ export const useJobStore = create<JobState>((set, get) => ({
   unassignWorkerJobs: async (workerId) => {
     const state = get();
     const jobsToUpdate = state.jobs.filter(job => job.worker_id === workerId);
+    
+    console.log('jobStore: Unassigning', jobsToUpdate.length, 'jobs from worker', workerId);
     
     for (const job of jobsToUpdate) {
       try {

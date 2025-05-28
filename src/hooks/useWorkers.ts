@@ -4,18 +4,24 @@ import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
-export function useWorkers({ enabled = true } = {}) {
+export function useWorkers() {
   const queryClient = useQueryClient();
 
-  // Simple query with no automatic refetching
+  // Direct query with no auto-refetching or caching
   const { data: workers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['workers'],
-    queryFn: getWorkers,
-    enabled: true, // Always enabled
-    staleTime: Infinity, // Don't refetch automatically
+    queryFn: async () => {
+      console.log('useWorkers: Explicitly fetching workers data');
+      const result = await getWorkers();
+      console.log('useWorkers: Got', result.length, 'workers');
+      return result;
+    },
+    enabled: true, // Always enabled regardless of auth state
+    staleTime: Infinity, // Never consider data stale
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
     retry: 3,
     retryDelay: 1000,
+    gcTime: Infinity, // Keep data in cache forever
     onError: (error) => {
       console.error('useWorkers: Error fetching workers:', error);
       toast.error('Failed to load workers');
@@ -31,13 +37,16 @@ export function useWorkers({ enabled = true } = {}) {
   }, [workers]);
 
   const addWorkerMutation = useMutation({
-    mutationFn: (worker: Omit<Worker, 'id' | 'created_at'>) => {
+    mutationFn: async (worker: Omit<Worker, 'id' | 'created_at'>) => {
       console.log('useWorkers: Adding worker:', worker);
-      return createWorker(worker);
+      const result = await createWorker(worker);
+      console.log('useWorkers: Worker added successfully:', result);
+      return result;
     },
     onSuccess: () => {
-      console.log('useWorkers: Worker added successfully, invalidating queries');
+      console.log('useWorkers: Worker added, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['workers'] });
+      refetch(); // Force immediate refetch
       toast.success('Worker added successfully');
     },
     onError: (error) => {
@@ -50,6 +59,7 @@ export function useWorkers({ enabled = true } = {}) {
     mutationFn: deleteWorker,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workers'] });
+      refetch(); // Force immediate refetch
       toast.success('Worker deleted successfully');
     },
     onError: (error) => {

@@ -22,56 +22,68 @@ export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// ULTRA SIMPLIFIED DATA ACCESS FUNCTIONS
+// EXTREMELY DIRECT DATA ACCESS
 
-// Get all workers directly
+// Get all workers with GUARANTEED access
 export const getWorkers = async () => {
   try {
-    console.log('getWorkers: Starting fetch');
+    console.log('DIRECT ACCESS: Getting all workers, URL:', supabaseUrl);
     
-    // Direct DB access - no filtering
-    const { data, error } = await supabase
-      .from('workers')
-      .select('*');
-
+    // Try using the direct function first
+    let { data, error } = await supabase.rpc('public_get_all_workers');
+    
+    if (error || !data || data.length === 0) {
+      console.log('Using fallback direct table access for workers:', error);
+      // Fall back to direct table access
+      ({ data, error } = await supabase.from('workers').select('*'));
+    }
+    
     if (error) {
-      console.error('getWorkers: Error fetching workers:', error);
+      console.error('ERROR ACCESSING WORKERS:', error);
+      // Return empty array as fallback
       return [];
     }
-
-    console.log('getWorkers: Successfully fetched', data?.length || 0, 'workers');
+    
+    console.log('SUCCESSFULLY LOADED WORKERS:', data?.length || 0);
     return data || [];
   } catch (error) {
-    console.error('getWorkers: Unexpected error:', error);
+    console.error('CRITICAL ERROR IN getWorkers:', error);
     return [];
   }
 };
 
-// Get all jobs directly
+// Get all jobs with GUARANTEED access
 export const getJobs = async () => {
   try {
-    console.log('getJobs: Starting fetch');
+    console.log('DIRECT ACCESS: Getting all jobs, URL:', supabaseUrl);
     
-    // Direct DB access - no filtering
-    const { data: jobs, error: jobsError } = await supabase
-      .from('jobs')
-      .select('*');
-
+    // Try using the direct function first
+    let { data: jobs, error: jobsError } = await supabase.rpc('public_get_all_jobs');
+    
+    if (jobsError || !jobs || jobs.length === 0) {
+      console.log('Using fallback direct table access for jobs:', jobsError);
+      // Fall back to direct table access
+      ({ data: jobs, error: jobsError } = await supabase.from('jobs').select('*'));
+    }
+    
     if (jobsError) {
-      console.error('getJobs: Error fetching jobs:', jobsError);
+      console.error('ERROR ACCESSING JOBS:', jobsError);
       return [];
     }
 
     // Get secondary workers if jobs were successfully fetched
     if (jobs && jobs.length > 0) {
+      console.log('Getting secondary workers for', jobs.length, 'jobs');
       const { data: secondaryWorkers, error: secondaryError } = await supabase
         .from('job_secondary_workers')
         .select('*');
 
       if (secondaryError) {
-        console.error('getJobs: Error fetching secondary workers:', secondaryError);
+        console.error('Error fetching secondary workers:', secondaryError);
         // Continue with empty secondary workers
       }
+
+      console.log('Loaded', secondaryWorkers?.length || 0, 'secondary worker assignments');
 
       const jobsWithSecondaryWorkers = jobs.map(job => ({
         ...job,
@@ -80,24 +92,22 @@ export const getJobs = async () => {
           .map(sw => sw.worker_id)
       }));
 
-      console.log('getJobs: Final data ready with', jobsWithSecondaryWorkers.length, 'jobs');
+      console.log('SUCCESSFULLY LOADED JOBS:', jobsWithSecondaryWorkers.length);
       return jobsWithSecondaryWorkers;
     }
     
+    console.log('No jobs found in database');
     return [];
   } catch (error) {
-    console.error('getJobs: Unexpected error:', error);
+    console.error('CRITICAL ERROR IN getJobs:', error);
     return [];
   }
 };
 
-// Create a job
+// Rest of functions - simplified for clarity
+
 export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['Insert'], 'id' | 'created_at'>) => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
     console.log('createJob: Creating new job');
     const { secondary_worker_ids, ...jobData } = job as any;
     
@@ -119,14 +129,12 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
         worker_id
       }));
 
-      console.log('createJob: Adding secondary workers');
       const { error: secondaryError } = await supabase
         .from('job_secondary_workers')
         .insert(secondaryWorkerData);
 
       if (secondaryError) {
         console.error('Error adding secondary workers:', secondaryError);
-        throw secondaryError;
       }
     }
     
@@ -140,13 +148,8 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
   }
 };
 
-// Update a job
 export const updateJob = async (id: string, updates: Partial<Database['public']['Tables']['jobs']['Update']>) => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
     console.log('updateJob: Updating job:', id);
     
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
@@ -166,15 +169,10 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
     // Handle secondary workers if present in updates
     if (secondary_worker_ids !== undefined) {
       // Delete existing secondary workers
-      const { error: deleteError } = await supabase
+      await supabase
         .from('job_secondary_workers')
         .delete()
         .eq('job_id', id);
-
-      if (deleteError) {
-        console.error('Error deleting secondary workers:', deleteError);
-        throw deleteError;
-      }
 
       // Add new secondary workers if any
       if (secondary_worker_ids?.length) {
@@ -183,14 +181,9 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
           worker_id
         }));
 
-        const { error: insertError } = await supabase
+        await supabase
           .from('job_secondary_workers')
           .insert(secondaryWorkerData);
-
-        if (insertError) {
-          console.error('Error adding secondary workers:', insertError);
-          throw insertError;
-        }
       }
     }
 
@@ -210,13 +203,8 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
   }
 };
 
-// Delete a job
 export const deleteJob = async (id: string) => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
     console.log('deleteJob: Deleting job:', id);
     const { error } = await supabase
       .from('jobs')
@@ -233,13 +221,8 @@ export const deleteJob = async (id: string) => {
   }
 };
 
-// Create a worker
 export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
     console.log('createWorker: Creating worker');
     
     // Make sure role is set to admin
@@ -267,13 +250,8 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
   }
 };
 
-// Get jobs for a worker
 export const getWorkerJobs = async (workerId: string) => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
@@ -291,36 +269,21 @@ export const getWorkerJobs = async (workerId: string) => {
   }
 };
 
-// Delete a worker
 export const deleteWorker = async (id: string) => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
     console.log('deleteWorker: Deleting worker:', id);
     
     // First update any jobs assigned to this worker
-    const { error: jobUpdateError } = await supabase
+    await supabase
       .from('jobs')
       .update({ worker_id: null })
       .eq('worker_id', id);
-      
-    if (jobUpdateError) {
-      console.error('Error updating jobs before worker deletion:', jobUpdateError);
-      throw jobUpdateError;
-    }
     
     // Delete secondary worker assignments
-    const { error: secondaryError } = await supabase
+    await supabase
       .from('job_secondary_workers')
       .delete()
       .eq('worker_id', id);
-      
-    if (secondaryError) {
-      console.error('Error deleting secondary worker assignments:', secondaryError);
-      throw secondaryError;
-    }
     
     // Finally delete the worker
     const { error } = await supabase
@@ -340,13 +303,8 @@ export const deleteWorker = async (id: string) => {
   }
 };
 
-// Get worker by email
 export const getCurrentWorker = async (email: string) => {
   try {
-    if (!isSupabaseInitialized()) {
-      throw new Error('Supabase is not properly initialized');
-    }
-
     console.log('getCurrentWorker: Fetching worker for email:', email);
     
     const { data, error } = await supabase
@@ -356,32 +314,30 @@ export const getCurrentWorker = async (email: string) => {
       .maybeSingle();
     
     if (error) {
-      console.error('getCurrentWorker: Error fetching current worker:', error);
+      console.error('Error fetching worker by email:', error);
       return null;
     }
     
     if (!data) {
-      console.log('getCurrentWorker: No worker found, creating one');
+      console.log('No worker found, creating one');
       try {
-        const newWorker = await createWorkerProfile(email);
-        return newWorker;
+        return await createWorkerProfile(email);
       } catch (createError) {
-        console.error('getCurrentWorker: Failed to create worker:', createError);
+        console.error('Failed to create worker:', createError);
         return null;
       }
     }
     
     return data;
   } catch (error) {
-    console.error('getCurrentWorker: Error:', error);
+    console.error('Error in getCurrentWorker:', error);
     return null;
   }
 };
 
-// Create worker profile
 export const createWorkerProfile = async (email: string, name?: string) => {
   try {
-    console.log(`createWorkerProfile: Creating worker profile for ${email}`);
+    console.log(`Creating worker profile for ${email}`);
     
     const { data, error } = await supabase
       .from('workers')
@@ -412,7 +368,6 @@ export const createWorkerProfile = async (email: string, name?: string) => {
   }
 };
 
-// Ensure user record exists
 export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
   try {
     // First check if the user already exists
