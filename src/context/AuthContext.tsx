@@ -16,6 +16,7 @@ interface AuthContextProps {
   signOut: () => Promise<void>;
   error: string | null;
   setError: (error: string | null) => void;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -73,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('AuthProvider: Found existing session');
           setUser(session.user);
           setSession(session);
+          await checkRLSPolicies();
         } else {
           console.log('AuthProvider: No existing session found');
           setUser(null);
@@ -173,6 +175,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await handleSignOut();
   };
 
+  // Everyone is an admin in this app
+  const isAdmin = true;
+
   const value = {
     session,
     user,
@@ -181,7 +186,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signOut,
     error,
-    setError
+    setError,
+    isAdmin
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

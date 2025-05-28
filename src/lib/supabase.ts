@@ -28,7 +28,7 @@ export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// Add function to check auth status
+// Simple function to check auth status
 export const checkAuthStatus = async () => {
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error) {
@@ -38,141 +38,75 @@ export const checkAuthStatus = async () => {
   return session;
 };
 
+// SIMPLIFIED: Direct query to workers table
 export const getWorkers = async () => {
   try {
-    const session = await checkAuthStatus();
-    if (!session) {
-      console.error('getWorkers: No active session');
-      return [];
-    }
-
-    console.log('getWorkers: Fetching workers');
+    console.log('getWorkers: Starting fetch');
     
-    // Try using the admin function first (bypasses RLS)
-    console.log('getWorkers: Attempting to use admin function');
-    const { data: adminData, error: adminError } = await supabase
-      .rpc('admin_get_all_workers');
-
-    if (!adminError && adminData && adminData.length > 0) {
-      console.log('getWorkers: Success using admin function', {
-        count: adminData.length,
-        first_worker: adminData[0]?.name || 'none'
-      });
-      return adminData;
-    } else if (adminError) {
-      console.log('getWorkers: Admin function failed:', adminError.message);
-    }
-
-    // Fall back to regular query
-    console.log('getWorkers: Falling back to regular query');
-    const { data, error, status } = await supabase
+    // Simple direct query with no conditions
+    const { data, error } = await supabase
       .from('workers')
       .select('*')
       .order('name');
-
+    
     if (error) {
-      console.error('getWorkers: Query failed:', error);
+      console.error('getWorkers: Error fetching workers:', error);
       throw error;
     }
-
-    console.log('getWorkers: Success', {
+    
+    console.log('getWorkers: Fetched workers successfully', {
       count: data?.length || 0,
-      status,
       first_worker: data?.[0]?.name || 'none'
     });
-
+    
     return data || [];
   } catch (error) {
-    console.error('getWorkers: Failed:', error);
+    console.error('getWorkers: Exception during fetch:', error);
     throw error;
   }
 };
 
+// SIMPLIFIED: Direct query to jobs table
 export const getJobs = async () => {
   try {
-    const session = await checkAuthStatus();
-    if (!session) {
-      console.error('getJobs: No active session');
-      return [];
-    }
-
-    console.log('getJobs: Fetching jobs');
-
-    // Try using the admin function first (bypasses RLS)
-    console.log('getJobs: Attempting to use admin function');
-    const { data: adminData, error: adminError } = await supabase
-      .rpc('admin_get_all_jobs');
-
-    if (!adminError && adminData && adminData.length > 0) {
-      console.log('getJobs: Success using admin function', {
-        count: adminData.length,
-        first_job: adminData[0]?.address || 'none'
-      });
-      
-      // Get secondary workers using admin function
-      const { data: adminSecondaryData, error: adminSecondaryError } = await supabase
-        .rpc('admin_get_all_secondary_workers');
-        
-      if (adminSecondaryError) {
-        console.error('getJobs: Admin secondary workers query failed:', adminSecondaryError);
-      }
-      
-      const jobsWithSecondaryWorkers = adminData.map(job => ({
-        ...job,
-        secondary_worker_ids: (adminSecondaryError ? [] : adminSecondaryData || [])
-          .filter((sw: any) => sw.job_id === job.id)
-          .map((sw: any) => sw.worker_id)
-      }));
-      
-      return jobsWithSecondaryWorkers;
-    } else if (adminError) {
-      console.log('getJobs: Admin function failed:', adminError.message);
-    }
-
-    // First get all jobs - add debugging
-    console.log('getJobs: Attempting to fetch all jobs');
-    const { data: jobs, error: jobsError, status: jobsStatus } = await supabase
+    console.log('getJobs: Starting fetch');
+    
+    // Simple direct query with no conditions
+    const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
-
+    
     if (jobsError) {
-      console.error('getJobs: Jobs query failed:', jobsError);
+      console.error('getJobs: Error fetching jobs:', jobsError);
       throw jobsError;
     }
-
-    console.log('getJobs: Jobs query response:', {
-      status: jobsStatus,
-      count: jobs?.length || 0,
-      first_job: jobs?.[0]?.address || 'none'
-    });
-
+    
     // Then get secondary workers
     const { data: secondaryWorkers, error: secondaryError } = await supabase
       .from('job_secondary_workers')
       .select('*');
-
+    
     if (secondaryError) {
-      console.error('getJobs: Secondary workers query failed:', secondaryError);
-      throw secondaryError;
+      console.error('getJobs: Error fetching secondary workers:', secondaryError);
+      // Continue anyway, we'll just have jobs without secondary workers
     }
-
+    
     const jobsWithSecondaryWorkers = jobs.map(job => ({
       ...job,
-      secondary_worker_ids: secondaryWorkers
+      secondary_worker_ids: (secondaryWorkers || [])
         .filter(sw => sw.job_id === job.id)
         .map(sw => sw.worker_id)
     }));
-
-    console.log('getJobs: Success', {
-      jobs_count: jobs.length,
-      secondary_assignments: secondaryWorkers.length,
+    
+    console.log('getJobs: Fetched jobs successfully', {
+      count: jobs.length,
       first_job: jobs[0]?.address || 'none'
     });
-
+    
     return jobsWithSecondaryWorkers;
   } catch (error) {
-    console.error('getJobs: Failed:', error);
+    console.error('getJobs: Exception during fetch:', error);
     throw error;
   }
 };

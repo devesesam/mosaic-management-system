@@ -14,14 +14,25 @@ import { AlertTriangle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 function App() {
-  const { user, loading: authLoading, error: authError, signOut } = useAuth();
+  const { user, error: authError, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  const { jobs, addJob, isLoading: isJobsLoading, error: jobsError, refetch: refetchJobs } = useJobs({
+  
+  const { 
+    jobs, 
+    addJob, 
+    error: jobsError, 
+    refetch: refetchJobs 
+  } = useJobs({
     enabled: !!user
   });
-  const { workers, isLoading: isWorkersLoading, error: workersError, refetch: refetchWorkers } = useWorkers({
+  
+  const { 
+    workers, 
+    error: workersError, 
+    refetch: refetchWorkers 
+  } = useWorkers({
     enabled: !!user
   });
 
@@ -38,16 +49,17 @@ function App() {
     }
   };
   
+  // Force refresh data when user logs in
   useEffect(() => {
     if (user) {
-      console.log('App: User authenticated');
-      // Force data refresh when user is available
+      console.log('App: User authenticated, forcing data refresh');
+      // Force immediate data refresh
       refetchJobs();
       refetchWorkers();
     }
   }, [user, refetchJobs, refetchWorkers]);
 
-  // Show login form if no user - immediately show this instead of loading screen
+  // Show login form if no user
   if (!user) {
     return <LoginForm />;
   }
@@ -83,7 +95,7 @@ function App() {
           </div>
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">
-            {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
+            {jobsError?.message || workersError?.message || 'Failed to load data. Please try again.'}
           </p>
           <button
             onClick={() => {
