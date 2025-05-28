@@ -112,8 +112,6 @@ export const getJobs = async () => {
         console.log('Secondary workers payload:', JSON.stringify(secondaryWorkers, null, 2));
       }
 
-      console.log('Loaded', secondaryWorkers?.length || 0, 'secondary worker assignments');
-
       const jobsWithSecondaryWorkers = jobs.map(job => ({
         ...job,
         secondary_worker_ids: (secondaryWorkers || [])
@@ -438,5 +436,79 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
   } catch (error) {
     console.error('Error in ensureUserRecord:', error);
     throw error;
+  }
+};
+
+// Add a function to directly check if tables exist
+export const checkTablesExist = async () => {
+  try {
+    // Test direct query to the pg_tables system view
+    const { data, error } = await supabase
+      .rpc('check_tables_exist', { 
+        table_names: ['workers', 'jobs', 'job_secondary_workers', 'users'] 
+      });
+    
+    if (error) {
+      console.error('Error checking if tables exist:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in checkTablesExist:', error);
+    return null;
+  }
+};
+
+// Test a simple insert and select to verify permissions
+export const testTablePermissions = async () => {
+  try {
+    // Try inserting a test worker
+    const testEmail = `test_${Date.now()}@example.com`;
+    
+    const { data: insertData, error: insertError } = await supabase
+      .from('workers')
+      .insert([{
+        name: 'Test Worker',
+        email: testEmail,
+        role: 'admin'
+      }])
+      .select()
+      .single();
+    
+    if (insertError) {
+      return {
+        success: false,
+        operation: 'insert',
+        error: insertError
+      };
+    }
+    
+    // If insert succeeded, try to delete the test worker
+    const { error: deleteError } = await supabase
+      .from('workers')
+      .delete()
+      .eq('id', insertData.id);
+    
+    if (deleteError) {
+      return {
+        success: false,
+        operation: 'delete',
+        error: deleteError
+      };
+    }
+    
+    return {
+      success: true,
+      operations: ['insert', 'delete'],
+      testId: insertData.id
+    };
+  } catch (error) {
+    console.error('Error in testTablePermissions:', error);
+    return {
+      success: false,
+      operation: 'unknown',
+      error
+    };
   }
 };

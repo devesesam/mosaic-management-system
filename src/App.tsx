@@ -11,12 +11,14 @@ import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import SupabaseConnectionTest from './components/debug/SupabaseConnectionTest';
 
 function App() {
   const { user, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
+  const [showDebug, setShowDebug] = useState(true); // Debug panel visibility
   const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs();
   const { workers, error: workersError, refetch: refetchWorkers } = useWorkers();
 
@@ -64,7 +66,18 @@ function App() {
   
   // Show login form if no user
   if (!user) {
-    return <LoginForm />;
+    return (
+      <>
+        <LoginForm />
+        {showDebug && <SupabaseConnectionTest />}
+        <button 
+          onClick={() => setShowDebug(!showDebug)}
+          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
+        >
+          {showDebug ? 'Hide Debug' : 'Show Debug'}
+        </button>
+      </>
+    );
   }
 
   // Show auth error if present
@@ -84,6 +97,13 @@ function App() {
             Return to Login
           </button>
         </div>
+        {showDebug && <SupabaseConnectionTest />}
+        <button 
+          onClick={() => setShowDebug(!showDebug)}
+          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
+        >
+          {showDebug ? 'Hide Debug' : 'Show Debug'}
+        </button>
       </div>
     );
   }
@@ -120,6 +140,13 @@ function App() {
             )}
           </button>
         </div>
+        {showDebug && <SupabaseConnectionTest />}
+        <button 
+          onClick={() => setShowDebug(!showDebug)}
+          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
+        >
+          {showDebug ? 'Hide Debug' : 'Show Debug'}
+        </button>
       </div>
     );
   }
@@ -164,6 +191,14 @@ function App() {
             },
           }}
         />
+        
+        {showDebug && <SupabaseConnectionTest />}
+        <button 
+          onClick={() => setShowDebug(!showDebug)}
+          className="fixed top-4 right-4 bg-gray-200 text-gray-800 px-3 py-1 rounded text-xs hover:bg-gray-300 z-50"
+        >
+          {showDebug ? 'Hide Debug' : 'Show Debug'}
+        </button>
       </div>
     </DndProvider>
   );
