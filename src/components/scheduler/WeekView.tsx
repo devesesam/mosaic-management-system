@@ -108,12 +108,17 @@ const WeekView: React.FC<WeekViewProps> = () => {
 
   const handleSubmitWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>) => {
     try {
+      console.log('WeekView: Submitting worker:', workerData);
+      // Use await to ensure we wait for the promise to resolve
       await addWorker(workerData);
-      toast.success('Worker added successfully');
+      console.log('WeekView: Worker added successfully');
       setIsWorkerFormOpen(false);
+      toast.success('Worker added successfully');
+      // Refetch workers to update the list
+      fetchWorkers();
     } catch (error) {
-      toast.error('Failed to add worker');
-      console.error('Error adding worker:', error);
+      console.error('WeekView: Error adding worker:', error);
+      toast.error('Failed to add worker: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
   
