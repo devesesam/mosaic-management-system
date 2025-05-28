@@ -12,35 +12,53 @@ try {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase credentials');
   }
+  
+  console.log('Supabase URL:', supabaseUrl);
 } catch (error) {
   console.error('Error loading Supabase credentials:', error);
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Create the client
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true
+  }
+});
 
 export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// EXTREMELY DIRECT DATA ACCESS
+// Add function to check auth status
+export const checkAuthStatus = async () => {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error('Auth check failed:', error);
+    return null;
+  }
+  return session;
+};
 
-// Get all workers with GUARANTEED access
+// DIRECT TABLE ACCESS FUNCTIONS
+
+// Get all workers with full debugging
 export const getWorkers = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all workers, URL:', supabaseUrl);
+    console.log('DIRECT ACCESS: Getting all workers');
+    console.log('Using Supabase client with URL:', supabaseUrl);
     
-    // Try using the direct function first
-    let { data, error } = await supabase.rpc('public_get_all_workers');
+    // Try direct table access with detailed logging
+    console.log('Executing: supabase.from("workers").select("*")');
+    const { data, error, status, statusText } = await supabase
+      .from('workers')
+      .select('*')
+      .order('name');
     
-    if (error || !data || data.length === 0) {
-      console.log('Using fallback direct table access for workers:', error);
-      // Fall back to direct table access
-      ({ data, error } = await supabase.from('workers').select('*'));
-    }
+    console.log('Response status:', status, statusText);
     
     if (error) {
       console.error('ERROR ACCESSING WORKERS:', error);
-      // Return empty array as fallback
       return [];
     }
     
@@ -52,19 +70,20 @@ export const getWorkers = async () => {
   }
 };
 
-// Get all jobs with GUARANTEED access
+// Get all jobs with full debugging
 export const getJobs = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all jobs, URL:', supabaseUrl);
+    console.log('DIRECT ACCESS: Getting all jobs');
+    console.log('Using Supabase client with URL:', supabaseUrl);
     
-    // Try using the direct function first
-    let { data: jobs, error: jobsError } = await supabase.rpc('public_get_all_jobs');
+    // Try direct table access with detailed logging
+    console.log('Executing: supabase.from("jobs").select("*")');
+    const { data: jobs, error: jobsError, status, statusText } = await supabase
+      .from('jobs')
+      .select('*')
+      .order('created_at', { ascending: false });
     
-    if (jobsError || !jobs || jobs.length === 0) {
-      console.log('Using fallback direct table access for jobs:', jobsError);
-      // Fall back to direct table access
-      ({ data: jobs, error: jobsError } = await supabase.from('jobs').select('*'));
-    }
+    console.log('Response status:', status, statusText);
     
     if (jobsError) {
       console.error('ERROR ACCESSING JOBS:', jobsError);
@@ -74,6 +93,8 @@ export const getJobs = async () => {
     // Get secondary workers if jobs were successfully fetched
     if (jobs && jobs.length > 0) {
       console.log('Getting secondary workers for', jobs.length, 'jobs');
+      console.log('Executing: supabase.from("job_secondary_workers").select("*")');
+      
       const { data: secondaryWorkers, error: secondaryError } = await supabase
         .from('job_secondary_workers')
         .select('*');
@@ -104,7 +125,7 @@ export const getJobs = async () => {
   }
 };
 
-// Rest of functions - simplified for clarity
+// Rest of functions with better error handling
 
 export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['Insert'], 'id' | 'created_at'>) => {
   try {
