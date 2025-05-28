@@ -146,6 +146,12 @@ const LoginForm: React.FC = () => {
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
+
+            <div className="mt-4 text-xs text-center text-gray-500">
+              Try these credentials:<br />
+              Email: <span className="font-medium">damsevese@gmail.com</span><br />
+              Password: <span className="font-medium">password</span>
+            </div>
           </div>
         </form>
       </div>
