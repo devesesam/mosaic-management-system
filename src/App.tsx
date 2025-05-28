@@ -12,6 +12,7 @@ import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
 import DirectDataFetcher from './components/debug/DirectDataFetcher';
+import RawDataFetcher from './components/debug/RawDataFetcher';
 
 function App() {
   const { user, error: authError, currentWorker, signOut } = useAuth();
@@ -19,6 +20,7 @@ function App() {
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
   const [showDataModal, setShowDataModal] = useState(false);
+  const [showRawDataModal, setShowRawDataModal] = useState(false);
   const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs();
   const { workers, error: workersError, refetch: refetchWorkers } = useWorkers();
 
@@ -57,6 +59,12 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
         setShowDataModal(prev => !prev);
+      }
+      
+      // Add Raw Data Modal shortcut (Ctrl+Shift+R)
+      if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        setShowRawDataModal(prev => !prev);
       }
     };
     
@@ -137,6 +145,14 @@ function App() {
             </button>
             
             <button
+              onClick={() => setShowRawDataModal(true)}
+              className="w-full py-2 px-4 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-md flex items-center justify-center"
+            >
+              <Database className="w-5 h-5 mr-2" />
+              View Raw Database Data (Alternative URL)
+            </button>
+            
+            <button
               onClick={() => setShowDataModal(true)}
               className="w-full py-2 px-4 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-md flex items-center justify-center"
             >
@@ -168,14 +184,24 @@ function App() {
             <MonthView />
           )}
           
-          {/* Floating button to show data modal */}
-          <button
-            onClick={() => setShowDataModal(true)}
-            className="absolute bottom-4 right-4 bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors z-10"
-            title="View Database Data"
-          >
-            <Database className="h-5 w-5 text-indigo-600" />
-          </button>
+          {/* Floating buttons to show data modals */}
+          <div className="absolute bottom-4 right-4 flex flex-col space-y-2">
+            <button
+              onClick={() => setShowRawDataModal(true)}
+              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors z-10"
+              title="View Raw Database Data (Alternative URL)"
+            >
+              <Database className="h-5 w-5 text-amber-600" />
+            </button>
+            
+            <button
+              onClick={() => setShowDataModal(true)}
+              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 transition-colors z-10"
+              title="View Database Data"
+            >
+              <Database className="h-5 w-5 text-indigo-600" />
+            </button>
+          </div>
         </main>
 
         {isJobFormOpen && (
@@ -187,6 +213,10 @@ function App() {
 
         {showDataModal && (
           <DirectDataFetcher onClose={() => setShowDataModal(false)} />
+        )}
+        
+        {showRawDataModal && (
+          <RawDataFetcher onClose={() => setShowRawDataModal(false)} />
         )}
 
         <Toaster 
