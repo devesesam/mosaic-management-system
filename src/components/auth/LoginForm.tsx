@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Book as Roof } from 'lucide-react';
+import { Book as Roof, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const LoginForm: React.FC = () => {
@@ -12,13 +12,34 @@ const LoginForm: React.FC = () => {
 
   // Ensure the user is always signed out when they reach the login page
   useEffect(() => {
+    console.log('LoginForm: Ensuring user is signed out');
     signOut();
   }, [signOut]);
+
+  useEffect(() => {
+    // Show toast for any errors
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+
+    // Input validation
+    if (!email) {
+      setError('Email is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!password) {
+      setError('Password is required');
+      setIsSubmitting(false);
+      return;
+    }
 
     // Password validation for sign up
     if (isSignUp && password.length < 6) {
@@ -76,6 +97,7 @@ const LoginForm: React.FC = () => {
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isSubmitting || loading}
               />
             </div>
             <div>
@@ -92,6 +114,7 @@ const LoginForm: React.FC = () => {
                 placeholder={isSignUp ? 'Password (min. 6 characters)' : 'Password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isSubmitting || loading}
               />
             </div>
           </div>
@@ -105,16 +128,27 @@ const LoginForm: React.FC = () => {
           <div className="flex flex-col space-y-4">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#0a2342] hover:bg-[#0c2d5a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70"
             >
-              {isSubmitting ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
+              {isSubmitting || loading ? (
+                <div className="flex items-center">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {isSignUp ? 'Signing up...' : 'Signing in...'}
+                </div>
+              ) : (
+                isSignUp ? 'Sign up' : 'Sign in'
+              )}
             </button>
             
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError(null);
+              }}
               className="text-sm text-indigo-600 hover:text-indigo-500 font-medium focus:outline-none"
+              disabled={isSubmitting || loading}
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>

@@ -15,7 +15,13 @@ try {
   console.error('Error loading Supabase credentials:', error);
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
@@ -455,6 +461,18 @@ export const getCurrentWorker = async (email: string) => {
       console.error('getCurrentWorker: Test fetch failed:', testError);
     }
     
+    // Try using the admin function first
+    const { data: adminData, error: adminError } = await supabase
+      .rpc('admin_get_all_workers');
+    
+    if (!adminError && adminData && adminData.length > 0) {
+      const workerByEmail = adminData.find((w: any) => w.email === email);
+      if (workerByEmail) {
+        console.log('getCurrentWorker: Found worker via admin function:', workerByEmail);
+        return workerByEmail;
+      }
+    }
+    
     // Now try to get the specific worker by email
     const { data, error, status } = await supabase
       .from('workers')
@@ -595,6 +613,18 @@ export const runDatabaseDiagnostics = async (email: string) => {
       console.log(`Workers table contains ${workers.length} records`);
       const userWorker = workers.find(w => w.email === email);
       console.log(`User worker record:`, userWorker || 'Not found');
+    }
+    
+    // Try using the admin function
+    const { data: adminWorkers, error: adminWorkersError } = await supabase
+      .rpc('admin_get_all_workers');
+      
+    if (adminWorkersError) {
+      console.error('Error fetching workers via admin function:', adminWorkersError);
+    } else {
+      console.log(`Admin function returned ${adminWorkers.length} worker records`);
+      const userWorker = adminWorkers.find((w: any) => w.email === email);
+      console.log(`User worker record via admin function:`, userWorker || 'Not found');
     }
     
     // Check jobs
