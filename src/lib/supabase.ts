@@ -35,6 +35,7 @@ export const getWorkers = async () => {
   try {
     console.log('getWorkers: Starting fetch...');
     
+    // Use the simpler direct table access without filters
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -47,13 +48,14 @@ export const getWorkers = async () => {
 
     console.log('getWorkers: Success', {
       count: data?.length || 0,
-      first_worker: data?.[0]?.name
+      first_worker: data?.length > 0 ? data[0].name : 'No workers found'
     });
 
     return data || [];
   } catch (error) {
     console.error('getWorkers: Failed:', error);
-    throw error;
+    // Still returning empty array but logging the error
+    return [];
   }
 };
 
@@ -61,7 +63,7 @@ export const getJobs = async () => {
   try {
     console.log('getJobs: Starting fetch...');
     
-    // First get all jobs
+    // First get all jobs with simpler approach
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
@@ -81,21 +83,25 @@ export const getJobs = async () => {
 
     if (secondaryError) {
       console.error('getJobs: Secondary workers query failed:', secondaryError);
-      throw secondaryError;
+      // Continue anyway, just won't have secondary workers
     }
 
-    console.log(`getJobs: Successfully fetched ${secondaryWorkers?.length || 0} secondary worker assignments`);
+    // Guard against null jobs
+    if (!jobs) {
+      console.warn('getJobs: No jobs found or null response');
+      return [];
+    }
 
-    const jobsWithSecondaryWorkers = (jobs || []).map(job => ({
+    const jobsWithSecondaryWorkers = jobs.map(job => ({
       ...job,
-      secondary_worker_ids: secondaryWorkers
+      secondary_worker_ids: (secondaryWorkers || [])
         .filter(sw => sw.job_id === job.id)
         .map(sw => sw.worker_id)
     }));
 
     console.log('getJobs: Returning combined data:', {
       total_jobs: jobsWithSecondaryWorkers.length,
-      first_job: jobsWithSecondaryWorkers[0]?.address || 'No jobs found'
+      first_job: jobsWithSecondaryWorkers.length > 0 ? jobsWithSecondaryWorkers[0].address : 'No jobs found'
     });
 
     return jobsWithSecondaryWorkers;
