@@ -11,12 +11,14 @@ import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import DebugPanel from './components/debug/DebugPanel';
 
 function App() {
   const { user, error: authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const { jobs, addJob, error: jobsError, refetch: refetchJobs } = useJobs();
   const { workers, error: workersError, refetch: refetchWorkers } = useWorkers();
 
@@ -48,6 +50,19 @@ function App() {
     
     return () => clearInterval(interval);
   }, [user, refetchJobs, refetchWorkers]);
+
+  // Toggle debug panel with keyboard shortcut (Ctrl+Shift+D)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setShowDebug(prev => !prev);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleNewJob = () => {
     setIsJobFormOpen(true);
@@ -164,6 +179,9 @@ function App() {
             },
           }}
         />
+
+        {/* Debug panel that can be toggled with Ctrl+Shift+D */}
+        {showDebug && <DebugPanel />}
       </div>
     </DndProvider>
   );
