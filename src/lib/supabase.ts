@@ -461,6 +461,50 @@ export const getCurrentWorker = async (email: string) => {
       console.error('getCurrentWorker: Test fetch failed:', testError);
     }
     
+    // Try the new direct worker retrieval function
+    try {
+      console.log('getCurrentWorker: Trying direct worker retrieval function');
+      const { data: directWorker, error: directError } = await supabase
+        .rpc('get_worker_by_email', { worker_email: email });
+        
+      if (!directError && directWorker && directWorker.length > 0) {
+        console.log('getCurrentWorker: Found worker via direct function:', directWorker[0]);
+        return directWorker[0];
+      } else if (directError) {
+        console.error('getCurrentWorker: Direct worker function failed:', directError);
+      } else {
+        console.log('getCurrentWorker: Direct worker function returned no results');
+      }
+    } catch (directError) {
+      console.error('getCurrentWorker: Error with direct worker function:', directError);
+    }
+    
+    // Try the force association function
+    try {
+      console.log('getCurrentWorker: Trying force association function');
+      const { data: forceResult, error: forceError } = await supabase
+        .rpc('force_associate_worker', { user_email: email });
+        
+      if (!forceError && forceResult && forceResult.length > 0) {
+        console.log('getCurrentWorker: Force association result:', forceResult[0]);
+        
+        if (forceResult[0].success) {
+          // Fetch the worker directly since we know it exists now
+          const { data: workerAfterForce, error: workerAfterError } = await supabase
+            .rpc('get_worker_by_email', { worker_email: email });
+            
+          if (!workerAfterError && workerAfterForce && workerAfterForce.length > 0) {
+            console.log('getCurrentWorker: Retrieved worker after force:', workerAfterForce[0]);
+            return workerAfterForce[0];
+          }
+        }
+      } else if (forceError) {
+        console.error('getCurrentWorker: Force association function failed:', forceError);
+      }
+    } catch (forceError) {
+      console.error('getCurrentWorker: Error with force association function:', forceError);
+    }
+    
     // Try using the admin function first
     const { data: adminData, error: adminError } = await supabase
       .rpc('admin_get_all_workers');
@@ -510,6 +554,25 @@ export const getCurrentWorker = async (email: string) => {
 export const createWorkerProfile = async (email: string, name?: string) => {
   try {
     console.log(`createWorkerProfile: Creating worker profile for ${email}...`);
+    
+    // Force create worker via database function to ensure success
+    const { data: forceResult, error: forceError } = await supabase
+      .rpc('force_associate_worker', { user_email: email });
+      
+    if (!forceError && forceResult && forceResult.length > 0) {
+      console.log('createWorkerProfile: Force association result:', forceResult[0]);
+      
+      if (forceResult[0].success) {
+        // Fetch the worker directly since we know it exists now
+        const { data: workerAfterForce, error: workerAfterError } = await supabase
+          .rpc('get_worker_by_email', { worker_email: email });
+          
+        if (!workerAfterError && workerAfterForce && workerAfterForce.length > 0) {
+          console.log('createWorkerProfile: Retrieved worker after force:', workerAfterForce[0]);
+          return workerAfterForce[0];
+        }
+      }
+    }
     
     // Force create worker via database function to ensure success
     const { data: repairData, error: repairError } = await supabase.rpc(
@@ -627,6 +690,16 @@ export const runDatabaseDiagnostics = async (email: string) => {
       console.log(`User worker record via admin function:`, userWorker || 'Not found');
     }
     
+    // Try using direct worker retrieval
+    const { data: directWorker, error: directError } = await supabase
+      .rpc('get_worker_by_email', { worker_email: email });
+      
+    if (directError) {
+      console.error('Error fetching worker directly:', directError);
+    } else {
+      console.log(`Direct worker retrieval:`, directWorker);
+    }
+    
     // Check jobs
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
@@ -732,5 +805,92 @@ export const checkRLSPolicies = async () => {
   } catch (error) {
     console.error('Error checking RLS policies:', error);
     throw error;
+  }
+};
+
+// Add a worker status helper function that users can call directly
+export const checkWorkerStatus = async (email: string) => {
+  try {
+    console.log(`Checking worker status for ${email}...`);
+    
+    // Try the direct retrieval function first
+    const { data: directWorker, error: directError } = await supabase
+      .rpc('get_worker_by_email', { worker_email: email });
+      
+    if (!directError && directWorker && directWorker.length > 0) {
+      return {
+        exists: true,
+        worker: directWorker[0],
+        source: 'direct_function',
+        error: null
+      };
+    }
+    
+    // Try the admin function
+    const { data: adminWorkers, error: adminError } = await supabase
+      .rpc('admin_get_all_workers');
+      
+    if (!adminError && adminWorkers) {
+      const worker = adminWorkers.find((w: any) => w.email === email);
+      if (worker) {
+        return {
+          exists: true,
+          worker,
+          source: 'admin_function',
+          error: null
+        };
+      }
+    }
+    
+    // Try standard query
+    const { data: standardWorker, error: standardError } = await supabase
+      .from('workers')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+      
+    if (!standardError && standardWorker) {
+      return {
+        exists: true,
+        worker: standardWorker,
+        source: 'standard_query',
+        error: null
+      };
+    }
+    
+    // Try force association as a last resort
+    const { data: forceResult, error: forceError } = await supabase
+      .rpc('force_associate_worker', { user_email: email });
+      
+    if (!forceError && forceResult && forceResult.length > 0 && forceResult[0].success) {
+      // Get the worker after forcing association
+      const { data: workerAfterForce } = await supabase
+        .rpc('get_worker_by_email', { worker_email: email });
+        
+      if (workerAfterForce && workerAfterForce.length > 0) {
+        return {
+          exists: true,
+          worker: workerAfterForce[0],
+          source: 'force_created',
+          error: null
+        };
+      }
+    }
+    
+    // If we get here, we couldn't find or create a worker
+    return {
+      exists: false,
+      worker: null,
+      source: null,
+      error: 'Failed to find or create worker profile'
+    };
+  } catch (error) {
+    console.error('Error checking worker status:', error);
+    return {
+      exists: false,
+      worker: null,
+      source: null,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 };

@@ -7,7 +7,8 @@ import {
   createWorkerProfile,
   ensureUserRecord, 
   runDatabaseDiagnostics,
-  checkRLSPolicies
+  checkRLSPolicies,
+  checkWorkerStatus
 } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
@@ -23,6 +24,8 @@ interface AuthContextProps {
   error: string | null;
   setError: (error: string | null) => void;
   isAdmin: boolean;
+  checkWorkerProfileStatus: () => Promise<any>;
+  repairWorkerProfile: () => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -138,29 +141,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await runDatabaseDiagnostics(user.email);
         
-        // Try to get worker profile
-        let worker = await getCurrentWorker(user.email);
+        // Check worker status using the new helper function
+        const status = await checkWorkerStatus(user.email);
+        console.log('AuthProvider: Worker status check result:', status);
         
-        // If no worker found, create one
-        if (!worker) {
-          console.log('AuthProvider: No worker profile found, creating one...');
-          worker = await createWorkerProfile(user.email);
-          console.log('Worker profile created:', worker);
+        if (status.exists && status.worker) {
+          setCurrentWorker(status.worker);
+          setError(null);
+          console.log('AuthProvider: Worker profile found:', status.worker);
+        } else {
+          // Try to get worker profile
+          let worker = await getCurrentWorker(user.email);
           
-          // If still no worker, something is really wrong
+          // If no worker found, create one
           if (!worker) {
-            console.error('AuthProvider: Failed to create worker profile');
-            setError('Failed to create your worker profile. Please contact support.');
-            setLoading(false);
-            return;
+            console.log('AuthProvider: No worker profile found, creating one...');
+            worker = await createWorkerProfile(user.email);
+            console.log('Worker profile created:', worker);
+            
+            // If still no worker, something is really wrong
+            if (!worker) {
+              console.error('AuthProvider: Failed to create worker profile');
+              setError('Failed to create your worker profile. Please contact support.');
+              setLoading(false);
+              return;
+            }
           }
+          
+          setCurrentWorker(worker);
+          setError(null);
         }
         
         // Ensure user record exists
         await ensureUserRecord(user.id, user.email);
-        
-        setCurrentWorker(worker);
-        setError(null);
       } catch (err) {
         console.error('AuthProvider: Error initializing worker profile:', err);
         setError('Error retrieving your account information. Please try again.');
@@ -177,6 +190,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentWorker(null);
     }
   }, [user]);
+
+  // Function to check worker profile status
+  const checkWorkerProfileStatus = async () => {
+    if (!user?.email) {
+      return { success: false, message: 'Not logged in', result: null };
+    }
+    
+    try {
+      const status = await checkWorkerStatus(user.email);
+      
+      // If worker exists but not in current state, update it
+      if (status.exists && status.worker && (!currentWorker || currentWorker.id !== status.worker.id)) {
+        setCurrentWorker(status.worker);
+      }
+      
+      return { 
+        success: status.exists, 
+        message: status.exists ? 'Worker profile found' : 'Worker profile not found',
+        result: status 
+      };
+    } catch (error) {
+      console.error('Error checking worker profile status:', error);
+      return { 
+        success: false, 
+        message: 'Error checking worker profile', 
+        result: error 
+      };
+    }
+  };
+
+  // Function to repair worker profile
+  const repairWorkerProfile = async () => {
+    if (!user?.email) {
+      return { success: false, message: 'Not logged in' };
+    }
+    
+    try {
+      const worker = await createWorkerProfile(user.email);
+      
+      if (worker) {
+        setCurrentWorker(worker);
+        return { success: true, message: 'Worker profile repaired', worker };
+      } else {
+        return { success: false, message: 'Failed to repair worker profile' };
+      }
+    } catch (error) {
+      console.error('Error repairing worker profile:', error);
+      return { success: false, message: 'Error repairing worker profile', error };
+    }
+  };
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
@@ -266,7 +329,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     error,
     setError,
-    isAdmin
+    isAdmin,
+    checkWorkerProfileStatus,
+    repairWorkerProfile
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

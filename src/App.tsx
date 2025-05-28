@@ -10,10 +10,11 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Loader2, UserX } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 function App() {
-  const { user, loading: authLoading, error: authError, currentWorker, signOut } = useAuth();
+  const { user, loading: authLoading, error: authError, currentWorker, signOut, repairWorkerProfile } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
@@ -69,6 +70,59 @@ function App() {
           >
             Return to Login
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show no worker profile error
+  if (user && !currentWorker && !authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+          <div className="flex justify-center text-amber-500 mb-4">
+            <UserX size={48} />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Worker Profile Missing</h2>
+          <p className="text-gray-600 mb-6 text-center">
+            Your worker profile is missing or cannot be accessed. This is needed to use the scheduler.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={async () => {
+                setIsRetrying(true);
+                try {
+                  const result = await repairWorkerProfile();
+                  if (result.success) {
+                    toast.success('Worker profile repaired successfully');
+                  } else {
+                    toast.error('Failed to repair worker profile');
+                  }
+                } catch (error) {
+                  toast.error('Error repairing worker profile');
+                } finally {
+                  setIsRetrying(false);
+                }
+              }}
+              disabled={isRetrying}
+              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
+            >
+              {isRetrying ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Repairing...
+                </>
+              ) : (
+                'Repair Worker Profile'
+              )}
+            </button>
+            <button
+              onClick={() => signOut()}
+              className="w-full py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-md hover:bg-gray-50"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
     );
