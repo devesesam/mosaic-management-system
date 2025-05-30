@@ -21,7 +21,7 @@ export function useJobs() {
       // Add timeout to prevent hanging
       const jobsPromise = getJobs();
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Jobs fetch timeout')), 30000)
+        setTimeout(() => reject(new Error('Jobs fetch timeout')), 60000)
       );
       
       try {
