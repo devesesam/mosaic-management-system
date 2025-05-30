@@ -113,11 +113,6 @@ export const getJobs = async () => {
       tile_color: job.tile_color || '#3b82f6'
     }));
 
-    console.log('Processed jobs sample:', 
-      processedJobs.length > 0 ? 
-      JSON.stringify(processedJobs[0], null, 2) : 
-      'No jobs found');
-
     // Get secondary workers if jobs were successfully fetched
     if (processedJobs.length > 0) {
       console.log('Getting secondary workers for', processedJobs.length, 'jobs');
@@ -141,20 +136,6 @@ export const getJobs = async () => {
       }));
 
       console.log('SUCCESSFULLY LOADED JOBS:', jobsWithSecondaryWorkers.length);
-      
-      // Log detailed sample of first job with dates for debugging
-      if (jobsWithSecondaryWorkers.length > 0) {
-        const sampleJob = jobsWithSecondaryWorkers[0];
-        console.log('Sample job with dates:', {
-          id: sampleJob.id,
-          address: sampleJob.address,
-          start_date: sampleJob.start_date,
-          end_date: sampleJob.end_date,
-          worker_id: sampleJob.worker_id,
-          secondary_workers: sampleJob.secondary_worker_ids
-        });
-      }
-      
       return jobsWithSecondaryWorkers;
     }
     
@@ -426,50 +407,6 @@ export const createWorkerProfile = async (email: string, name?: string) => {
     return data;
   } catch (error) {
     console.error('Error creating worker profile:', error);
-    throw error;
-  }
-};
-
-export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
-  try {
-    // First check if the user already exists
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', authUserId)
-      .single();
-    
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "Row not found"
-      console.error('Error checking if user exists:', checkError);
-    }
-    
-    if (existingUser) {
-      console.log('User record already exists');
-      return existingUser;
-    }
-    
-    // If not, create the user record
-    console.log('Creating new user record with ID:', authUserId);
-    const { data, error } = await supabase
-      .from('users')
-      .insert([{
-        id: authUserId,
-        name: name || email.split('@')[0],
-        email: email,
-        role: 'admin'
-      }])
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error creating user record:', error);
-      throw error;
-    }
-    
-    console.log('User record created successfully');
-    return data;
-  } catch (error) {
-    console.error('Error in ensureUserRecord:', error);
     throw error;
   }
 };

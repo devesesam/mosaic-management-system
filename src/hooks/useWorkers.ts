@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export function useWorkers() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling and timeouts
+  // Use query with better error handling
   const { 
     data: workers = [], 
     isLoading, 
