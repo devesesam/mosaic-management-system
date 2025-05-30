@@ -153,15 +153,6 @@ function App() {
         />
 
         <main className="flex-1 overflow-hidden relative">
-          {(jobsLoading || workersLoading) && (
-            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-50">
-              <div className="flex flex-col items-center">
-                <Loader size={40} className="animate-spin text-indigo-600" />
-                <p className="mt-3 text-gray-700">Loading data...</p>
-              </div>
-            </div>
-          )}
-          
           {activeView === 'week' ? (
             <WeekView />
           ) : (
