@@ -6,10 +6,9 @@ export default defineConfig({
   base: './',
   build: {
     rollupOptions: {
-      input: 'index.html',
       output: {
         manualChunks: {
-          'vendor': [
+          vendor: [
             'react', 
             'react-dom',
             '@supabase/supabase-js',
@@ -17,7 +16,7 @@ export default defineConfig({
             'react-dnd',
             'react-dnd-html5-backend'
           ],
-          'utils': ['date-fns', 'react-hot-toast', 'lucide-react']
+          utils: ['date-fns', 'react-hot-toast', 'lucide-react']
         }
       }
     },
@@ -51,4 +50,4 @@ export default defineConfig({
       'lucide-react'
     ]
   }
-})
+});
