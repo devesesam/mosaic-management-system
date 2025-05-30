@@ -10,7 +10,7 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, Database } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 function App() {
   const { user, authError, currentWorker, signOut } = useAuth();
@@ -36,7 +36,7 @@ function App() {
   // Load data when component mounts or user changes
   useEffect(() => {
     if (user) {
-      console.log('App: Initial data load');
+      console.log('App: Initial data load for user:', user.email);
       refetchJobs();
       refetchWorkers();
     }

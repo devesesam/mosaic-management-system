@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, getCurrentWorker, createWorkerProfile } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -48,17 +48,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         console.log('AuthProvider: Initializing auth...');
-        await handleSignOut();
+        setLoading(true);
         
         // Get current session if any
         const { data } = await supabase.auth.getSession();
+        console.log('Initial session check:', data.session ? 'Session exists' : 'No session');
+        
         if (data.session) {
           setSession(data.session);
           setUser(data.session.user);
+          
+          // Try to get worker profile for this user
+          if (data.session.user.email) {
+            try {
+              const worker = await getCurrentWorker(data.session.user.email);
+              
+              if (worker) {
+                console.log('Found existing worker profile');
+                setCurrentWorker(worker);
+              } else {
+                console.log('No worker profile found, creating one');
+                const newWorker = await createWorkerProfile(data.session.user.email);
+                setCurrentWorker(newWorker);
+              }
+            } catch (err) {
+              console.error('Error getting/creating worker profile:', err);
+            }
+          }
         }
       } catch (err) {
-        console.error('AuthProvider: Error during initialization:', err);
+        console.error('AuthProvider: Error getting session:', err);
         setAuthError('Authentication service unavailable. Please try again later.');
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -72,6 +94,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
         setSession(session);
+        
+        // Initialize worker profile
+        if (session.user.email) {
+          try {
+            const worker = await getCurrentWorker(session.user.email);
+            
+            if (worker) {
+              setCurrentWorker(worker);
+            } else {
+              const newWorker = await createWorkerProfile(session.user.email);
+              setCurrentWorker(newWorker);
+            }
+          } catch (err) {
+            console.error('Error fetching worker profile:', err);
+          }
+        }
       }
     });
 

@@ -12,6 +12,7 @@ try {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase credentials');
   }
+  console.log('Supabase initialized with valid credentials');
 } catch (error) {
   console.error('Error loading Supabase credentials:', error);
 }
@@ -22,16 +23,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true
   },
-  global: {
-    fetch: (...args) => fetch(...args)
-  },
   db: {
     schema: 'public'
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    }
   }
 });
 
@@ -49,12 +42,14 @@ export const checkAuthStatus = async () => {
   return session;
 };
 
-// DIRECT TABLE ACCESS FUNCTIONS
-
-// Get all workers with improved error handling
+// Get all workers with improved error handling and debugging
 export const getWorkers = async () => {
   try {
     console.log('Getting workers...');
+    
+    // Check authentication state first
+    const { data: sessionData } = await supabase.auth.getSession();
+    console.log('Current auth state:', sessionData.session ? 'Authenticated' : 'Not authenticated');
     
     const { data, error, status } = await supabase
       .from('workers')
@@ -74,12 +69,16 @@ export const getWorkers = async () => {
   }
 };
 
-// Get all jobs with improved error handling
+// Get all jobs with improved error handling and debugging
 export const getJobs = async () => {
   try {
     console.log('Getting jobs...');
     
-    // Fetch jobs directly without timeout
+    // Check authentication state first
+    const { data: sessionData } = await supabase.auth.getSession();
+    console.log('Current auth state:', sessionData.session ? 'Authenticated' : 'Not authenticated');
+    
+    // Fetch jobs directly
     const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
@@ -320,18 +319,56 @@ export const deleteWorker = async (id: string) => {
   }
 };
 
-// These functions are stubs since we don't need worker profile fetching during auth
 export const getCurrentWorker = async (email: string) => {
-  console.error('getCurrentWorker should not be called during authentication');
-  return null;
+  try {
+    console.log('Getting worker profile for:', email);
+    
+    const { data, error } = await supabase
+      .from('workers')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching worker by email:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in getCurrentWorker:', error);
+    return null;
+  }
 };
 
 export const createWorkerProfile = async (email: string, name?: string) => {
-  console.error('createWorkerProfile should not be called during authentication');
-  return null;
+  try {
+    console.log('Creating worker profile for:', email);
+    
+    const { data, error } = await supabase
+      .from('workers')
+      .insert([{
+        name: name || email.split('@')[0],
+        email: email,
+        role: 'admin'
+      }])
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Failed to create worker profile:', error);
+      throw error;
+    }
+    
+    console.log('Worker profile created successfully');
+    return data;
+  } catch (error) {
+    console.error('Error creating worker profile:', error);
+    throw error;
+  }
 };
 
 export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
-  console.error('ensureUserRecord should not be called during authentication');
+  console.log('User record management is handled by database triggers');
   return null;
 };
