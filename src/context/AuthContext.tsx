@@ -50,10 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('AuthProvider: Initializing auth...');
         setLoading(true);
         
-        // Clear any existing session first to ensure fresh state
-        await handleSignOut();
-        
-        // Get current session
+        // Get current session - don't get worker profiles during initialization
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -70,29 +67,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session.user);
           setSession(session);
           
-          // Try to get or create worker profile for this user
-          if (session.user.email) {
-            try {
-              console.log('AuthProvider: Getting worker profile for', session.user.email);
-              const worker = await getCurrentWorker(session.user.email);
-              
-              if (worker) {
-                console.log('AuthProvider: Found worker profile:', worker);
-                setCurrentWorker(worker);
-              } else {
-                console.log('AuthProvider: No worker profile found, explicitly creating one');
-                const newWorker = await createWorkerProfile(session.user.email);
-                console.log('AuthProvider: Created worker profile:', newWorker);
-                setCurrentWorker(newWorker);
-              }
-              
-              // Also ensure user record exists
-              await ensureUserRecord(session.user.id, session.user.email);
-            } catch (err) {
-              console.error('Error getting/creating worker profile:', err);
-              // Don't fail the auth process if worker profile fails
-            }
-          }
+          // We are NOT getting worker profiles here to avoid the issue
+          // the user profile info is enough for initial rendering
         } else {
           console.log('AuthProvider: No active session found');
         }
@@ -115,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         setSession(session);
         
-        // Initialize worker profile in background
+        // Only fetch worker profile AFTER successful sign in, not during initialization
         if (session.user.email) {
           try {
             console.log('AuthProvider: Getting worker profile for', session.user.email);
@@ -165,16 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log('AuthProvider: Sign in successful');
       
-      // Try to initialize worker profile right away
-      if (data?.user?.email) {
-        try {
-          console.log('AuthProvider: Fetching worker profile after sign in');
-          // We'll let the auth state change listener handle this
-          // for consistency and to avoid race conditions
-        } catch (err) {
-          console.error('Error initializing worker profile:', err);
-        }
-      }
+      // Worker profile will be fetched by the auth state change listener
       
       setLoading(false);
       return true;
