@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, getCurrentWorker, createWorkerProfile, ensureUserRecord } from '../lib/supabase';
+import { supabase, getCurrentWorker, createWorkerProfile, ensureUserRecord, verifySupabaseConnection } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -50,20 +50,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('AuthProvider: Initializing auth...');
         setLoading(true);
         
-        // Add timeout to prevent hanging
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Authentication timeout')), 60000); // Increased from 30000 to 60000 (60 seconds)
-        });
+        // Check Supabase connection first
+        const connectionStatus = await verifySupabaseConnection();
+        if (!connectionStatus.connected) {
+          console.error('Supabase connection failed during initialization:', connectionStatus.error);
+          setAuthError('Database connection failed. Please check your network and try again.');
+          setLoading(false);
+          return;
+        }
         
-        const { data } = await Promise.race([
-          sessionPromise,
-          timeoutPromise.then(() => {
-            throw new Error('Authentication timeout');
-          })
-        ]) as any;
+        // Get current session
+        const { data, error } = await supabase.auth.getSession();
         
-        const session = data.session;
+        if (error) {
+          console.error('AuthProvider: Error getting session:', error);
+          setAuthError(`Authentication error: ${error.message}`);
+          setLoading(false);
+          return;
+        }
+        
+        const session = data?.session;
         
         if (session?.user) {
           console.log('AuthProvider: Found existing session');
@@ -74,18 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (session.user.email) {
             try {
               console.log('AuthProvider: Getting worker profile for', session.user.email);
-              // Add timeout for worker profile fetch
-              const workerPromise = getCurrentWorker(session.user.email);
-              const workerTimeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Worker profile fetch timeout')), 60000); // Increased from 30000 to 60000 (60 seconds)
-              });
-              
-              const worker = await Promise.race([
-                workerPromise, 
-                workerTimeoutPromise.then(() => {
-                  throw new Error('Worker profile fetch timeout');
-                })
-              ]) as any;
+              const worker = await getCurrentWorker(session.user.email);
               
               if (worker) {
                 console.log('AuthProvider: Found worker profile:', worker);
@@ -106,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch (err) {
-        console.error('AuthProvider: Error getting session:', err);
+        console.error('AuthProvider: Error during initialization:', err);
         setAuthError('Authentication service unavailable. Please try again later.');
       } finally {
         setLoading(false);
@@ -162,18 +157,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('AuthProvider: Attempting sign in for:', email);
       
-      // Add timeout for sign in
-      const signInPromise = supabase.auth.signInWithPassword({ email, password });
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Sign in timeout')), 60000); // Increased from 30000 to 60000 (60 seconds)
-      });
+      // Check Supabase connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        console.error('Supabase connection failed during sign in:', connectionStatus.error);
+        setError('Database connection failed. Please check your network and try again.');
+        setLoading(false);
+        return false;
+      }
       
-      const { data, error: signInError } = await Promise.race([
-        signInPromise,
-        timeoutPromise.then(() => {
-          throw new Error('Sign in timeout');
-        })
-      ]) as any;
+      // Perform sign in
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       
       if (signInError) {
         console.error('AuthProvider: Sign in error:', signInError);
@@ -210,6 +204,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     
     try {
+      // Check Supabase connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        console.error('Supabase connection failed during sign up:', connectionStatus.error);
+        setError('Database connection failed. Please check your network and try again.');
+        setLoading(false);
+        return;
+      }
+      
       const { error: signUpError } = await supabase.auth.signUp({ 
         email, 
         password,

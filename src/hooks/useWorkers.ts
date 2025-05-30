@@ -1,13 +1,13 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
+import { createWorker, getWorkers, deleteWorker, verifySupabaseConnection } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
 export function useWorkers() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling and timeouts
+  // Use query with better error handling
   const { 
     data: workers = [], 
     isLoading, 
@@ -18,18 +18,14 @@ export function useWorkers() {
     queryFn: async () => {
       console.log('useWorkers: Explicitly fetching workers data');
       
-      // Add timeout to prevent hanging
-      const workersPromise = getWorkers();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Workers fetch timeout')), 60000)
-      );
+      // Check connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        throw new Error(`Cannot fetch workers: Database connection failed (${connectionStatus.error?.message})`);
+      }
       
       try {
-        const result = await Promise.race([
-          workersPromise,
-          timeoutPromise
-        ]) as Worker[];
-        
+        const result = await getWorkers();
         console.log('useWorkers: Got', result.length, 'workers');
         return result;
       } catch (error) {
@@ -40,12 +36,12 @@ export function useWorkers() {
     enabled: true,
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 1000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * (2 ** attemptIndex), 30000), // Exponential backoff
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useWorkers: Error fetching workers:', error);
-      toast.error('Failed to load workers');
+      toast.error('Failed to load workers: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   });
 
@@ -61,18 +57,14 @@ export function useWorkers() {
     mutationFn: async (worker: Omit<Worker, 'id' | 'created_at'>) => {
       console.log('useWorkers: Adding worker:', worker);
       
-      // Add timeout to prevent hanging
-      const createPromise = createWorker(worker);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Create worker timeout')), 60000)
-      );
+      // Check connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        throw new Error(`Cannot create worker: Database connection failed (${connectionStatus.error?.message})`);
+      }
       
       try {
-        const result = await Promise.race([
-          createPromise,
-          timeoutPromise
-        ]) as Worker;
-        
+        const result = await createWorker(worker);
         console.log('useWorkers: Worker added successfully:', result);
         return result;
       } catch (error) {
@@ -88,19 +80,19 @@ export function useWorkers() {
     },
     onError: (error) => {
       console.error('Error adding worker:', error);
-      toast.error('Failed to add worker');
+      toast.error('Failed to add worker: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 
   const deleteWorkerMutation = useMutation({
     mutationFn: async (workerId: string) => {
-      // Add timeout to prevent hanging
-      const deletePromise = deleteWorker(workerId);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Delete worker timeout')), 60000)
-      );
+      // Check connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        throw new Error(`Cannot delete worker: Database connection failed (${connectionStatus.error?.message})`);
+      }
       
-      return Promise.race([deletePromise, timeoutPromise]);
+      return deleteWorker(workerId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workers'] });
@@ -109,7 +101,7 @@ export function useWorkers() {
     },
     onError: (error) => {
       console.error('Error deleting worker:', error);
-      toast.error('Failed to delete worker');
+      toast.error('Failed to delete worker: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 

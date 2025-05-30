@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
-// Create Supabase client with better error handling and debugging
+// Create Supabase client with better error handling and diagnostics
 let supabaseUrl = '';
 let supabaseAnonKey = '';
 
@@ -13,147 +13,163 @@ try {
     throw new Error('Missing Supabase credentials');
   }
   
-  console.log('Supabase initialization with URL:', supabaseUrl);
+  console.log('Supabase URL is configured:', !!supabaseUrl);
 } catch (error) {
   console.error('Error loading Supabase credentials:', error);
 }
 
-// Create the client
+// Create the client with improved configuration
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
-    autoRefreshToken: true
-  }
+    autoRefreshToken: true,
+    storageKey: 'tasman-roofing-auth-storage',
+    detectSessionInUrl: true,
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 2,
+    },
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'tasman-roofing-scheduler',
+    },
+  },
 });
+
+// Connection status verification
+export const verifySupabaseConnection = async () => {
+  console.log('Verifying Supabase connection...');
+  try {
+    // Simple ping to verify we can connect
+    const { data, error } = await supabase.from('workers').select('count', { count: 'exact', head: true });
+    
+    if (error) {
+      console.error('Supabase connection error:', error);
+      return { connected: false, error };
+    }
+    
+    console.log('Supabase connection successful');
+    return { connected: true };
+  } catch (error) {
+    console.error('Supabase connection check failed:', error);
+    return { connected: false, error };
+  }
+};
 
 export const isSupabaseInitialized = () => {
   return Boolean(supabaseUrl && supabaseAnonKey);
 };
 
-// Add function to check auth status
+// Check auth status with better error handling
 export const checkAuthStatus = async () => {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error) {
-    console.error('Auth check failed:', error);
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Auth check failed:', error);
+      return null;
+    }
+    return session;
+  } catch (error) {
+    console.error('Unexpected error checking auth status:', error);
     return null;
   }
-  return session;
 };
 
 // DIRECT TABLE ACCESS FUNCTIONS
 
-// Get all workers with full debugging
+// Get all workers with better error handling and logging
 export const getWorkers = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all workers');
+    console.log('getWorkers: Fetching workers from Supabase');
     
-    // Try direct table access with detailed logging
-    console.log('Executing: supabase.from("workers").select("*")');
-    const { data, error, status, statusText } = await supabase
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
+    
+    const { data, error, status } = await supabase
       .from('workers')
       .select('*')
       .order('name');
     
-    console.log('Response status:', status, statusText);
+    console.log('getWorkers: Response status:', status);
     
     if (error) {
-      console.error('ERROR ACCESSING WORKERS:', error);
-      console.log('Full error payload:', JSON.stringify(error, null, 2));
+      console.error('getWorkers: Error fetching workers:', error);
       throw new Error(`Failed to fetch workers: ${error.message}`);
     }
     
-    console.log('SUCCESSFULLY LOADED WORKERS:', data?.length || 0);
-    if (data && data.length > 0) {
-      console.log('First worker sample:', JSON.stringify(data[0], null, 2));
-    }
+    console.log(`getWorkers: Successfully loaded ${data?.length || 0} workers`);
     return data || [];
   } catch (error) {
-    console.error('CRITICAL ERROR IN getWorkers:', error);
+    console.error('getWorkers: Critical error:', error);
     throw error;
   }
 };
 
-// Get all jobs with full debugging
+// Get all jobs with better error handling and logging
 export const getJobs = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all jobs');
+    console.log('getJobs: Fetching jobs from Supabase');
     
-    // Try direct table access with detailed logging
-    console.log('Executing: supabase.from("jobs").select("*")');
-    const { data: jobs, error: jobsError, status, statusText } = await supabase
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
+    
+    const { data: jobs, error: jobsError, status } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
     
-    console.log('Response status:', status, statusText);
+    console.log('getJobs: Response status:', status);
     
     if (jobsError) {
-      console.error('ERROR ACCESSING JOBS:', jobsError);
-      console.log('Full error payload:', JSON.stringify(jobsError, null, 2));
+      console.error('getJobs: Error fetching jobs:', jobsError);
       throw new Error(`Failed to fetch jobs: ${jobsError.message}`);
     }
 
-    // Ensure correct date formatting and defaults for calendar display
+    // Process jobs data
     const processedJobs = (jobs || []).map(job => ({
       ...job,
-      // Ensure dates are in ISO format with timezone if they exist
       start_date: job.start_date || null,
       end_date: job.end_date || null,
-      // Default status if missing
       status: job.status || 'Awaiting Order',
-      // Default color if missing
       tile_color: job.tile_color || '#3b82f6'
     }));
 
-    console.log('Processed jobs sample:', 
-      processedJobs.length > 0 ? 
-      JSON.stringify(processedJobs[0], null, 2) : 
-      'No jobs found');
+    console.log(`getJobs: Successfully loaded ${processedJobs.length} jobs`);
 
-    // Get secondary workers if jobs were successfully fetched
+    // Get secondary workers only if we have jobs
     if (processedJobs.length > 0) {
-      console.log('Getting secondary workers for', processedJobs.length, 'jobs');
+      console.log('getJobs: Fetching secondary workers');
       
       const { data: secondaryWorkers, error: secondaryError } = await supabase
         .from('job_secondary_workers')
         .select('*');
 
       if (secondaryError) {
-        console.error('Error fetching secondary workers:', secondaryError);
+        console.error('getJobs: Error fetching secondary workers:', secondaryError);
         // Continue with empty secondary workers
       } else {
-        console.log('Loaded', secondaryWorkers?.length || 0, 'secondary worker assignments');
+        console.log(`getJobs: Loaded ${secondaryWorkers?.length || 0} secondary worker assignments`);
       }
 
-      const jobsWithSecondaryWorkers = processedJobs.map(job => ({
+      return processedJobs.map(job => ({
         ...job,
         secondary_worker_ids: (secondaryWorkers || [])
           .filter(sw => sw.job_id === job.id)
           .map(sw => sw.worker_id)
       }));
-
-      console.log('SUCCESSFULLY LOADED JOBS:', jobsWithSecondaryWorkers.length);
-      
-      // Log detailed sample of first job with dates for debugging
-      if (jobsWithSecondaryWorkers.length > 0) {
-        const sampleJob = jobsWithSecondaryWorkers[0];
-        console.log('Sample job with dates:', {
-          id: sampleJob.id,
-          address: sampleJob.address,
-          start_date: sampleJob.start_date,
-          end_date: sampleJob.end_date,
-          worker_id: sampleJob.worker_id,
-          secondary_workers: sampleJob.secondary_worker_ids
-        });
-      }
-      
-      return jobsWithSecondaryWorkers;
     }
     
-    console.log('No jobs found in database');
-    return [];
+    return processedJobs;
   } catch (error) {
-    console.error('CRITICAL ERROR IN getJobs:', error);
+    console.error('getJobs: Critical error:', error);
     throw error;
   }
 };
@@ -165,6 +181,12 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
     console.log('createJob: Creating new job');
     const { secondary_worker_ids, ...jobData } = job as any;
     
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
+    
     const { data: newJob, error: jobError } = await supabase
       .from('jobs')
       .insert([jobData])
@@ -172,7 +194,7 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
       .single();
     
     if (jobError) {
-      console.error('Error creating job:', jobError);
+      console.error('createJob: Error creating job:', jobError);
       throw jobError;
     }
 
@@ -188,7 +210,7 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
         .insert(secondaryWorkerData);
 
       if (secondaryError) {
-        console.error('Error adding secondary workers:', secondaryError);
+        console.error('createJob: Error adding secondary workers:', secondaryError);
       }
     }
     
@@ -197,7 +219,7 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
       secondary_worker_ids: secondary_worker_ids || []
     };
   } catch (error) {
-    console.error('Error in createJob:', error);
+    console.error('createJob: Critical error:', error);
     throw error;
   }
 };
@@ -205,6 +227,12 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
 export const updateJob = async (id: string, updates: Partial<Database['public']['Tables']['jobs']['Update']>) => {
   try {
     console.log('updateJob: Updating job:', id);
+    
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
     
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
     
@@ -216,17 +244,21 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
       .single();
     
     if (jobError) {
-      console.error('Error updating job:', jobError);
+      console.error('updateJob: Error updating job:', jobError);
       throw jobError;
     }
 
     // Handle secondary workers if present in updates
     if (secondary_worker_ids !== undefined) {
       // Delete existing secondary workers
-      await supabase
+      const { error: deleteError } = await supabase
         .from('job_secondary_workers')
         .delete()
         .eq('job_id', id);
+        
+      if (deleteError) {
+        console.error('updateJob: Error deleting secondary workers:', deleteError);
+      }
 
       // Add new secondary workers if any
       if (secondary_worker_ids?.length) {
@@ -235,24 +267,32 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
           worker_id
         }));
 
-        await supabase
+        const { error: insertError } = await supabase
           .from('job_secondary_workers')
           .insert(secondaryWorkerData);
+          
+        if (insertError) {
+          console.error('updateJob: Error adding new secondary workers:', insertError);
+        }
       }
     }
 
     // Get final secondary workers
-    const { data: currentSecondaryWorkers } = await supabase
+    const { data: currentSecondaryWorkers, error: getError } = await supabase
       .from('job_secondary_workers')
       .select('worker_id')
       .eq('job_id', id);
+      
+    if (getError) {
+      console.error('updateJob: Error fetching final secondary workers:', getError);
+    }
 
     return {
       ...updatedJob,
       secondary_worker_ids: (currentSecondaryWorkers || []).map(sw => sw.worker_id)
     };
   } catch (error) {
-    console.error('Error in updateJob:', error);
+    console.error('updateJob: Critical error:', error);
     throw error;
   }
 };
@@ -260,17 +300,24 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
 export const deleteJob = async (id: string) => {
   try {
     console.log('deleteJob: Deleting job:', id);
+    
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
+    
     const { error } = await supabase
       .from('jobs')
       .delete()
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting job:', error);
+      console.error('deleteJob: Error deleting job:', error);
       throw error;
     }
   } catch (error) {
-    console.error('Error in deleteJob:', error);
+    console.error('deleteJob: Critical error:', error);
     throw error;
   }
 };
@@ -278,6 +325,12 @@ export const deleteJob = async (id: string) => {
 export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
   try {
     console.log('createWorker: Creating worker');
+    
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
     
     // Make sure role is set to admin
     const workerData = {
@@ -292,33 +345,41 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
       .single();
 
     if (error) {
-      console.error('Error creating worker:', error);
+      console.error('createWorker: Error creating worker:', error);
       throw error;
     }
 
     console.log('createWorker: Worker created successfully');
     return data;
   } catch (error) {
-    console.error('Error in createWorker:', error);
+    console.error('createWorker: Critical error:', error);
     throw error;
   }
 };
 
 export const getWorkerJobs = async (workerId: string) => {
   try {
+    console.log('getWorkerJobs: Fetching jobs for worker:', workerId);
+    
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
+    
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
       .eq('worker_id', workerId);
 
     if (error) {
-      console.error('Error fetching worker jobs:', error);
+      console.error('getWorkerJobs: Error fetching worker jobs:', error);
       throw error;
     }
 
     return data || [];
   } catch (error) {
-    console.error('Error in getWorkerJobs:', error);
+    console.error('getWorkerJobs: Critical error:', error);
     throw error;
   }
 };
@@ -327,17 +388,31 @@ export const deleteWorker = async (id: string) => {
   try {
     console.log('deleteWorker: Deleting worker:', id);
     
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      throw new Error(`Supabase connection check failed: ${connectionStatus.error?.message}`);
+    }
+    
     // First update any jobs assigned to this worker
-    await supabase
+    const { error: updateError } = await supabase
       .from('jobs')
       .update({ worker_id: null })
       .eq('worker_id', id);
+      
+    if (updateError) {
+      console.error('deleteWorker: Error updating jobs:', updateError);
+    }
     
     // Delete secondary worker assignments
-    await supabase
+    const { error: deleteSecondaryError } = await supabase
       .from('job_secondary_workers')
       .delete()
       .eq('worker_id', id);
+      
+    if (deleteSecondaryError) {
+      console.error('deleteWorker: Error deleting secondary assignments:', deleteSecondaryError);
+    }
     
     // Finally delete the worker
     const { error } = await supabase
@@ -346,13 +421,13 @@ export const deleteWorker = async (id: string) => {
       .eq('id', id);
 
     if (error) {
-      console.error('Error in deleteWorker:', error);
+      console.error('deleteWorker: Error deleting worker:', error);
       throw error;
     }
 
     return true;
   } catch (error) {
-    console.error('Error in deleteWorker:', error);
+    console.error('deleteWorker: Critical error:', error);
     throw error;
   }
 };
@@ -361,6 +436,13 @@ export const getCurrentWorker = async (email: string) => {
   try {
     console.log('getCurrentWorker: Fetching worker for email:', email);
     
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      console.warn(`Supabase connection check failed during getCurrentWorker: ${connectionStatus.error?.message}`);
+      // Continue anyway as this is a critical path for login
+    }
+    
     const { data, error } = await supabase
       .from('workers')
       .select('*')
@@ -368,30 +450,37 @@ export const getCurrentWorker = async (email: string) => {
       .maybeSingle();
     
     if (error) {
-      console.error('Error fetching worker by email:', error);
+      console.error('getCurrentWorker: Error fetching worker by email:', error);
       return null;
     }
     
     if (!data) {
-      console.log('No worker found, creating one');
+      console.log('getCurrentWorker: No worker found, creating one');
       try {
         return await createWorkerProfile(email);
       } catch (createError) {
-        console.error('Failed to create worker:', createError);
+        console.error('getCurrentWorker: Failed to create worker:', createError);
         return null;
       }
     }
     
     return data;
   } catch (error) {
-    console.error('Error in getCurrentWorker:', error);
+    console.error('getCurrentWorker: Critical error:', error);
     return null;
   }
 };
 
 export const createWorkerProfile = async (email: string, name?: string) => {
   try {
-    console.log(`Creating worker profile for ${email}`);
+    console.log(`createWorkerProfile: Creating worker profile for ${email}`);
+    
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      console.warn(`Supabase connection check failed during createWorkerProfile: ${connectionStatus.error?.message}`);
+      // Continue anyway as this is a critical path for login
+    }
     
     const { data, error } = await supabase
       .from('workers')
@@ -410,20 +499,29 @@ export const createWorkerProfile = async (email: string, name?: string) => {
       .single();
       
     if (error) {
-      console.error('Failed to create worker profile:', error);
+      console.error('createWorkerProfile: Failed to create worker profile:', error);
       throw error;
     }
     
-    console.log('Worker profile created/updated');
+    console.log('createWorkerProfile: Worker profile created/updated');
     return data;
   } catch (error) {
-    console.error('Error creating worker profile:', error);
+    console.error('createWorkerProfile: Critical error:', error);
     throw error;
   }
 };
 
 export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
   try {
+    console.log('ensureUserRecord: Ensuring user record exists for:', authUserId);
+    
+    // Check connection first
+    const connectionStatus = await verifySupabaseConnection();
+    if (!connectionStatus.connected) {
+      console.warn(`Supabase connection check failed during ensureUserRecord: ${connectionStatus.error?.message}`);
+      // Continue anyway as this is a critical path for login
+    }
+    
     // First check if the user already exists
     const { data: existingUser, error: checkError } = await supabase
       .from('users')
@@ -432,16 +530,16 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
       .single();
     
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "Row not found"
-      console.error('Error checking if user exists:', checkError);
+      console.error('ensureUserRecord: Error checking if user exists:', checkError);
     }
     
     if (existingUser) {
-      console.log('User record already exists');
+      console.log('ensureUserRecord: User record already exists');
       return existingUser;
     }
     
     // If not, create the user record
-    console.log('Creating new user record with ID:', authUserId);
+    console.log('ensureUserRecord: Creating new user record with ID:', authUserId);
     const { data, error } = await supabase
       .from('users')
       .insert([{
@@ -454,14 +552,14 @@ export const ensureUserRecord = async (authUserId: string, email: string, name?:
       .single();
     
     if (error) {
-      console.error('Error creating user record:', error);
+      console.error('ensureUserRecord: Error creating user record:', error);
       throw error;
     }
     
-    console.log('User record created successfully');
+    console.log('ensureUserRecord: User record created successfully');
     return data;
   } catch (error) {
-    console.error('Error in ensureUserRecord:', error);
+    console.error('ensureUserRecord: Critical error:', error);
     throw error;
   }
 };

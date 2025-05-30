@@ -1,13 +1,13 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getJobs, createJob, updateJob, deleteJob } from '../lib/supabase';
+import { getJobs, createJob, updateJob, deleteJob, verifySupabaseConnection } from '../lib/supabase';
 import { Job } from '../types';
 import toast from 'react-hot-toast';
 
 export function useJobs() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling and timeouts
+  // Use query with better error handling
   const { 
     data: jobs = [], 
     isLoading, 
@@ -18,17 +18,14 @@ export function useJobs() {
     queryFn: async () => {
       console.log('useJobs: Explicitly fetching jobs data');
       
-      // Add timeout to prevent hanging
-      const jobsPromise = getJobs();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Jobs fetch timeout')), 60000)
-      );
+      // Check connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        throw new Error(`Cannot fetch jobs: Database connection failed (${connectionStatus.error?.message})`);
+      }
       
       try {
-        const result = await Promise.race([
-          jobsPromise,
-          timeoutPromise
-        ]) as Job[];
+        const result = await getJobs();
         
         console.log('useJobs: Got', result.length, 'jobs');
         
@@ -64,12 +61,12 @@ export function useJobs() {
     enabled: true,
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 1000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * (2 ** attemptIndex), 30000), // Exponential backoff
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useJobs: Error fetching jobs:', error);
-      toast.error('Failed to load jobs');
+      toast.error('Failed to load jobs: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   });
 
@@ -82,39 +79,62 @@ export function useJobs() {
   }, [jobs]);
 
   const addJobMutation = useMutation({
-    mutationFn: (job: Omit<Job, 'id' | 'created_at'>) => createJob(job),
+    mutationFn: async (job: Omit<Job, 'id' | 'created_at'>) => {
+      // Check connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        throw new Error(`Cannot create job: Database connection failed (${connectionStatus.error?.message})`);
+      }
+      
+      return createJob(job);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Job created successfully');
     },
     onError: (error) => {
       console.error('Error creating job:', error);
-      toast.error('Failed to create job');
+      toast.error('Failed to create job: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 
   const updateJobMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Job> }) =>
-      updateJob(id, updates),
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Job> }) => {
+      // Check connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        throw new Error(`Cannot update job: Database connection failed (${connectionStatus.error?.message})`);
+      }
+      
+      return updateJob(id, updates);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Job updated successfully');
     },
     onError: (error) => {
       console.error('Error updating job:', error);
-      toast.error('Failed to update job');
+      toast.error('Failed to update job: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 
   const deleteJobMutation = useMutation({
-    mutationFn: deleteJob,
+    mutationFn: async (id: string) => {
+      // Check connection first
+      const connectionStatus = await verifySupabaseConnection();
+      if (!connectionStatus.connected) {
+        throw new Error(`Cannot delete job: Database connection failed (${connectionStatus.error?.message})`);
+      }
+      
+      return deleteJob(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Job deleted successfully');
     },
     onError: (error) => {
       console.error('Error deleting job:', error);
-      toast.error('Failed to delete job');
+      toast.error('Failed to delete job: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 
