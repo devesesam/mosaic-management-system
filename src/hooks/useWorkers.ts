@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 export function useWorkers() {
   const queryClient = useQueryClient();
+  const { session } = useAuth();
 
   // Use query with improved configuration for faster loading
   const { 
@@ -27,7 +29,7 @@ export function useWorkers() {
         throw new Error(error instanceof Error ? error.message : 'Failed to fetch workers');
       }
     },
-    enabled: true,
+    enabled: !!session, // Only run query when we have a valid session
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
     retry: 1, // Reduced retries for faster error feedback
