@@ -5,21 +5,6 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: [
-            'react', 
-            'react-dom',
-            '@supabase/supabase-js',
-            'zustand',
-            'react-dnd',
-            'react-dnd-html5-backend'
-          ],
-          utils: ['date-fns', 'react-hot-toast', 'lucide-react']
-        }
-      }
-    },
     chunkSizeWarningLimit: 600,
     target: 'esnext',
     minify: 'esbuild'
