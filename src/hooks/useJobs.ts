@@ -3,13 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getJobs, createJob, updateJob, deleteJob } from '../lib/supabase';
 import { Job } from '../types';
 import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext';
 
 export function useJobs() {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
 
-  // Use query with improved configuration for faster loading
+  // Use query with better error handling and timeouts
   const { 
     data: jobs = [], 
     isLoading, 
@@ -18,7 +16,7 @@ export function useJobs() {
   } = useQuery({
     queryKey: ['jobs'],
     queryFn: async () => {
-      console.log('useJobs: Fetching jobs data');
+      console.log('useJobs: Explicitly fetching jobs data');
       
       try {
         const result = await getJobs();
@@ -42,11 +40,11 @@ export function useJobs() {
         throw new Error(error instanceof Error ? error.message : 'Failed to fetch jobs');
       }
     },
-    enabled: !!session, // Only run query when we have a valid session
+    enabled: true, // Always enabled, don't wait for session
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 1, // Reduced retries for faster error feedback
-    retryDelay: 1000, // Fixed short delay between retries
+    retry: 2,
+    retryDelay: 1000,
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useJobs: Error fetching jobs:', error);
@@ -77,7 +75,8 @@ export function useJobs() {
   });
 
   const updateJobMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Job> }) => updateJob(id, updates),
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Job> }) =>
+      updateJob(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Job updated successfully');
@@ -89,7 +88,7 @@ export function useJobs() {
   });
 
   const deleteJobMutation = useMutation({
-    mutationFn: (id: string) => deleteJob(id),
+    mutationFn: deleteJob,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       toast.success('Job deleted successfully');

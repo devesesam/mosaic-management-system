@@ -3,13 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext';
 
 export function useWorkers() {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
 
-  // Use query with improved configuration for faster loading
+  // Use query with better error handling and timeouts
   const { 
     data: workers = [], 
     isLoading, 
@@ -18,7 +16,7 @@ export function useWorkers() {
   } = useQuery({
     queryKey: ['workers'],
     queryFn: async () => {
-      console.log('useWorkers: Fetching workers data');
+      console.log('useWorkers: Explicitly fetching workers data');
       
       try {
         const result = await getWorkers();
@@ -29,11 +27,11 @@ export function useWorkers() {
         throw new Error(error instanceof Error ? error.message : 'Failed to fetch workers');
       }
     },
-    enabled: !!session, // Only run query when we have a valid session
+    enabled: true, // Always enabled, don't wait for session
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 1, // Reduced retries for faster error feedback
-    retryDelay: 1000, // Fixed short delay between retries
+    retry: 2,
+    retryDelay: 1000,
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useWorkers: Error fetching workers:', error);
@@ -77,7 +75,15 @@ export function useWorkers() {
   });
 
   const deleteWorkerMutation = useMutation({
-    mutationFn: (workerId: string) => deleteWorker(workerId),
+    mutationFn: async (workerId: string) => {
+      try {
+        const result = await deleteWorker(workerId);
+        return result;
+      } catch (error) {
+        console.error('useWorkers: Error deleting worker:', error);
+        throw error;
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workers'] });
       refetch(); // Force immediate refetch
