@@ -1,10 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
   base: './',
+  root: '.', // ensure Vite looks at root where index.html is
   build: {
+    outDir: 'dist',
+    rollupOptions: {
+      input: path.resolve(__dirname, 'index.html') // <- explicitly define entry file
+    },
     chunkSizeWarningLimit: 600,
     target: 'esnext',
     minify: 'esbuild'
