@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -49,6 +49,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         console.log('AuthProvider: Initializing auth...');
         setLoading(true);
+        
+        // Clear any existing session first to ensure fresh state
+        await handleSignOut();
         
         // Get current session
         const { data, error } = await supabase.auth.getSession();
@@ -90,6 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Don't fail the auth process if worker profile fails
             }
           }
+        } else {
+          console.log('AuthProvider: No active session found');
         }
       } catch (err) {
         console.error('AuthProvider: Error during initialization:', err);
@@ -210,7 +215,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    setLoading(true);
     await handleSignOut();
+    setLoading(false);
   };
 
   const isAdmin = true;
