@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, getCurrentWorker, createWorkerProfile, ensureUserRecord, verifySupabaseConnection } from '../lib/supabase';
+import { supabase, getCurrentWorker, createWorkerProfile, ensureUserRecord } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -49,15 +49,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         console.log('AuthProvider: Initializing auth...');
         setLoading(true);
-        
-        // Check Supabase connection first
-        const connectionStatus = await verifySupabaseConnection();
-        if (!connectionStatus.connected) {
-          console.error('Supabase connection failed during initialization:', connectionStatus.error);
-          setAuthError('Database connection failed. Please check your network and try again.');
-          setLoading(false);
-          return;
-        }
         
         // Get current session
         const { data, error } = await supabase.auth.getSession();
@@ -157,15 +148,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('AuthProvider: Attempting sign in for:', email);
       
-      // Check Supabase connection first
-      const connectionStatus = await verifySupabaseConnection();
-      if (!connectionStatus.connected) {
-        console.error('Supabase connection failed during sign in:', connectionStatus.error);
-        setError('Database connection failed. Please check your network and try again.');
-        setLoading(false);
-        return false;
-      }
-      
       // Perform sign in
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       
@@ -204,15 +186,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     
     try {
-      // Check Supabase connection first
-      const connectionStatus = await verifySupabaseConnection();
-      if (!connectionStatus.connected) {
-        console.error('Supabase connection failed during sign up:', connectionStatus.error);
-        setError('Database connection failed. Please check your network and try again.');
-        setLoading(false);
-        return;
-      }
-      
       const { error: signUpError } = await supabase.auth.signUp({ 
         email, 
         password,

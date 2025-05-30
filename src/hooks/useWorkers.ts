@@ -1,13 +1,13 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createWorker, getWorkers, deleteWorker, verifySupabaseConnection } from '../lib/supabase';
+import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
 export function useWorkers() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling
+  // Use query with better error handling and timeouts
   const { 
     data: workers = [], 
     isLoading, 
@@ -17,12 +17,6 @@ export function useWorkers() {
     queryKey: ['workers'],
     queryFn: async () => {
       console.log('useWorkers: Explicitly fetching workers data');
-      
-      // Check connection first
-      const connectionStatus = await verifySupabaseConnection();
-      if (!connectionStatus.connected) {
-        throw new Error(`Cannot fetch workers: Database connection failed (${connectionStatus.error?.message})`);
-      }
       
       try {
         const result = await getWorkers();
@@ -57,12 +51,6 @@ export function useWorkers() {
     mutationFn: async (worker: Omit<Worker, 'id' | 'created_at'>) => {
       console.log('useWorkers: Adding worker:', worker);
       
-      // Check connection first
-      const connectionStatus = await verifySupabaseConnection();
-      if (!connectionStatus.connected) {
-        throw new Error(`Cannot create worker: Database connection failed (${connectionStatus.error?.message})`);
-      }
-      
       try {
         const result = await createWorker(worker);
         console.log('useWorkers: Worker added successfully:', result);
@@ -85,15 +73,7 @@ export function useWorkers() {
   });
 
   const deleteWorkerMutation = useMutation({
-    mutationFn: async (workerId: string) => {
-      // Check connection first
-      const connectionStatus = await verifySupabaseConnection();
-      if (!connectionStatus.connected) {
-        throw new Error(`Cannot delete worker: Database connection failed (${connectionStatus.error?.message})`);
-      }
-      
-      return deleteWorker(workerId);
-    },
+    mutationFn: (workerId: string) => deleteWorker(workerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workers'] });
       refetch(); // Force immediate refetch
