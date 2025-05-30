@@ -20,7 +20,6 @@ export const getWorkers = async () => {
     .from('workers')
     .select('*')
     .order('name');
-
   if (error) return [];
   return data || [];
 };
@@ -47,6 +46,20 @@ export const getJobs = async () => {
       .filter(sw => sw.job_id === job.id)
       .map(sw => sw.worker_id)
   }));
+};
+
+export const getWorkerJobs = async (workerId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('worker_id', workerId);
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Failed to fetch worker jobs:', error);
+    return [];
+  }
 };
 
 export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['Insert'], 'id' | 'created_at'>) => {
@@ -118,7 +131,6 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
     .insert([{ ...worker, role: 'admin' }])
     .select()
     .single();
-
   if (error) throw error;
   return data;
 };
