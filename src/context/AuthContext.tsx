@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, getCurrentWorker, createWorkerProfile, ensureUserRecord } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(true); // Start with loading true
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -50,32 +50,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('AuthProvider: Initializing auth...');
         setLoading(true);
         
-        // Get current session - don't get worker profiles during initialization
-        const { data, error } = await supabase.auth.getSession();
+        // Call signOut first to ensure we always start with a clean state
+        // This ensures we never try to get worker profiles on page load
+        await handleSignOut();
         
-        if (error) {
-          console.error('AuthProvider: Error getting session:', error);
-          setAuthError(`Authentication error: ${error.message}`);
-          setLoading(false);
-          return;
-        }
-        
-        const session = data?.session;
-        
-        if (session?.user) {
-          console.log('AuthProvider: Found existing session');
-          setUser(session.user);
-          setSession(session);
-          
-          // We are NOT getting worker profiles here to avoid the issue
-          // the user profile info is enough for initial rendering
-        } else {
-          console.log('AuthProvider: No active session found');
-        }
+        // Now that we've ensured we're signed out, we can finish initialization
+        setLoading(false);
       } catch (err) {
         console.error('AuthProvider: Error during initialization:', err);
         setAuthError('Authentication service unavailable. Please try again later.');
-      } finally {
         setLoading(false);
       }
     };
@@ -91,29 +74,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         setSession(session);
         
-        // Only fetch worker profile AFTER successful sign in, not during initialization
-        if (session.user.email) {
-          try {
-            console.log('AuthProvider: Getting worker profile for', session.user.email);
-            const worker = await getCurrentWorker(session.user.email);
-            
-            if (worker) {
-              console.log('AuthProvider: Found worker profile:', worker);
-              setCurrentWorker(worker);
-            } else {
-              console.log('AuthProvider: No worker profile found, creating one');
-              const newWorker = await createWorkerProfile(session.user.email);
-              console.log('AuthProvider: Created worker profile:', newWorker);
-              setCurrentWorker(newWorker);
-            }
-            
-            // Also ensure user record exists
-            await ensureUserRecord(session.user.id, session.user.email);
-          } catch (err) {
-            console.error('Error fetching worker profile:', err);
-            // Don't break auth flow on worker profile error
-          }
-        }
+        // Do NOT get worker profiles here either
+        // We'll only fetch a worker profile when explicitly needed in the app
       }
     });
 
@@ -141,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log('AuthProvider: Sign in successful');
       
-      // Worker profile will be fetched by the auth state change listener
+      // We specifically do NOT fetch worker profiles here
       
       setLoading(false);
       return true;

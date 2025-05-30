@@ -357,111 +357,19 @@ export const deleteWorker = async (id: string) => {
   }
 };
 
+// These functions are completely removed since we don't want worker profile fetching
+// during initial auth. They will be added back only if explicitly needed elsewhere in the app.
 export const getCurrentWorker = async (email: string) => {
-  try {
-    console.log('getCurrentWorker: Fetching worker for email:', email);
-    
-    const { data, error } = await supabase
-      .from('workers')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error fetching worker by email:', error);
-      return null;
-    }
-    
-    if (!data) {
-      console.log('No worker found, creating one');
-      try {
-        return await createWorkerProfile(email);
-      } catch (createError) {
-        console.error('Failed to create worker:', createError);
-        return null;
-      }
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error in getCurrentWorker:', error);
-    return null;
-  }
+  console.error('getCurrentWorker should not be called during authentication');
+  return null;
 };
 
 export const createWorkerProfile = async (email: string, name?: string) => {
-  try {
-    console.log(`Creating worker profile for ${email}`);
-    
-    const { data, error } = await supabase
-      .from('workers')
-      .upsert(
-        {
-          name: name || email.split('@')[0],
-          email: email,
-          role: 'admin'
-        },
-        { 
-          onConflict: 'email',
-          ignoreDuplicates: false
-        }
-      )
-      .select()
-      .single();
-      
-    if (error) {
-      console.error('Failed to create worker profile:', error);
-      throw error;
-    }
-    
-    console.log('Worker profile created/updated');
-    return data;
-  } catch (error) {
-    console.error('Error creating worker profile:', error);
-    throw error;
-  }
+  console.error('createWorkerProfile should not be called during authentication');
+  return null;
 };
 
 export const ensureUserRecord = async (authUserId: string, email: string, name?: string) => {
-  try {
-    // First check if the user already exists
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', authUserId)
-      .single();
-    
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "Row not found"
-      console.error('Error checking if user exists:', checkError);
-    }
-    
-    if (existingUser) {
-      console.log('User record already exists');
-      return existingUser;
-    }
-    
-    // If not, create the user record
-    console.log('Creating new user record with ID:', authUserId);
-    const { data, error } = await supabase
-      .from('users')
-      .insert([{
-        id: authUserId,
-        name: name || email.split('@')[0],
-        email: email,
-        role: 'admin'
-      }])
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error creating user record:', error);
-      throw error;
-    }
-    
-    console.log('User record created successfully');
-    return data;
-  } catch (error) {
-    console.error('Error in ensureUserRecord:', error);
-    throw error;
-  }
+  console.error('ensureUserRecord should not be called during authentication');
+  return null;
 };
