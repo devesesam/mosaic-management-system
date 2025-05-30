@@ -7,45 +7,66 @@ import toast from 'react-hot-toast';
 export function useJobs() {
   const queryClient = useQueryClient();
 
-  // Direct query with no auto-refetching or caching
-  const { data: jobs = [], isLoading, error, refetch } = useQuery({
+  // Use query with better error handling and timeouts
+  const { 
+    data: jobs = [], 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
     queryKey: ['jobs'],
     queryFn: async () => {
       console.log('useJobs: Explicitly fetching jobs data');
-      const result = await getJobs();
-      console.log('useJobs: Got', result.length, 'jobs');
       
-      // Ensure all jobs have the required fields for the calendar
-      const validatedJobs = result.map(job => ({
-        ...job,
-        // Convert dates to strings if they're not already
-        start_date: job.start_date ? job.start_date : null,
-        end_date: job.end_date ? job.end_date : null,
-        // Ensure other required fields
-        status: job.status || 'Awaiting Order',
-        tile_color: job.tile_color || '#3b82f6',
-        secondary_worker_ids: job.secondary_worker_ids || []
-      }));
+      // Add timeout to prevent hanging
+      const jobsPromise = getJobs();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Jobs fetch timeout')), 10000)
+      );
       
-      // Log the first job for debugging
-      if (validatedJobs.length > 0) {
-        console.log('useJobs: First job sample:', {
-          id: validatedJobs[0].id,
-          address: validatedJobs[0].address,
-          start_date: validatedJobs[0].start_date,
-          end_date: validatedJobs[0].end_date,
-          worker_id: validatedJobs[0].worker_id
-        });
+      try {
+        const result = await Promise.race([
+          jobsPromise,
+          timeoutPromise
+        ]) as Job[];
+        
+        console.log('useJobs: Got', result.length, 'jobs');
+        
+        // Ensure all jobs have the required fields for the calendar
+        const validatedJobs = result.map(job => ({
+          ...job,
+          // Convert dates to strings if they're not already
+          start_date: job.start_date ? job.start_date : null,
+          end_date: job.end_date ? job.end_date : null,
+          // Ensure other required fields
+          status: job.status || 'Awaiting Order',
+          tile_color: job.tile_color || '#3b82f6',
+          secondary_worker_ids: job.secondary_worker_ids || []
+        }));
+        
+        // Log the first job for debugging
+        if (validatedJobs.length > 0) {
+          console.log('useJobs: First job sample:', {
+            id: validatedJobs[0].id,
+            address: validatedJobs[0].address,
+            start_date: validatedJobs[0].start_date,
+            end_date: validatedJobs[0].end_date,
+            worker_id: validatedJobs[0].worker_id
+          });
+        }
+        
+        return validatedJobs;
+      } catch (error) {
+        console.error('useJobs: Error fetching jobs:', error);
+        throw new Error(error instanceof Error ? error.message : 'Failed to fetch jobs');
       }
-      
-      return validatedJobs;
     },
-    enabled: true, // Always enabled regardless of auth state
-    staleTime: Infinity, // Never consider data stale
-    refetchOnWindowFocus: false, // Don't refetch when window gains focus
-    retry: 3,
+    enabled: true,
+    staleTime: 60000, // Consider data stale after 1 minute
+    refetchOnWindowFocus: false,
+    retry: 2,
     retryDelay: 1000,
-    gcTime: Infinity, // Keep data in cache forever
+    gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useJobs: Error fetching jobs:', error);
       toast.error('Failed to load jobs');

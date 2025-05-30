@@ -7,21 +7,42 @@ import toast from 'react-hot-toast';
 export function useWorkers() {
   const queryClient = useQueryClient();
 
-  // Direct query with no auto-refetching or caching
-  const { data: workers = [], isLoading, error, refetch } = useQuery({
+  // Use query with better error handling and timeouts
+  const { 
+    data: workers = [], 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
     queryKey: ['workers'],
     queryFn: async () => {
       console.log('useWorkers: Explicitly fetching workers data');
-      const result = await getWorkers();
-      console.log('useWorkers: Got', result.length, 'workers');
-      return result;
+      
+      // Add timeout to prevent hanging
+      const workersPromise = getWorkers();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Workers fetch timeout')), 10000)
+      );
+      
+      try {
+        const result = await Promise.race([
+          workersPromise,
+          timeoutPromise
+        ]) as Worker[];
+        
+        console.log('useWorkers: Got', result.length, 'workers');
+        return result;
+      } catch (error) {
+        console.error('useWorkers: Error fetching workers:', error);
+        throw new Error(error instanceof Error ? error.message : 'Failed to fetch workers');
+      }
     },
-    enabled: true, // Always enabled regardless of auth state
-    staleTime: Infinity, // Never consider data stale
-    refetchOnWindowFocus: false, // Don't refetch when window gains focus
-    retry: 3,
+    enabled: true,
+    staleTime: 60000, // Consider data stale after 1 minute
+    refetchOnWindowFocus: false,
+    retry: 2,
     retryDelay: 1000,
-    gcTime: Infinity, // Keep data in cache forever
+    gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useWorkers: Error fetching workers:', error);
       toast.error('Failed to load workers');
@@ -39,9 +60,25 @@ export function useWorkers() {
   const addWorkerMutation = useMutation({
     mutationFn: async (worker: Omit<Worker, 'id' | 'created_at'>) => {
       console.log('useWorkers: Adding worker:', worker);
-      const result = await createWorker(worker);
-      console.log('useWorkers: Worker added successfully:', result);
-      return result;
+      
+      // Add timeout to prevent hanging
+      const createPromise = createWorker(worker);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Create worker timeout')), 10000)
+      );
+      
+      try {
+        const result = await Promise.race([
+          createPromise,
+          timeoutPromise
+        ]) as Worker;
+        
+        console.log('useWorkers: Worker added successfully:', result);
+        return result;
+      } catch (error) {
+        console.error('useWorkers: Error adding worker:', error);
+        throw new Error(error instanceof Error ? error.message : 'Failed to add worker');
+      }
     },
     onSuccess: () => {
       console.log('useWorkers: Worker added, invalidating queries');
@@ -56,7 +93,15 @@ export function useWorkers() {
   });
 
   const deleteWorkerMutation = useMutation({
-    mutationFn: deleteWorker,
+    mutationFn: async (workerId: string) => {
+      // Add timeout to prevent hanging
+      const deletePromise = deleteWorker(workerId);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Delete worker timeout')), 10000)
+      );
+      
+      return Promise.race([deletePromise, timeoutPromise]);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workers'] });
       refetch(); // Force immediate refetch
