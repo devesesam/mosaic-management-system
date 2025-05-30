@@ -25,6 +25,11 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
   db: {
     schema: 'public'
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'tasman-roofing-scheduler'
+    }
   }
 });
 
@@ -48,8 +53,14 @@ export const getWorkers = async () => {
     console.log('Getting workers...');
     
     // Check authentication state first
-    const { data: sessionData } = await supabase.auth.getSession();
-    console.log('Current auth state:', sessionData.session ? 'Authenticated' : 'Not authenticated');
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !sessionData.session) {
+      console.warn('getWorkers: No valid session found', sessionError || 'Session is null');
+      throw new Error('Authentication required to fetch workers');
+    }
+    
+    console.log('Current auth state: Authenticated as', sessionData.session.user.email);
     
     const { data, error, status } = await supabase
       .from('workers')
@@ -75,8 +86,14 @@ export const getJobs = async () => {
     console.log('Getting jobs...');
     
     // Check authentication state first
-    const { data: sessionData } = await supabase.auth.getSession();
-    console.log('Current auth state:', sessionData.session ? 'Authenticated' : 'Not authenticated');
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !sessionData.session) {
+      console.warn('getJobs: No valid session found', sessionError || 'Session is null');
+      throw new Error('Authentication required to fetch jobs');
+    }
+    
+    console.log('Current auth state: Authenticated as', sessionData.session.user.email);
     
     // Fetch jobs directly
     const { data: jobs, error: jobsError } = await supabase
