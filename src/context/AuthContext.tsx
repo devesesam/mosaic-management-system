@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -48,18 +48,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         console.log('AuthProvider: Initializing auth...');
-        setLoading(true);
-        
-        // Call signOut first to ensure we always start with a clean state
-        // This ensures we never try to get worker profiles on page load
         await handleSignOut();
         
-        // Now that we've ensured we're signed out, we can finish initialization
-        setLoading(false);
+        // Get current session if any
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setSession(data.session);
+          setUser(data.session.user);
+        }
       } catch (err) {
         console.error('AuthProvider: Error during initialization:', err);
         setAuthError('Authentication service unavailable. Please try again later.');
-        setLoading(false);
       }
     };
     
@@ -73,9 +72,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
         setSession(session);
-        
-        // Do NOT get worker profiles here either
-        // We'll only fetch a worker profile when explicitly needed in the app
       }
     });
 
@@ -91,8 +87,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('AuthProvider: Attempting sign in for:', email);
       
-      // Perform sign in
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
       
       if (signInError) {
         console.error('AuthProvider: Sign in error:', signInError);
@@ -102,9 +100,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       console.log('AuthProvider: Sign in successful');
-      
-      // We specifically do NOT fetch worker profiles here
-      
       setLoading(false);
       return true;
     } catch (err) {
@@ -144,9 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    setLoading(true);
     await handleSignOut();
-    setLoading(false);
   };
 
   const isAdmin = true;

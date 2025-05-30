@@ -108,17 +108,17 @@ const LoginForm: React.FC = () => {
           <div className="flex flex-col space-y-4">
             <button
               type="submit"
-              disabled={isSubmitting || loading}
+              disabled={isSubmitting}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#0a2342] hover:bg-[#0c2d5a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70"
             >
-              {isSubmitting || loading ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
+              {isSubmitting ? (isSignUp ? 'Signing up...' : 'Signing in...') : (isSignUp ? 'Sign up' : 'Sign in')}
             </button>
             
             <button
               type="button"
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm text-indigo-600 hover:text-indigo-500 font-medium focus:outline-none"
-              disabled={isSubmitting || loading}
+              disabled={isSubmitting}
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
