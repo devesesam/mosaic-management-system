@@ -20,6 +20,7 @@ import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
 import { useJobStore } from '../../store/jobStore';
 import { useWorkerStore } from '../../store/workerStore';
+import { useAuth } from '../../context/AuthContext';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
@@ -35,6 +36,7 @@ const WeekView: React.FC<WeekViewProps> = () => {
   
   const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobStore();
   const { workers, fetchWorkers, addWorker } = useWorkerStore();
+  const { session } = useAuth();
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -48,26 +50,31 @@ const WeekView: React.FC<WeekViewProps> = () => {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
   
-  // One-time data fetch when component mounts
+  // Only fetch data when authenticated
   useEffect(() => {
-    console.log('WeekView: Initial data load');
+    if (!session) {
+      console.log('WeekView: No session, skipping data fetch');
+      return;
+    }
+    
+    console.log('WeekView: Session available, fetching data');
     fetchJobs();
     fetchWorkers();
-  }, [fetchJobs, fetchWorkers]);
+  }, [session, fetchJobs, fetchWorkers]);
   
   // Debug log the jobs data
   useEffect(() => {
     if (jobs.length > 0) {
       console.log('WeekView: Jobs loaded:', jobs.length);
-      console.log('WeekView: First job sample:', {
-        id: jobs[0].id,
-        address: jobs[0].address,
-        start_date: jobs[0].start_date,
-        end_date: jobs[0].end_date,
-        worker_id: jobs[0].worker_id
-      });
     }
   }, [jobs]);
+  
+  // Debug log the workers data
+  useEffect(() => {
+    if (workers.length > 0) {
+      console.log('WeekView: Workers loaded:', workers.length);
+    }
+  }, [workers]);
   
   // Get unscheduled jobs
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
@@ -248,6 +255,12 @@ const WeekView: React.FC<WeekViewProps> = () => {
       {jobs.length === 0 && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
+        </div>
+      )}
+      
+      {!session && (
+        <div className="p-4 bg-amber-50 border-b border-amber-200">
+          <p className="text-amber-800 font-medium">Waiting for authentication... Data will load when you're signed in.</p>
         </div>
       )}
       

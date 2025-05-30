@@ -22,6 +22,7 @@ import {
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
 import { useJobStore } from '../../store/jobStore';
+import { useAuth } from '../../context/AuthContext';
 import UnscheduledPanel from './UnscheduledPanel';
 import JobForm from '../jobs/JobForm';
 import DayJobsModal from './DayJobsModal';
@@ -39,18 +40,12 @@ const MonthView: React.FC<MonthViewProps> = () => {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   
   const { jobs, fetchJobs, updateJob, deleteJob } = useJobStore();
+  const { session } = useAuth();
   
   // Debug log the jobs data
   useEffect(() => {
     if (jobs.length > 0) {
       console.log('MonthView: Jobs loaded:', jobs.length);
-      console.log('MonthView: First job sample:', {
-        id: jobs[0].id,
-        address: jobs[0].address,
-        start_date: jobs[0].start_date,
-        end_date: jobs[0].end_date,
-        worker_id: jobs[0].worker_id
-      });
     }
   }, [jobs]);
   
@@ -84,14 +79,21 @@ const MonthView: React.FC<MonthViewProps> = () => {
     }
   });
 
-  // One-time load of jobs when component mounts
+  // Only fetch data when authenticated
   useEffect(() => {
-    console.log('MonthView: Initial data load');
+    if (!session) {
+      console.log('MonthView: No session, skipping data fetch');
+      return;
+    }
+    
+    console.log('MonthView: Session available, fetching data');
     fetchJobs();
-  }, [fetchJobs]);
+  }, [session, fetchJobs]);
 
   // Get unscheduled jobs (no date and no worker)
-  const unscheduledJobs = jobs.filter(job => !job.start_date && !job.worker_id);
+  const unscheduledJobs = useMemo(() => {
+    return jobs.filter(job => !job.start_date && !job.worker_id);
+  }, [jobs]);
 
   // Get jobs for a specific day - less restrictive to show more jobs
   const getDayJobs = (day: Date) => {
@@ -404,7 +406,13 @@ const MonthView: React.FC<MonthViewProps> = () => {
           </button>
         </div>
         
-        {/* Debug information */}
+        {/* Warning messages */}
+        {!session && (
+          <div className="p-4 bg-amber-50 border-b border-amber-200">
+            <p className="text-amber-800 font-medium">Waiting for authentication... Data will load when you're signed in.</p>
+          </div>
+        )}
+        
         {jobs.length === 0 && (
           <div className="p-4 bg-yellow-50 border-b border-yellow-200">
             <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>

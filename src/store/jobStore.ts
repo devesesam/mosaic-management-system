@@ -32,10 +32,14 @@ export const useJobStore = create<JobState>((set, get) => ({
       set({ jobs, loading: false, error: null });
     } catch (error) {
       console.error('Error fetching jobs:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to fetch jobs', 
-        loading: false 
-      });
+      
+      // More specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to fetch jobs - check your network connection and authentication';
+        
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
     }
   },
   
@@ -58,10 +62,14 @@ export const useJobStore = create<JobState>((set, get) => ({
       return newJob;
     } catch (error) {
       console.error('Error adding job:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to add job', 
-        loading: false 
-      });
+      
+      // More specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to add job - check your network connection and authentication';
+        
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
       throw error;
     }
   },
@@ -85,10 +93,14 @@ export const useJobStore = create<JobState>((set, get) => ({
       return updatedJob;
     } catch (error) {
       console.error('Error updating job:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to update job', 
-        loading: false 
-      });
+      
+      // More specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to update job - check your network connection and authentication';
+        
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
       throw error;
     }
   },
@@ -110,10 +122,14 @@ export const useJobStore = create<JobState>((set, get) => ({
       get().fetchJobs();
     } catch (error) {
       console.error('Error deleting job:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to delete job', 
-        loading: false 
-      });
+      
+      // More specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to delete job - check your network connection and authentication';
+        
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
       throw error;
     }
   },

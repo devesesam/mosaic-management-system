@@ -27,11 +27,14 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       set({ workers, loading: false, error: null });
     } catch (error) {
       console.error('WorkerStore: Error fetching workers:', error);
-      set({ 
-        error: 'Failed to fetch workers',
-        loading: false
-      });
-      throw error;
+      
+      // More specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to fetch workers - check your network connection and authentication';
+        
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
     }
   },
   
@@ -56,10 +59,14 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       return newWorker;
     } catch (error) {
       console.error('WorkerStore: Error adding worker:', error);
-      set({ 
-        error: 'Failed to add worker', 
-        loading: false 
-      });
+      
+      // More specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to add worker - check your network connection and authentication';
+        
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
       throw error;
     }
   },
@@ -82,10 +89,14 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       await get().fetchWorkers();
     } catch (error) {
       console.error('WorkerStore: Error deleting worker:', error);
-      set({
-        error: 'Failed to delete worker',
-        loading: false
-      });
+      
+      // More specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to delete worker - check your network connection and authentication';
+        
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
       throw error;
     }
   }
