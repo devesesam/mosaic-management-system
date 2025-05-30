@@ -1,19 +1,29 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
   base: './',
-  root: '.', // ensure Vite looks at root where index.html is
   build: {
-    outDir: 'dist',
-    rollupOptions: {
-      input: path.resolve(__dirname, 'index.html') // <- explicitly define entry file
-    },
-    chunkSizeWarningLimit: 600,
     target: 'esnext',
-    minify: 'esbuild'
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: [
+            'react',
+            'react-dom',
+            '@supabase/supabase-js',
+            'zustand',
+            'react-dnd',
+            'react-dnd-html5-backend'
+          ],
+          utils: ['date-fns', 'react-hot-toast', 'lucide-react']
+        }
+      }
+      // ❌ DO NOT specify `input` at all
+    }
   },
   server: {
     port: 5173,
