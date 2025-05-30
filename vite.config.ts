@@ -6,6 +6,7 @@ export default defineConfig({
   base: './',
   build: {
     rollupOptions: {
+      input: 'index.html',
       output: {
         manualChunks: {
           'vendor': [
