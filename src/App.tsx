@@ -13,7 +13,7 @@ import { Toaster } from 'react-hot-toast';
 import { AlertTriangle, Database, Loader } from 'lucide-react';
 
 function App() {
-  const { user, authError, currentWorker, signOut, loading: authLoading } = useAuth();
+  const { user, authError, currentWorker, signOut } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
@@ -78,18 +78,6 @@ function App() {
       console.error('Error creating job:', error);
     }
   };
-  
-  // Show loading screen if authenticating
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader size={48} className="animate-spin text-indigo-600 mx-auto" />
-          <p className="mt-4 text-lg text-gray-600">Loading application...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Show login form if no user
   if (!user) {
