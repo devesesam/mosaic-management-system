@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Add timeout to prevent hanging
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Authentication timeout')), 30000); // Increased from 20000 to 30000 (30 seconds)
+          setTimeout(() => reject(new Error('Authentication timeout')), 60000); // Increased from 30000 to 60000 (60 seconds)
         });
         
         const { data } = await Promise.race([
@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Add timeout for worker profile fetch
               const workerPromise = getCurrentWorker(session.user.email);
               const workerTimeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Worker profile fetch timeout')), 30000); // Increased from 20000 to 30000 (30 seconds)
+                setTimeout(() => reject(new Error('Worker profile fetch timeout')), 60000); // Increased from 30000 to 60000 (60 seconds)
               });
               
               const worker = await Promise.race([
@@ -165,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Add timeout for sign in
       const signInPromise = supabase.auth.signInWithPassword({ email, password });
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Sign in timeout')), 30000); // Increased from 20000 to 30000 (30 seconds)
+        setTimeout(() => reject(new Error('Sign in timeout')), 60000); // Increased from 30000 to 60000 (60 seconds)
       });
       
       const { data, error: signInError } = await Promise.race([

@@ -21,7 +21,7 @@ export function useWorkers() {
       // Add timeout to prevent hanging
       const workersPromise = getWorkers();
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Workers fetch timeout')), 30000)
+        setTimeout(() => reject(new Error('Workers fetch timeout')), 60000)
       );
       
       try {
@@ -64,7 +64,7 @@ export function useWorkers() {
       // Add timeout to prevent hanging
       const createPromise = createWorker(worker);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Create worker timeout')), 30000)
+        setTimeout(() => reject(new Error('Create worker timeout')), 60000)
       );
       
       try {
@@ -97,7 +97,7 @@ export function useWorkers() {
       // Add timeout to prevent hanging
       const deletePromise = deleteWorker(workerId);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Delete worker timeout')), 30000)
+        setTimeout(() => reject(new Error('Delete worker timeout')), 60000)
       );
       
       return Promise.race([deletePromise, timeoutPromise]);
