@@ -10,7 +10,7 @@ import JobForm from './components/jobs/JobForm';
 import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, Database, Loader } from 'lucide-react';
+import { AlertTriangle, Database } from 'lucide-react';
 
 function App() {
   const { user, authError, currentWorker, signOut } = useAuth();
@@ -33,23 +33,16 @@ function App() {
     isLoading: workersLoading 
   } = useWorkers();
 
-  // Force immediate data load when component mounts or user changes
+  // Load data when component mounts or user changes
   useEffect(() => {
     if (user) {
-      console.log('App: Initial data load or user changed -', user ? 'User logged in' : 'No user');
-      
-      // Delay slightly to ensure auth is fully processed
-      const timer = setTimeout(() => {
-        console.log('App: Triggering data fetch');
-        refetchJobs();
-        refetchWorkers();
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+      console.log('App: Initial data load');
+      refetchJobs();
+      refetchWorkers();
     }
   }, [user, refetchJobs, refetchWorkers]);
 
-  // Set up periodic refresh with error handling
+  // Set up periodic refresh
   useEffect(() => {
     if (!user) return;
     
@@ -61,7 +54,7 @@ function App() {
       } catch (error) {
         console.error('Error during periodic refresh:', error);
       }
-    }, 60000); // Refresh every 60 seconds instead of 30 seconds
+    }, 60000); // Refresh every 60 seconds
     
     return () => clearInterval(interval);
   }, [user, refetchJobs, refetchWorkers]);
@@ -130,7 +123,7 @@ function App() {
             >
               {isRetrying ? (
                 <>
-                  <Loader className="w-5 h-5 mr-2 animate-spin" />
+                  <div className="w-5 h-5 mr-2 border-t-2 border-b-2 border-white rounded-full animate-spin"></div>
                   Refreshing...
                 </>
               ) : (

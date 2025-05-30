@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 
-// Create Supabase client with better error handling and debugging
+// Create Supabase client
 let supabaseUrl = '';
 let supabaseAnonKey = '';
 
@@ -12,17 +12,26 @@ try {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase credentials');
   }
-  
-  console.log('Supabase initialization with URL:', supabaseUrl);
 } catch (error) {
   console.error('Error loading Supabase credentials:', error);
 }
 
-// Create the client
+// Create the client with connection options for better performance
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true
+  },
+  global: {
+    fetch: (...args) => fetch(...args)
+  },
+  db: {
+    schema: 'public'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });
 
@@ -42,77 +51,57 @@ export const checkAuthStatus = async () => {
 
 // DIRECT TABLE ACCESS FUNCTIONS
 
-// Get all workers with full debugging
+// Get all workers with improved error handling
 export const getWorkers = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all workers');
+    console.log('Getting workers...');
     
-    // Try direct table access with detailed logging
-    console.log('Executing: supabase.from("workers").select("*")');
-    const { data, error, status, statusText } = await supabase
+    const { data, error, status } = await supabase
       .from('workers')
       .select('*')
       .order('name');
     
-    console.log('Response status:', status, statusText);
-    
     if (error) {
-      console.error('ERROR ACCESSING WORKERS:', error);
-      console.log('Full error payload:', JSON.stringify(error, null, 2));
+      console.error('Error fetching workers:', error);
       throw new Error(`Failed to fetch workers: ${error.message}`);
     }
     
-    console.log('SUCCESSFULLY LOADED WORKERS:', data?.length || 0);
-    if (data && data.length > 0) {
-      console.log('First worker sample:', JSON.stringify(data[0], null, 2));
-    }
+    console.log(`Successfully loaded ${data?.length || 0} workers`);
     return data || [];
   } catch (error) {
-    console.error('CRITICAL ERROR IN getWorkers:', error);
+    console.error('Critical error in getWorkers:', error);
     throw error;
   }
 };
 
-// Get all jobs with full debugging
+// Get all jobs with improved error handling
 export const getJobs = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all jobs');
+    console.log('Getting jobs...');
     
-    // Try direct table access with detailed logging
-    console.log('Executing: supabase.from("jobs").select("*")');
-    const { data: jobs, error: jobsError, status, statusText } = await supabase
+    // Fetch jobs directly without timeout
+    const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
     
-    console.log('Response status:', status, statusText);
-    
     if (jobsError) {
-      console.error('ERROR ACCESSING JOBS:', jobsError);
-      console.log('Full error payload:', JSON.stringify(jobsError, null, 2));
+      console.error('Error fetching jobs:', jobsError);
       throw new Error(`Failed to fetch jobs: ${jobsError.message}`);
     }
 
-    // Ensure correct date formatting and defaults for calendar display
+    // Process jobs to ensure proper format
     const processedJobs = (jobs || []).map(job => ({
       ...job,
-      // Ensure dates are in ISO format with timezone if they exist
       start_date: job.start_date || null,
       end_date: job.end_date || null,
-      // Default status if missing
       status: job.status || 'Awaiting Order',
-      // Default color if missing
       tile_color: job.tile_color || '#3b82f6'
     }));
 
-    console.log('Processed jobs sample:', 
-      processedJobs.length > 0 ? 
-      JSON.stringify(processedJobs[0], null, 2) : 
-      'No jobs found');
-
     // Get secondary workers if jobs were successfully fetched
     if (processedJobs.length > 0) {
-      console.log('Getting secondary workers for', processedJobs.length, 'jobs');
+      console.log(`Fetching secondary workers for ${processedJobs.length} jobs`);
       
       const { data: secondaryWorkers, error: secondaryError } = await supabase
         .from('job_secondary_workers')
@@ -121,8 +110,6 @@ export const getJobs = async () => {
       if (secondaryError) {
         console.error('Error fetching secondary workers:', secondaryError);
         // Continue with empty secondary workers
-      } else {
-        console.log('Loaded', secondaryWorkers?.length || 0, 'secondary worker assignments');
       }
 
       const jobsWithSecondaryWorkers = processedJobs.map(job => ({
@@ -132,28 +119,13 @@ export const getJobs = async () => {
           .map(sw => sw.worker_id)
       }));
 
-      console.log('SUCCESSFULLY LOADED JOBS:', jobsWithSecondaryWorkers.length);
-      
-      // Log detailed sample of first job with dates for debugging
-      if (jobsWithSecondaryWorkers.length > 0) {
-        const sampleJob = jobsWithSecondaryWorkers[0];
-        console.log('Sample job with dates:', {
-          id: sampleJob.id,
-          address: sampleJob.address,
-          start_date: sampleJob.start_date,
-          end_date: sampleJob.end_date,
-          worker_id: sampleJob.worker_id,
-          secondary_workers: sampleJob.secondary_worker_ids
-        });
-      }
-      
+      console.log(`Successfully loaded ${jobsWithSecondaryWorkers.length} jobs`);
       return jobsWithSecondaryWorkers;
     }
     
-    console.log('No jobs found in database');
-    return [];
+    return processedJobs;
   } catch (error) {
-    console.error('CRITICAL ERROR IN getJobs:', error);
+    console.error('Critical error in getJobs:', error);
     throw error;
   }
 };
@@ -162,7 +134,6 @@ export const getJobs = async () => {
 
 export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['Insert'], 'id' | 'created_at'>) => {
   try {
-    console.log('createJob: Creating new job');
     const { secondary_worker_ids, ...jobData } = job as any;
     
     const { data: newJob, error: jobError } = await supabase
@@ -204,8 +175,6 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
 
 export const updateJob = async (id: string, updates: Partial<Database['public']['Tables']['jobs']['Update']>) => {
   try {
-    console.log('updateJob: Updating job:', id);
-    
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
     
     const { data: updatedJob, error: jobError } = await supabase
@@ -259,7 +228,6 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
 
 export const deleteJob = async (id: string) => {
   try {
-    console.log('deleteJob: Deleting job:', id);
     const { error } = await supabase
       .from('jobs')
       .delete()
@@ -277,8 +245,6 @@ export const deleteJob = async (id: string) => {
 
 export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
   try {
-    console.log('createWorker: Creating worker');
-    
     // Make sure role is set to admin
     const workerData = {
       ...worker,
@@ -296,7 +262,6 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
       throw error;
     }
 
-    console.log('createWorker: Worker created successfully');
     return data;
   } catch (error) {
     console.error('Error in createWorker:', error);
@@ -325,8 +290,6 @@ export const getWorkerJobs = async (workerId: string) => {
 
 export const deleteWorker = async (id: string) => {
   try {
-    console.log('deleteWorker: Deleting worker:', id);
-    
     // First update any jobs assigned to this worker
     await supabase
       .from('jobs')
@@ -357,8 +320,7 @@ export const deleteWorker = async (id: string) => {
   }
 };
 
-// These functions are completely removed since we don't want worker profile fetching
-// during initial auth. They will be added back only if explicitly needed elsewhere in the app.
+// These functions are stubs since we don't need worker profile fetching during auth
 export const getCurrentWorker = async (email: string) => {
   console.error('getCurrentWorker should not be called during authentication');
   return null;

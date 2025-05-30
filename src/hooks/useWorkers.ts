@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export function useWorkers() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling and timeouts
+  // Use query with improved configuration for faster loading
   const { 
     data: workers = [], 
     isLoading, 
@@ -16,7 +16,7 @@ export function useWorkers() {
   } = useQuery({
     queryKey: ['workers'],
     queryFn: async () => {
-      console.log('useWorkers: Explicitly fetching workers data');
+      console.log('useWorkers: Fetching workers data');
       
       try {
         const result = await getWorkers();
@@ -30,8 +30,8 @@ export function useWorkers() {
     enabled: true,
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * (2 ** attemptIndex), 30000), // Exponential backoff
+    retry: 1, // Reduced retries for faster error feedback
+    retryDelay: 1000, // Fixed short delay between retries
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useWorkers: Error fetching workers:', error);
@@ -41,10 +41,12 @@ export function useWorkers() {
 
   // Debug logging when workers data changes
   React.useEffect(() => {
-    console.log('useWorkers: Workers data updated:', {
-      count: workers.length,
-      firstWorker: workers.length > 0 ? workers[0].name : 'No workers'
-    });
+    if (workers.length > 0) {
+      console.log('useWorkers: Workers data updated:', {
+        count: workers.length,
+        firstWorker: workers.length > 0 ? workers[0].name : 'No workers'
+      });
+    }
   }, [workers]);
 
   const addWorkerMutation = useMutation({

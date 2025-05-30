@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export function useJobs() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling and timeouts
+  // Use query with improved configuration for faster loading
   const { 
     data: jobs = [], 
     isLoading, 
@@ -16,11 +16,10 @@ export function useJobs() {
   } = useQuery({
     queryKey: ['jobs'],
     queryFn: async () => {
-      console.log('useJobs: Explicitly fetching jobs data');
+      console.log('useJobs: Fetching jobs data');
       
       try {
         const result = await getJobs();
-        
         console.log('useJobs: Got', result.length, 'jobs');
         
         // Ensure all jobs have the required fields for the calendar
@@ -35,17 +34,6 @@ export function useJobs() {
           secondary_worker_ids: job.secondary_worker_ids || []
         }));
         
-        // Log the first job for debugging
-        if (validatedJobs.length > 0) {
-          console.log('useJobs: First job sample:', {
-            id: validatedJobs[0].id,
-            address: validatedJobs[0].address,
-            start_date: validatedJobs[0].start_date,
-            end_date: validatedJobs[0].end_date,
-            worker_id: validatedJobs[0].worker_id
-          });
-        }
-        
         return validatedJobs;
       } catch (error) {
         console.error('useJobs: Error fetching jobs:', error);
@@ -55,8 +43,8 @@ export function useJobs() {
     enabled: true,
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * (2 ** attemptIndex), 30000), // Exponential backoff
+    retry: 1, // Reduced retries for faster error feedback
+    retryDelay: 1000, // Fixed short delay between retries
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
       console.error('useJobs: Error fetching jobs:', error);
@@ -66,10 +54,12 @@ export function useJobs() {
 
   // Debug logging when jobs data changes
   React.useEffect(() => {
-    console.log('useJobs: Jobs data updated:', {
-      count: jobs.length,
-      firstJob: jobs.length > 0 ? jobs[0].address : 'No jobs'
-    });
+    if (jobs.length > 0) {
+      console.log('useJobs: Jobs data updated:', {
+        count: jobs.length,
+        firstJob: jobs.length > 0 ? jobs[0].address : 'No jobs'
+      });
+    }
   }, [jobs]);
 
   const addJobMutation = useMutation({

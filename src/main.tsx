@@ -5,17 +5,18 @@ import App from './App.tsx';
 import './index.css';
 import { AuthProvider } from './context/AuthContext.tsx';
 
-// Create query client with better error handling
+// Create query client with better error handling and faster response
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * (2 ** attemptIndex), 30000), // Exponential backoff
+      retry: 1, // Reduced retries for faster failure response
+      retryDelay: 1000, // Short fixed delay for faster user feedback
+      refetchOnWindowFocus: false,
     },
     mutations: {
-      retry: 2,
-      retryDelay: (attemptIndex) => Math.min(1000 * (2 ** attemptIndex), 15000),
+      retry: 1,
+      retryDelay: 1000,
     },
   },
 });
