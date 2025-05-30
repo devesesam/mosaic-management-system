@@ -18,6 +18,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
   error: null,
   
   fetchWorkers: async () => {
+    console.log('workerStore: Calling fetchWorkers()');
     set({ loading: true, error: null });
     console.log('workerStore: Fetching workers');
     

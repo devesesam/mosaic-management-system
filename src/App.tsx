@@ -11,6 +11,7 @@ import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
+import { getWorkers } from './lib/supabase';
 
 function App() {
   const { user, authError, currentWorker, signOut } = useAuth();
@@ -58,6 +59,18 @@ function App() {
     
     return () => clearInterval(interval);
   }, [user, refetchJobs, refetchWorkers]);
+
+  // Temporary debug effect to directly call getWorkers
+  useEffect(() => {
+    (async () => {
+      try {
+        const workers = await getWorkers();
+        console.log('App: Loaded workers manually:', workers);
+      } catch (e) {
+        console.error('App: Failed to load workers:', e);
+      }
+    })();
+  }, []);
 
   const handleNewJob = () => {
     setIsJobFormOpen(true);
