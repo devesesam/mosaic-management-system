@@ -10,7 +10,7 @@ import JobForm from './components/jobs/JobForm';
 import { useJobsStore } from './store/jobsStore';
 import { useWorkerStore } from './store/workersStore';
 import { Toaster } from 'react-hot-toast';
-import { AlertTriangle, Loader } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 function App() {
   const { user, authError, currentWorker, signOut } = useAuth();
