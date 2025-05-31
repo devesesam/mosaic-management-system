@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   format, 
   startOfMonth, 
@@ -14,14 +14,11 @@ import {
   addMonths,
   subMonths,
   differenceInDays,
-  isBefore,
-  isAfter,
-  max,
   isWithinInterval
 } from 'date-fns';
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
-import { useJobStore } from '../../store/jobStore';
+import { useJobsStore } from '../../store/jobsStore';
 import UnscheduledPanel from './UnscheduledPanel';
 import JobForm from '../jobs/JobForm';
 import DayJobsModal from './DayJobsModal';
@@ -29,16 +26,14 @@ import DraggableJob from './DraggableJob';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-interface MonthViewProps {
-}
-
-const MonthView: React.FC<MonthViewProps> = () => {
+const MonthView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   
-  const { jobs, fetchJobs, updateJob, deleteJob } = useJobStore();
+  // Use store for data access - no auth dependency
+  const { jobs, fetchJobs, updateJob, deleteJob } = useJobsStore();
   
   // Debug log the jobs data
   useEffect(() => {
@@ -65,17 +60,21 @@ const MonthView: React.FC<MonthViewProps> = () => {
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   
   // Create weeks array
-  const weeks: Date[][] = [];
-  let currentWeek: Date[] = [];
-  
-  calendarDays.forEach((day) => {
-    currentWeek.push(day);
+  const weeks = useMemo(() => {
+    const result: Date[][] = [];
+    let currentWeek: Date[] = [];
     
-    if (currentWeek.length === 7) {
-      weeks.push(currentWeek);
-      currentWeek = [];
-    }
-  });
+    calendarDays.forEach((day) => {
+      currentWeek.push(day);
+      
+      if (currentWeek.length === 7) {
+        result.push(currentWeek);
+        currentWeek = [];
+      }
+    });
+    
+    return result;
+  }, [calendarDays]);
 
   // Fetch data when component mounts
   useEffect(() => {
@@ -89,7 +88,7 @@ const MonthView: React.FC<MonthViewProps> = () => {
   }, [jobs]);
 
   // Get jobs for a specific day - less restrictive to show more jobs
-  const getDayJobs = (day: Date) => {
+  const getDayJobs = useCallback((day: Date) => {
     return jobs.filter(job => {
       // If job has no start date, it can't be displayed on a specific day
       if (!job.start_date) return false;
@@ -114,12 +113,12 @@ const MonthView: React.FC<MonthViewProps> = () => {
         return false;
       }
     });
-  };
+  }, [jobs]);
   
   // Helper function to check if a date is within a range (inclusive)
   const isWithinRange = (date: Date, start: Date, end: Date) => {
     return (
-      isAfter(date, start) && isBefore(date, end) ||
+      (date > start && date < end) ||
       isSameDay(date, start) ||
       isSameDay(date, end)
     );
@@ -136,7 +135,7 @@ const MonthView: React.FC<MonthViewProps> = () => {
   };
   
   // Calculate multi-day job positions for the entire month view
-  const getMultiDayJobs = () => {
+  const getMultiDayJobs = useCallback(() => {
     // For multiple weeks, we need to calculate row positions for multi-day jobs
     const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number}[] = [];
     const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
@@ -155,7 +154,7 @@ const MonthView: React.FC<MonthViewProps> = () => {
           (
             isWithinRange(startDate, calendarStart, calendarEnd) ||
             isWithinRange(endDate, calendarStart, calendarEnd) ||
-            (isBefore(startDate, calendarStart) && isAfter(endDate, calendarEnd))
+            (startDate < calendarStart && endDate > calendarEnd)
           )
         );
       } catch (error) {
@@ -197,7 +196,7 @@ const MonthView: React.FC<MonthViewProps> = () => {
           const weekEnd = week[6];
           
           // Skip if job is completely outside this week
-          if (isBefore(endDate, weekStart) || isAfter(startDate, weekEnd)) {
+          if (endDate < weekStart || startDate > weekEnd) {
             return;
           }
           
@@ -206,9 +205,9 @@ const MonthView: React.FC<MonthViewProps> = () => {
           let endCol = 6;
           
           // Adjust start column if job starts during or after this week
-          if (isAfter(startDate, weekStart) || isSameDay(startDate, weekStart)) {
+          if (startDate >= weekStart) {
             for (let i = 0; i < 7; i++) {
-              if (isSameDay(week[i], startDate) || (i > 0 && isBefore(week[i-1], startDate) && isAfter(week[i], startDate))) {
+              if (isSameDay(week[i], startDate) || (i > 0 && week[i-1] < startDate && week[i] > startDate)) {
                 startCol = i;
                 break;
               }
@@ -216,9 +215,9 @@ const MonthView: React.FC<MonthViewProps> = () => {
           }
           
           // Adjust end column if job ends during this week
-          if (isBefore(endDate, weekEnd) || isSameDay(endDate, weekEnd)) {
+          if (endDate <= weekEnd) {
             for (let i = 6; i >= 0; i--) {
-              if (isSameDay(week[i], endDate) || (i < 6 && isAfter(week[i+1], endDate) && isBefore(week[i], endDate))) {
+              if (isSameDay(week[i], endDate) || (i < 6 && week[i+1] > endDate && week[i] < endDate)) {
                 endCol = i;
                 break;
               }
@@ -251,35 +250,37 @@ const MonthView: React.FC<MonthViewProps> = () => {
     });
     
     return multiDayJobs;
-  };
+  }, [jobs, weeks, calendarStart, calendarEnd]);
   
-  const multiDayJobs = getMultiDayJobs();
+  const multiDayJobs = useMemo(() => getMultiDayJobs(), [getMultiDayJobs]);
 
   // Calculate max rows needed for each week (considering both single day and multi-day jobs)
-  const weekHeights = weeks.map((week, weekIndex) => {
-    // First, get max row index of multi-day jobs in this week
-    const multiDayRows = multiDayJobs
-      .filter(mj => mj.weekIdx === weekIndex)
-      .map(mj => mj.rowIdx);
-    
-    const maxMultiDayRow = multiDayRows.length > 0 ? Math.max(...multiDayRows) : -1;
-    
-    // Then, check single-day jobs in each day of the week
-    const maxSingleDayJobs = week.map(day => {
-      const dayJobs = getDayJobs(day).filter(job => 
-        !multiDayJobs.some(mj => mj.job.id === job.id)
-      );
-      return dayJobs.length;
+  const weekHeights = useMemo(() => {
+    return weeks.map((week, weekIndex) => {
+      // First, get max row index of multi-day jobs in this week
+      const multiDayRows = multiDayJobs
+        .filter(mj => mj.weekIdx === weekIndex)
+        .map(mj => mj.rowIdx);
+      
+      const maxMultiDayRow = multiDayRows.length > 0 ? Math.max(...multiDayRows) : -1;
+      
+      // Then, check single-day jobs in each day of the week
+      const maxSingleDayJobs = week.map(day => {
+        const dayJobs = getDayJobs(day).filter(job => 
+          !multiDayJobs.some(mj => mj.job.id === job.id)
+        );
+        return dayJobs.length;
+      });
+      
+      const maxSingleDayCount = Math.max(...maxSingleDayJobs);
+      
+      // Max rows needed is the greater of multi-day rows or single-day jobs count
+      const maxRows = Math.max(maxMultiDayRow + 1, maxSingleDayCount);
+      
+      // Calculate cell height: min 100px + 24px per row + 40px padding
+      return Math.max(100, (maxRows * 24) + 40);
     });
-    
-    const maxSingleDayCount = Math.max(...maxSingleDayJobs);
-    
-    // Max rows needed is the greater of multi-day rows or single-day jobs count
-    const maxRows = Math.max(maxMultiDayRow + 1, maxSingleDayCount);
-    
-    // Calculate cell height: min 100px + 24px per row + 40px padding
-    return Math.max(100, (maxRows * 24) + 40);
-  });
+  }, [weeks, multiDayJobs, getDayJobs]);
 
   const handleJobDrop = async (job: Job, date: Date) => {
     try {

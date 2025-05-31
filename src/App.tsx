@@ -7,8 +7,8 @@ import Navbar from './components/layout/Navbar';
 import WeekView from './components/scheduler/WeekView';
 import MonthView from './components/scheduler/MonthView';
 import JobForm from './components/jobs/JobForm';
-import { useJobs } from './hooks/useJobs';
-import { useWorkers } from './hooks/useWorkers';
+import { useJobsStore } from './store/jobsStore';
+import { useWorkerStore } from './store/workersStore';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 
@@ -24,14 +24,14 @@ function App() {
     error: jobsError, 
     refetch: refetchJobs,
     isLoading: jobsLoading 
-  } = useJobs();
+  } = useJobsStore();
   
   const { 
     workers, 
     error: workersError, 
     refetch: refetchWorkers,
     isLoading: workersLoading 
-  } = useWorkers();
+  } = useWorkerStore();
 
   // Load data when component mounts - no auth dependency
   useEffect(() => {

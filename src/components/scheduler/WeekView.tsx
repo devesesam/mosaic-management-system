@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   format, 
   startOfWeek, 
@@ -6,34 +6,28 @@ import {
   eachDayOfInterval, 
   addWeeks, 
   subWeeks,
-  isSameDay,
   parseISO,
   addDays,
-  differenceInDays,
-  isWithinInterval,
-  isBefore,
-  isAfter
+  differenceInDays
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Job, Worker } from '../../types';
+import { Job } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
-import { useJobStore } from '../../store/jobStore';
-import { useWorkerStore } from '../../store/workerStore';
+import { useJobsStore } from '../../store/jobsStore';
+import { useWorkerStore } from '../../store/workersStore';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
 
-interface WeekViewProps {
-}
-
-const WeekView: React.FC<WeekViewProps> = () => {
+const WeekView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   
-  const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobStore();
+  // Use store to fetch data - no auth dependency needed
+  const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobsStore();
   const { workers, fetchWorkers, addWorker } = useWorkerStore();
   
   // Get start and end of week
@@ -55,7 +49,7 @@ const WeekView: React.FC<WeekViewProps> = () => {
     fetchWorkers();
   }, [fetchJobs, fetchWorkers]);
   
-  // Debug log the jobs data
+  // Debug log jobs data
   useEffect(() => {
     if (jobs.length > 0) {
       console.log('WeekView: Jobs loaded:', jobs.length);
@@ -73,7 +67,7 @@ const WeekView: React.FC<WeekViewProps> = () => {
   const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
   
   // Get jobs for a worker on a specific day
-  const getWorkerDayJobs = (workerId: string | null, day: Date) => {
+  const getWorkerDayJobs = useCallback((workerId: string | null, day: Date) => {
     return jobs.filter(job => {
       // Skip if worker doesn't match
       if (job.worker_id !== workerId) return false;
@@ -87,19 +81,23 @@ const WeekView: React.FC<WeekViewProps> = () => {
         // Handle jobs with end dates (multi-day jobs)
         if (job.end_date) {
           const jobEnd = parseISO(job.end_date);
-          return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
-                 isSameDay(jobStart, day) || 
-                 isSameDay(jobEnd, day);
+          
+          // Check if day is within the job's date range
+          return (
+            (day >= jobStart && day <= jobEnd) || 
+            format(day, 'yyyy-MM-dd') === format(jobStart, 'yyyy-MM-dd') || 
+            format(day, 'yyyy-MM-dd') === format(jobEnd, 'yyyy-MM-dd')
+          );
         }
         
         // For single-day jobs, just check the start date
-        return isSameDay(jobStart, day);
+        return format(day, 'yyyy-MM-dd') === format(jobStart, 'yyyy-MM-dd');
       } catch (error) {
         console.error('Error parsing job dates:', error, job);
         return false;
       }
     });
-  };
+  }, [jobs]);
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
     try {
@@ -156,6 +154,7 @@ const WeekView: React.FC<WeekViewProps> = () => {
         start_date: date ? date.toISOString() : null
       };
 
+      // Calculate end date based on duration or set single day
       if (date && job.start_date && job.end_date) {
         const originalDuration = differenceInDays(
           parseISO(job.end_date),
