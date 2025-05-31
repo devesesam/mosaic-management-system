@@ -7,8 +7,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Validate that we have the required environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase credentials! Check your environment variables.');
+  const errorMessage = 'CRITICAL ERROR: Missing Supabase credentials! Check your .env file.';
+  console.error(errorMessage);
+  throw new Error(errorMessage);
 }
+
+console.log('Initializing Supabase client with URL:', supabaseUrl);
 
 // Create and export the Supabase client
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -20,16 +24,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     headers: {
       'X-Client-Info': 'tasman-roofing-scheduler'
     }
-  },
-  db: {
-    schema: 'public'
   }
 });
-
-// Helper function to check if Supabase is initialized
-export const isSupabaseInitialized = () => {
-  return Boolean(supabaseUrl && supabaseAnonKey);
-};
 
 // Export a function to handle errors consistently
 export const handleSupabaseError = (error: unknown): Error => {

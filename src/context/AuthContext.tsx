@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, getCurrentWorker, createWorkerProfile } from '../lib/supabase';
+import { supabase, handleSupabaseError } from '../api/supabaseClient';
+import { getWorkerByEmail, createOrUpdateWorkerProfile } from '../api/workersApi';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -61,14 +62,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Try to get worker profile for this user
           if (data.session.user.email) {
             try {
-              const worker = await getCurrentWorker(data.session.user.email);
+              const worker = await getWorkerByEmail(data.session.user.email);
               
               if (worker) {
                 console.log('Found existing worker profile');
                 setCurrentWorker(worker);
               } else {
                 console.log('No worker profile found, creating one');
-                const newWorker = await createWorkerProfile(data.session.user.email);
+                const newWorker = await createOrUpdateWorkerProfile(data.session.user.email);
                 setCurrentWorker(newWorker);
               }
             } catch (err) {
@@ -98,12 +99,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Initialize worker profile
         if (session.user.email) {
           try {
-            const worker = await getCurrentWorker(session.user.email);
+            const worker = await getWorkerByEmail(session.user.email);
             
             if (worker) {
               setCurrentWorker(worker);
             } else {
-              const newWorker = await createWorkerProfile(session.user.email);
+              const newWorker = await createOrUpdateWorkerProfile(session.user.email);
               setCurrentWorker(newWorker);
             }
           } catch (err) {
