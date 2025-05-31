@@ -22,38 +22,38 @@ function App() {
     jobs, 
     addJob, 
     error: jobsError, 
-    refetch: refetchJobs,
+    fetchJobs,
     isLoading: jobsLoading 
   } = useJobsStore();
   
   const { 
     workers, 
     error: workersError, 
-    refetch: refetchWorkers,
+    fetchWorkers,
     isLoading: workersLoading 
   } = useWorkerStore();
 
   // Load data when component mounts - no auth dependency
   useEffect(() => {
     console.log('App: Initial data load');
-    refetchJobs();
-    refetchWorkers();
-  }, [refetchJobs, refetchWorkers]);
+    fetchJobs();
+    fetchWorkers();
+  }, [fetchJobs, fetchWorkers]);
 
   // Set up periodic refresh without auth dependency
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('App: Periodic data refresh');
       try {
-        refetchJobs();
-        refetchWorkers();
+        fetchJobs();
+        fetchWorkers();
       } catch (error) {
         console.error('Error during periodic refresh:', error);
       }
     }, 60000); // Refresh every minute
     
     return () => clearInterval(interval);
-  }, [refetchJobs, refetchWorkers]);
+  }, [fetchJobs, fetchWorkers]);
 
   const handleNewJob = () => {
     setIsJobFormOpen(true);
@@ -110,8 +110,8 @@ function App() {
             <button
               onClick={() => {
                 setIsRetrying(true);
-                refetchJobs();
-                refetchWorkers();
+                fetchJobs();
+                fetchWorkers();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
               className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
