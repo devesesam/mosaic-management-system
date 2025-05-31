@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createWorker, getWorkers, deleteWorker } from '../lib/supabase';
+import { createWorker, getAllWorkers, deleteWorker } from '../api/workersApi';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -23,7 +23,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     console.log('workerStore: Fetching workers');
     
     try {
-      const workers = await getWorkers();
+      const workers = await getAllWorkers();
       console.log('workerStore: Fetched', workers.length, 'workers');
       set({ workers, loading: false, error: null });
     } catch (error) {

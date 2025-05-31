@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Worker } from '../../types';
 import { X, Trash2, AlertTriangle } from 'lucide-react';
 import { useWorkerStore } from '../../store/workerStore';
-import { getWorkerJobs } from '../../lib/supabase';
+import { getJobsForWorker } from '../../api/jobsApi';
 
 interface WorkerManageModalProps {
   onClose: () => void;
@@ -19,7 +19,7 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers 
   const checkWorkerJobs = async (worker: Worker) => {
     setIsLoading(true);
     try {
-      const jobs = await getWorkerJobs(worker.id);
+      const jobs = await getJobsForWorker(worker.id);
       setAssignedJobsCount(jobs.length);
       setSelectedWorker(worker);
       setShowDeleteConfirm(true);
