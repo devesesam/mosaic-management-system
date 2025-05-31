@@ -11,7 +11,6 @@ import { useJobs } from './hooks/useJobs';
 import { useWorkers } from './hooks/useWorkers';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
-import { getWorkers } from './lib/supabase';
 
 function App() {
   const { user, authError, currentWorker, signOut } = useAuth();
@@ -34,19 +33,15 @@ function App() {
     isLoading: workersLoading 
   } = useWorkers();
 
-  // Load data when component mounts or user changes
+  // Load data when component mounts
   useEffect(() => {
-    if (user) {
-      console.log('App: Initial data load for user:', user.email);
-      refetchJobs();
-      refetchWorkers();
-    }
-  }, [user, refetchJobs, refetchWorkers]);
+    console.log('App: Initial data load');
+    refetchJobs();
+    refetchWorkers();
+  }, [refetchJobs, refetchWorkers]);
 
   // Set up periodic refresh
   useEffect(() => {
-    if (!user) return;
-    
     const interval = setInterval(() => {
       console.log('App: Periodic data refresh');
       try {
@@ -58,19 +53,7 @@ function App() {
     }, 60000); // Refresh every 60 seconds
     
     return () => clearInterval(interval);
-  }, [user, refetchJobs, refetchWorkers]);
-
-  // Temporary debug effect to directly call getWorkers
-  useEffect(() => {
-    (async () => {
-      try {
-        const workers = await getWorkers();
-        console.log('App: Loaded workers manually:', workers);
-      } catch (e) {
-        console.error('App: Failed to load workers:', e);
-      }
-    })();
-  }, []);
+  }, [refetchJobs, refetchWorkers]);
 
   const handleNewJob = () => {
     setIsJobFormOpen(true);

@@ -22,7 +22,6 @@ import {
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
 import { useJobStore } from '../../store/jobStore';
-import { useAuth } from '../../context/AuthContext';
 import UnscheduledPanel from './UnscheduledPanel';
 import JobForm from '../jobs/JobForm';
 import DayJobsModal from './DayJobsModal';
@@ -40,7 +39,6 @@ const MonthView: React.FC<MonthViewProps> = () => {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   
   const { jobs, fetchJobs, updateJob, deleteJob } = useJobStore();
-  const { session } = useAuth();
   
   // Debug log the jobs data
   useEffect(() => {
@@ -79,16 +77,11 @@ const MonthView: React.FC<MonthViewProps> = () => {
     }
   });
 
-  // Only fetch data when authenticated
+  // Fetch data when component mounts
   useEffect(() => {
-    if (!session) {
-      console.log('MonthView: No session, skipping data fetch');
-      return;
-    }
-    
-    console.log('MonthView: Session available, fetching data');
+    console.log('MonthView: Initial data load');
     fetchJobs();
-  }, [session, fetchJobs]);
+  }, [fetchJobs]);
 
   // Get unscheduled jobs (no date and no worker)
   const unscheduledJobs = useMemo(() => {
@@ -407,12 +400,6 @@ const MonthView: React.FC<MonthViewProps> = () => {
         </div>
         
         {/* Warning messages */}
-        {!session && (
-          <div className="p-4 bg-amber-50 border-b border-amber-200">
-            <p className="text-amber-800 font-medium">Waiting for authentication... Data will load when you're signed in.</p>
-          </div>
-        )}
-        
         {jobs.length === 0 && (
           <div className="p-4 bg-yellow-50 border-b border-yellow-200">
             <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>

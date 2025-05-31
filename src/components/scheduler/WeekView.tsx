@@ -20,7 +20,6 @@ import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
 import { useJobStore } from '../../store/jobStore';
 import { useWorkerStore } from '../../store/workerStore';
-import { useAuth } from '../../context/AuthContext';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
@@ -36,7 +35,6 @@ const WeekView: React.FC<WeekViewProps> = () => {
   
   const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobStore();
   const { workers, fetchWorkers, addWorker } = useWorkerStore();
-  const { session } = useAuth();
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -50,17 +48,12 @@ const WeekView: React.FC<WeekViewProps> = () => {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
   
-  // Only fetch data when authenticated
+  // Fetch data when component mounts
   useEffect(() => {
-    if (!session) {
-      console.log('WeekView: No session, skipping data fetch');
-      return;
-    }
-    
-    console.log('WeekView: Session available, fetching data');
+    console.log('WeekView: Initial data load');
     fetchJobs();
     fetchWorkers();
-  }, [session, fetchJobs, fetchWorkers]);
+  }, [fetchJobs, fetchWorkers]);
   
   // Debug log the jobs data
   useEffect(() => {
@@ -255,12 +248,6 @@ const WeekView: React.FC<WeekViewProps> = () => {
       {jobs.length === 0 && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
-        </div>
-      )}
-      
-      {!session && (
-        <div className="p-4 bg-amber-50 border-b border-amber-200">
-          <p className="text-amber-800 font-medium">Waiting for authentication... Data will load when you're signed in.</p>
         </div>
       )}
       
