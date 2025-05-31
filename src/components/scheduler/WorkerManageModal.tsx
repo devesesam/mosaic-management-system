@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Worker } from '../../types';
 import { X, Trash2, AlertTriangle } from 'lucide-react';
-import { useWorkerStore } from '../../store/workerStore';
+import { useWorkerStore } from '../../store/workersStore';
 import { getJobsForWorker } from '../../api/jobsApi';
 
 interface WorkerManageModalProps {
