@@ -3,24 +3,34 @@ import { Job } from '../types';
 
 /**
  * Get all jobs from the database with their secondary workers
- * No authentication required - using public access RLS policies
  */
 export const getAllJobs = async (): Promise<Job[]> => {
   try {
     console.log('JobsAPI: Fetching all jobs');
     
-    // Fetch jobs with a simple query (no auth needed)
-    const { data: jobs, error: jobsError } = await supabase
+    // Log immediately before the actual Supabase call
+    console.log('JobsAPI: CRITICAL - About to execute supabase.from("jobs").select()');
+    console.time('JobsAPI: jobs query execution time');
+    
+    // Fetch jobs with detailed error handling
+    const { data: jobs, error: jobsError, status, statusText } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
     
+    console.timeEnd('JobsAPI: jobs query execution time');
+    console.log('JobsAPI: CRITICAL - Supabase jobs query completed with status:', status, statusText);
+    
     if (jobsError) {
+      console.error('JobsAPI: CRITICAL ERROR - Failed to fetch jobs:', jobsError);
+      console.log('JobsAPI: Error details:', JSON.stringify(jobsError, null, 2));
       throw jobsError;
     }
 
+    console.log('JobsAPI: Jobs data received, count:', jobs?.length || 0);
+    
     if (!jobs || jobs.length === 0) {
-      console.log('JobsAPI: No jobs found');
+      console.log('JobsAPI: No jobs found in database');
       return [];
     }
 
@@ -33,14 +43,23 @@ export const getAllJobs = async (): Promise<Job[]> => {
       tile_color: job.tile_color || '#3b82f6'
     }));
 
-    // Now fetch secondary worker assignments
-    const { data: secondaryWorkers, error: secondaryError } = await supabase
+    // Fetch secondary workers
+    console.log('JobsAPI: CRITICAL - About to fetch secondary workers');
+    console.time('JobsAPI: secondary workers query time');
+    
+    const { data: secondaryWorkers, error: secondaryError, status: secondaryStatus } = await supabase
       .from('job_secondary_workers')
       .select('*');
+    
+    console.timeEnd('JobsAPI: secondary workers query time');
+    console.log('JobsAPI: CRITICAL - Secondary workers query completed with status:', secondaryStatus);
 
     if (secondaryError) {
       console.error('JobsAPI: Error fetching secondary workers:', secondaryError);
+      console.log('JobsAPI: Secondary workers error details:', JSON.stringify(secondaryError, null, 2));
       // Continue with empty secondary workers rather than failing
+    } else {
+      console.log('JobsAPI: Secondary workers data received, count:', secondaryWorkers?.length || 0);
     }
 
     // Add secondary worker IDs to each job
@@ -51,9 +70,10 @@ export const getAllJobs = async (): Promise<Job[]> => {
         .map(sw => sw.worker_id)
     }));
 
-    console.log(`JobsAPI: Successfully fetched ${jobsWithSecondaryWorkers.length} jobs`);
+    console.log('JobsAPI: Successfully processed all jobs with secondary workers');
     return jobsWithSecondaryWorkers;
   } catch (error) {
+    console.error('JobsAPI: CRITICAL - Exception during job fetching:', error);
     throw handleSupabaseError(error);
   }
 };
@@ -67,6 +87,7 @@ export const createJob = async (jobData: Omit<Job, 'id' | 'created_at'>): Promis
     const { secondary_worker_ids, ...jobBase } = jobData as any;
     
     // Insert the main job record
+    console.log('JobsAPI: CRITICAL - About to insert new job');
     const { data: newJob, error: jobError } = await supabase
       .from('jobs')
       .insert([jobBase])
@@ -74,11 +95,16 @@ export const createJob = async (jobData: Omit<Job, 'id' | 'created_at'>): Promis
       .single();
     
     if (jobError) {
+      console.error('JobsAPI: Error creating job:', jobError);
       throw jobError;
     }
 
+    console.log('JobsAPI: Job created successfully with ID:', newJob.id);
+
     // Handle secondary workers if provided
     if (secondary_worker_ids?.length) {
+      console.log('JobsAPI: Adding secondary workers:', secondary_worker_ids.length);
+      
       const secondaryWorkerData = secondary_worker_ids.map(worker_id => ({
         job_id: newJob.id,
         worker_id
@@ -91,15 +117,45 @@ export const createJob = async (jobData: Omit<Job, 'id' | 'created_at'>): Promis
       if (secondaryError) {
         console.error('JobsAPI: Error adding secondary workers:', secondaryError);
         // Continue despite error with secondary workers
+      } else {
+        console.log('JobsAPI: Secondary workers added successfully');
       }
     }
     
-    console.log('JobsAPI: Job created successfully:', newJob.id);
     return {
       ...newJob,
       secondary_worker_ids: secondary_worker_ids || []
     };
   } catch (error) {
+    console.error('JobsAPI: Exception during job creation:', error);
+    throw handleSupabaseError(error);
+  }
+};
+
+/**
+ * Get jobs for a specific worker
+ */
+export const getJobsForWorker = async (workerId: string): Promise<Job[]> => {
+  try {
+    console.log('JobsAPI: Fetching jobs for worker:', workerId);
+    
+    console.log('JobsAPI: CRITICAL - About to query jobs for worker');
+    const { data, error, status } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('worker_id', workerId);
+    
+    console.log('JobsAPI: Worker jobs query completed with status:', status);
+
+    if (error) {
+      console.error('JobsAPI: Error fetching worker jobs:', error);
+      throw error;
+    }
+
+    console.log(`JobsAPI: Found ${data?.length || 0} jobs for worker ${workerId}`);
+    return data || [];
+  } catch (error) {
+    console.error('JobsAPI: Exception fetching worker jobs:', error);
     throw handleSupabaseError(error);
   }
 };
@@ -114,6 +170,7 @@ export const updateJob = async (id: string, updates: Partial<Job>): Promise<Job>
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
     
     // Update the main job record
+    console.log('JobsAPI: CRITICAL - About to update job');
     const { data: updatedJob, error: jobError } = await supabase
       .from('jobs')
       .update(jobUpdates)
@@ -122,12 +179,16 @@ export const updateJob = async (id: string, updates: Partial<Job>): Promise<Job>
       .single();
     
     if (jobError) {
+      console.error('JobsAPI: Error updating job:', jobError);
       throw jobError;
     }
+
+    console.log('JobsAPI: Job updated successfully:', id);
 
     // Handle secondary workers if included in the updates
     if (secondary_worker_ids !== undefined) {
       // Delete existing secondary workers
+      console.log('JobsAPI: CRITICAL - Removing existing secondary workers');
       const { error: deleteError } = await supabase
         .from('job_secondary_workers')
         .delete()
@@ -139,6 +200,7 @@ export const updateJob = async (id: string, updates: Partial<Job>): Promise<Job>
 
       // Add new secondary workers if any
       if (secondary_worker_ids?.length) {
+        console.log('JobsAPI: CRITICAL - Adding new secondary workers:', secondary_worker_ids.length);
         const secondaryWorkerData = secondary_worker_ids.map(worker_id => ({
           job_id: id,
           worker_id
@@ -155,17 +217,22 @@ export const updateJob = async (id: string, updates: Partial<Job>): Promise<Job>
     }
 
     // Get final secondary workers for the response
-    const { data: currentSecondaryWorkers } = await supabase
+    console.log('JobsAPI: CRITICAL - Fetching final secondary workers');
+    const { data: currentSecondaryWorkers, error: fetchError } = await supabase
       .from('job_secondary_workers')
       .select('worker_id')
       .eq('job_id', id);
+      
+    if (fetchError) {
+      console.error('JobsAPI: Error fetching updated secondary workers:', fetchError);
+    }
 
-    console.log('JobsAPI: Job updated successfully:', id);
     return {
       ...updatedJob,
       secondary_worker_ids: (currentSecondaryWorkers || []).map(sw => sw.worker_id)
     };
   } catch (error) {
+    console.error('JobsAPI: Exception during job update:', error);
     throw handleSupabaseError(error);
   }
 };
@@ -178,40 +245,22 @@ export const deleteJob = async (id: string): Promise<void> => {
     console.log('JobsAPI: Deleting job:', id);
     
     // Delete the job (secondary workers will be cascade deleted by foreign key)
-    const { error } = await supabase
+    console.log('JobsAPI: CRITICAL - About to delete job');
+    const { error, status } = await supabase
       .from('jobs')
       .delete()
       .eq('id', id);
+    
+    console.log('JobsAPI: Delete job completed with status:', status);
 
     if (error) {
+      console.error('JobsAPI: Error deleting job:', error);
       throw error;
     }
     
     console.log('JobsAPI: Job deleted successfully:', id);
   } catch (error) {
-    throw handleSupabaseError(error);
-  }
-};
-
-/**
- * Get jobs for a specific worker
- */
-export const getJobsForWorker = async (workerId: string): Promise<Job[]> => {
-  try {
-    console.log('JobsAPI: Fetching jobs for worker:', workerId);
-    
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('worker_id', workerId);
-
-    if (error) {
-      throw error;
-    }
-
-    console.log(`JobsAPI: Found ${data?.length || 0} jobs for worker ${workerId}`);
-    return data || [];
-  } catch (error) {
+    console.error('JobsAPI: Exception during job deletion:', error);
     throw handleSupabaseError(error);
   }
 };
