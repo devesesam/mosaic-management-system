@@ -36,7 +36,7 @@ export const useJobStore = create<JobState>((set, get) => ({
       // More specific error message
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to fetch jobs - check your network connection and authentication';
+        : 'Failed to fetch jobs - check your network connection';
         
       set({ error: errorMessage, loading: false });
       toast.error(errorMessage);
@@ -66,7 +66,7 @@ export const useJobStore = create<JobState>((set, get) => ({
       // More specific error message
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to add job - check your network connection and authentication';
+        : 'Failed to add job - check your network connection';
         
       set({ error: errorMessage, loading: false });
       toast.error(errorMessage);
@@ -97,7 +97,7 @@ export const useJobStore = create<JobState>((set, get) => ({
       // More specific error message
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to update job - check your network connection and authentication';
+        : 'Failed to update job - check your network connection';
         
       set({ error: errorMessage, loading: false });
       toast.error(errorMessage);
@@ -126,7 +126,7 @@ export const useJobStore = create<JobState>((set, get) => ({
       // More specific error message
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to delete job - check your network connection and authentication';
+        : 'Failed to delete job - check your network connection';
         
       set({ error: errorMessage, loading: false });
       toast.error(errorMessage);

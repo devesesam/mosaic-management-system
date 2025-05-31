@@ -33,14 +33,14 @@ function App() {
     isLoading: workersLoading 
   } = useWorkers();
 
-  // Load data when component mounts
+  // Load data when component mounts - no auth dependency
   useEffect(() => {
     console.log('App: Initial data load');
     refetchJobs();
     refetchWorkers();
   }, [refetchJobs, refetchWorkers]);
 
-  // Set up periodic refresh
+  // Set up periodic refresh without auth dependency
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('App: Periodic data refresh');
@@ -50,7 +50,7 @@ function App() {
       } catch (error) {
         console.error('Error during periodic refresh:', error);
       }
-    }, 60000); // Refresh every 60 seconds
+    }, 60000); // Refresh every minute
     
     return () => clearInterval(interval);
   }, [refetchJobs, refetchWorkers]);

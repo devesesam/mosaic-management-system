@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export function useWorkers() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling
+  // Simpler, more direct query without auth dependencies
   const { 
     data: workers = [], 
     isLoading, 
@@ -16,7 +16,7 @@ export function useWorkers() {
   } = useQuery({
     queryKey: ['workers'],
     queryFn: async () => {
-      console.log('useWorkers: Explicitly fetching workers data');
+      console.log('useWorkers: Fetching workers data');
       
       try {
         const result = await getWorkers();
@@ -24,13 +24,13 @@ export function useWorkers() {
         return result;
       } catch (error) {
         console.error('useWorkers: Error fetching workers:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to fetch workers');
+        throw error;
       }
     },
-    enabled: true, // Always enabled, don't wait for session
+    enabled: true, // Always enabled, don't wait for auth
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 2,
+    retry: 1, // Only retry once to avoid flooding with requests
     retryDelay: 1000,
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
@@ -42,10 +42,7 @@ export function useWorkers() {
   // Debug logging when workers data changes
   React.useEffect(() => {
     if (workers.length > 0) {
-      console.log('useWorkers: Workers data updated:', {
-        count: workers.length,
-        firstWorker: workers.length > 0 ? workers[0].name : 'No workers'
-      });
+      console.log('useWorkers: Workers data updated, count:', workers.length);
     }
   }, [workers]);
 
@@ -55,11 +52,11 @@ export function useWorkers() {
       
       try {
         const result = await createWorker(worker);
-        console.log('useWorkers: Worker added successfully:', result);
+        console.log('useWorkers: Worker added successfully');
         return result;
       } catch (error) {
         console.error('useWorkers: Error adding worker:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to add worker');
+        throw error;
       }
     },
     onSuccess: () => {
@@ -77,8 +74,8 @@ export function useWorkers() {
   const deleteWorkerMutation = useMutation({
     mutationFn: async (workerId: string) => {
       try {
-        const result = await deleteWorker(workerId);
-        return result;
+        await deleteWorker(workerId);
+        return workerId;
       } catch (error) {
         console.error('useWorkers: Error deleting worker:', error);
         throw error;

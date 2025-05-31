@@ -32,7 +32,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       // More specific error message
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to fetch workers - check your network connection and authentication';
+        : 'Failed to fetch workers - check your network connection';
         
       set({ error: errorMessage, loading: false });
       toast.error(errorMessage);
@@ -64,7 +64,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       // More specific error message
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to add worker - check your network connection and authentication';
+        : 'Failed to add worker - check your network connection';
         
       set({ error: errorMessage, loading: false });
       toast.error(errorMessage);
@@ -94,7 +94,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
       // More specific error message
       const errorMessage = error instanceof Error 
         ? error.message 
-        : 'Failed to delete worker - check your network connection and authentication';
+        : 'Failed to delete worker - check your network connection';
         
       set({ error: errorMessage, loading: false });
       toast.error(errorMessage);

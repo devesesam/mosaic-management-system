@@ -48,75 +48,64 @@ export const checkAuthStatus = async () => {
   return session;
 };
 
-// DIRECT TABLE ACCESS FUNCTIONS
+// DIRECT DATA ACCESS FUNCTIONS
 
-// Get all workers with full debugging
+/**
+ * Get all workers from the database
+ * This function is designed to work with public access RLS
+ */
 export const getWorkers = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all workers');
+    console.log('Fetching all workers');
     
-    // Try direct table access with detailed logging
-    console.log('Executing: supabase.from("workers").select("*")');
-    const { data, error, status, statusText } = await supabase
+    const { data, error } = await supabase
       .from('workers')
       .select('*')
       .order('name');
     
-    console.log('Response status:', status, statusText);
-    
     if (error) {
-      console.error('ERROR ACCESSING WORKERS:', error);
-      console.log('Full error payload:', JSON.stringify(error, null, 2));
+      console.error('Error fetching workers:', error);
       throw new Error(`Failed to fetch workers: ${error.message}`);
     }
     
-    console.log('SUCCESSFULLY LOADED WORKERS:', data?.length || 0);
-    if (data && data.length > 0) {
-      console.log('First worker sample:', JSON.stringify(data[0], null, 2));
-    }
+    console.log(`Successfully fetched ${data?.length || 0} workers`);
     return data || [];
   } catch (error) {
-    console.error('CRITICAL ERROR IN getWorkers:', error);
+    console.error('Error in getWorkers:', error);
     throw error;
   }
 };
 
-// Get all jobs with full debugging
+/**
+ * Get all jobs with secondary workers from the database
+ * This function is designed to work with public access RLS
+ */
 export const getJobs = async () => {
   try {
-    console.log('DIRECT ACCESS: Getting all jobs');
+    console.log('Fetching all jobs');
     
-    // Try direct table access with detailed logging
-    console.log('Executing: supabase.from("jobs").select("*")');
-    const { data: jobs, error: jobsError, status, statusText } = await supabase
+    // First, get all jobs
+    const { data: jobs, error: jobsError } = await supabase
       .from('jobs')
       .select('*')
       .order('created_at', { ascending: false });
     
-    console.log('Response status:', status, statusText);
-    
     if (jobsError) {
-      console.error('ERROR ACCESSING JOBS:', jobsError);
-      console.log('Full error payload:', JSON.stringify(jobsError, null, 2));
+      console.error('Error fetching jobs:', jobsError);
       throw new Error(`Failed to fetch jobs: ${jobsError.message}`);
     }
 
-    // Ensure correct date formatting and defaults for calendar display
+    // Process jobs to ensure consistent format
     const processedJobs = (jobs || []).map(job => ({
       ...job,
-      // Ensure dates are in ISO format with timezone if they exist
       start_date: job.start_date || null,
       end_date: job.end_date || null,
-      // Default status if missing
       status: job.status || 'Awaiting Order',
-      // Default color if missing
       tile_color: job.tile_color || '#3b82f6'
     }));
 
-    // Get secondary workers if jobs were successfully fetched
+    // If there are jobs, get secondary workers
     if (processedJobs.length > 0) {
-      console.log('Getting secondary workers for', processedJobs.length, 'jobs');
-      
       const { data: secondaryWorkers, error: secondaryError } = await supabase
         .from('job_secondary_workers')
         .select('*');
@@ -124,10 +113,9 @@ export const getJobs = async () => {
       if (secondaryError) {
         console.error('Error fetching secondary workers:', secondaryError);
         // Continue with empty secondary workers
-      } else {
-        console.log('Loaded', secondaryWorkers?.length || 0, 'secondary worker assignments');
       }
 
+      // Add secondary worker IDs to each job
       const jobsWithSecondaryWorkers = processedJobs.map(job => ({
         ...job,
         secondary_worker_ids: (secondaryWorkers || [])
@@ -135,14 +123,14 @@ export const getJobs = async () => {
           .map(sw => sw.worker_id)
       }));
 
-      console.log('SUCCESSFULLY LOADED JOBS:', jobsWithSecondaryWorkers.length);
+      console.log(`Successfully fetched ${jobsWithSecondaryWorkers.length} jobs`);
       return jobsWithSecondaryWorkers;
     }
     
     console.log('No jobs found in database');
     return [];
   } catch (error) {
-    console.error('CRITICAL ERROR IN getJobs:', error);
+    console.error('Error in getJobs:', error);
     throw error;
   }
 };
@@ -151,7 +139,7 @@ export const getJobs = async () => {
 
 export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['Insert'], 'id' | 'created_at'>) => {
   try {
-    console.log('createJob: Creating new job');
+    console.log('Creating new job');
     const { secondary_worker_ids, ...jobData } = job as any;
     
     const { data: newJob, error: jobError } = await supabase
@@ -193,7 +181,7 @@ export const createJob = async (job: Omit<Database['public']['Tables']['jobs']['
 
 export const updateJob = async (id: string, updates: Partial<Database['public']['Tables']['jobs']['Update']>) => {
   try {
-    console.log('updateJob: Updating job:', id);
+    console.log('Updating job:', id);
     
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
     
@@ -248,7 +236,7 @@ export const updateJob = async (id: string, updates: Partial<Database['public'][
 
 export const deleteJob = async (id: string) => {
   try {
-    console.log('deleteJob: Deleting job:', id);
+    console.log('Deleting job:', id);
     const { error } = await supabase
       .from('jobs')
       .delete()
@@ -266,7 +254,7 @@ export const deleteJob = async (id: string) => {
 
 export const createWorker = async (worker: Omit<Database['public']['Tables']['workers']['Insert'], 'id' | 'created_at'>) => {
   try {
-    console.log('createWorker: Creating worker');
+    console.log('Creating worker');
     
     // Make sure role is set to admin
     const workerData = {
@@ -285,7 +273,7 @@ export const createWorker = async (worker: Omit<Database['public']['Tables']['wo
       throw error;
     }
 
-    console.log('createWorker: Worker created successfully');
+    console.log('Worker created successfully');
     return data;
   } catch (error) {
     console.error('Error in createWorker:', error);
@@ -314,7 +302,7 @@ export const getWorkerJobs = async (workerId: string) => {
 
 export const deleteWorker = async (id: string) => {
   try {
-    console.log('deleteWorker: Deleting worker:', id);
+    console.log('Deleting worker:', id);
     
     // First update any jobs assigned to this worker
     await supabase
@@ -348,7 +336,7 @@ export const deleteWorker = async (id: string) => {
 
 export const getCurrentWorker = async (email: string) => {
   try {
-    console.log('getCurrentWorker: Fetching worker for email:', email);
+    console.log('Fetching worker for email:', email);
     
     const { data, error } = await supabase
       .from('workers')

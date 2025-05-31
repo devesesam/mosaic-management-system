@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export function useJobs() {
   const queryClient = useQueryClient();
 
-  // Use query with better error handling
+  // Simpler, more direct query without auth dependencies
   const { 
     data: jobs = [], 
     isLoading, 
@@ -16,34 +16,29 @@ export function useJobs() {
   } = useQuery({
     queryKey: ['jobs'],
     queryFn: async () => {
-      console.log('useJobs: Explicitly fetching jobs data');
+      console.log('useJobs: Fetching jobs data');
       
       try {
         const result = await getJobs();
         console.log('useJobs: Got', result.length, 'jobs');
         
         // Ensure all jobs have the required fields for the calendar
-        const validatedJobs = result.map(job => ({
+        return result.map(job => ({
           ...job,
-          // Convert dates to strings if they're not already
-          start_date: job.start_date ? job.start_date : null,
-          end_date: job.end_date ? job.end_date : null,
-          // Ensure other required fields
+          // Set defaults for required fields
           status: job.status || 'Awaiting Order',
           tile_color: job.tile_color || '#3b82f6',
           secondary_worker_ids: job.secondary_worker_ids || []
         }));
-        
-        return validatedJobs;
       } catch (error) {
         console.error('useJobs: Error fetching jobs:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to fetch jobs');
+        throw error;
       }
     },
-    enabled: true, // Always enabled, don't wait for session
+    enabled: true, // Always enabled, don't wait for auth
     staleTime: 60000, // Consider data stale after 1 minute
     refetchOnWindowFocus: false,
-    retry: 2,
+    retry: 1, // Only retry once to avoid flooding with requests
     retryDelay: 1000,
     gcTime: 300000, // Keep data in cache for 5 minutes
     onError: (error) => {
@@ -55,10 +50,7 @@ export function useJobs() {
   // Debug logging when jobs data changes
   React.useEffect(() => {
     if (jobs.length > 0) {
-      console.log('useJobs: Jobs data updated:', {
-        count: jobs.length,
-        firstJob: jobs.length > 0 ? jobs[0].address : 'No jobs'
-      });
+      console.log('useJobs: Jobs data updated, count:', jobs.length);
     }
   }, [jobs]);
 
