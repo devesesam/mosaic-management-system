@@ -9,6 +9,7 @@ export default defineConfig({
     minify: 'esbuild',
     chunkSizeWarningLimit: 600,
     rollupOptions: {
+      input: 'index.html', // Explicitly set index.html as the entry point
       output: {
         manualChunks: {
           vendor: [
@@ -22,7 +23,6 @@ export default defineConfig({
           utils: ['date-fns', 'react-hot-toast', 'lucide-react']
         }
       }
-      // ❌ DO NOT specify `input` at all
     }
   },
   server: {
