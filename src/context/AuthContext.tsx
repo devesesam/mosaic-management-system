@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (signInError) {
         console.error('AuthProvider: Sign in error:', signInError);
-        setError(signInError.message);
+        setError('Invalid login credentials');
         setLoading(false);
         return false;
       }
@@ -143,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (err) {
       console.error('AuthProvider: Error signing in:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      setError('Failed to sign in. Please try again.');
       setLoading(false);
       return false;
     }
