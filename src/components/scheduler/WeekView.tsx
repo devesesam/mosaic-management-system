@@ -192,6 +192,14 @@ const WeekView: React.FC = () => {
       }
       
       const startDate = parseISO(job.start_date);
+      
+      // Check if the parsed date is valid
+      if (isNaN(startDate.getTime())) {
+        console.error('Invalid start_date for job:', job.start_date);
+        toast.error('Cannot resize job: invalid start date');
+        return;
+      }
+      
       const newEndDate = addDays(startDate, days - 1);
       
       console.log('WeekView: Resizing job:', {
