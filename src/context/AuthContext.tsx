@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from '../api/supabaseClient';
-import { getWorkerByEmail, createOrUpdateWorkerProfile, getAllWorkers } from '../api/workersApi';
+import { getWorkerByEmail, createOrUpdateWorkerProfile } from '../api/workersApi';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -17,8 +17,8 @@ interface AuthContextProps {
   setError: (error: string | null) => void;
   isAdmin: boolean;
   authError: string | null;
-  rawWorkerData: any;
-  setRawWorkerData: (data: any) => void;
+  showHelloModal: boolean;
+  setShowHelloModal: (show: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [rawWorkerData, setRawWorkerData] = useState<any>(null);
+  const [showHelloModal, setShowHelloModal] = useState(false);
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
@@ -40,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentWorker(null);
       setError(null);
       setAuthError(null);
-      setRawWorkerData(null);
+      setShowHelloModal(false);
       localStorage.removeItem('supabase.auth.token');
       await supabase.auth.signOut();
     } catch (err) {
@@ -100,6 +100,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         setSession(session);
         
+        // SHOW HELLO MODAL AFTER LOGIN
+        setShowHelloModal(true);
+        
         // Initialize worker profile
         if (session.user.email) {
           try {
@@ -145,25 +148,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      // DEBUG: Always fetch raw worker data after successful login to show in modal
-      try {
-        const rawData = await getAllWorkers();
-        setRawWorkerData({
-          success: true,
-          data: rawData,
-          timestamp: new Date().toISOString(),
-          dataType: typeof rawData,
-          isArray: Array.isArray(rawData),
-          length: Array.isArray(rawData) ? rawData.length : 'N/A'
-        });
-      } catch (debugError) {
-        setRawWorkerData({
-          success: false,
-          error: debugError.message || 'Failed to fetch workers',
-          timestamp: new Date().toISOString(),
-          debugError
-        });
-      }
+      // SHOW HELLO MODAL IMMEDIATELY AFTER SUCCESSFUL LOGIN
+      setShowHelloModal(true);
       
       setLoading(false);
       return true;
@@ -221,8 +207,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError,
     isAdmin,
     authError,
-    rawWorkerData,
-    setRawWorkerData
+    showHelloModal,
+    setShowHelloModal
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

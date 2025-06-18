@@ -7,14 +7,14 @@ import Navbar from './components/layout/Navbar';
 import WeekView from './components/scheduler/WeekView';
 import MonthView from './components/scheduler/MonthView';
 import JobForm from './components/jobs/JobForm';
-import RawDataModal from './components/RawDataModal';
+import HelloModal from './components/HelloModal';
 import { useJobsStore } from './store/jobsStore';
 import { useWorkerStore } from './store/workersStore';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 
 function App() {
-  const { user, authError, currentWorker, signOut, rawWorkerData, setRawWorkerData } = useAuth();
+  const { user, authError, currentWorker, signOut, showHelloModal, setShowHelloModal } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
@@ -157,12 +157,10 @@ function App() {
           />
         )}
 
-        {/* Debug Modal for Raw Worker Data */}
-        {rawWorkerData && (
-          <RawDataModal
-            data={rawWorkerData}
-            onClose={() => setRawWorkerData(null)}
-            title="Raw Worker Data Debug"
+        {/* Hello World Modal - Shows after login */}
+        {showHelloModal && (
+          <HelloModal
+            onClose={() => setShowHelloModal(false)}
           />
         )}
 
