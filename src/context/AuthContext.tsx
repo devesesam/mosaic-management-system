@@ -128,8 +128,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     
     try {
-      console.log('AuthProvider: Attempting sign in for:', email);
-      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
@@ -147,17 +145,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      console.log('AuthProvider: Sign in successful');
-      
-      // DEBUG: Fetch raw worker data after successful login
+      // DEBUG: Always fetch raw worker data after successful login to show in modal
       try {
-        console.log('AuthProvider: Fetching raw worker data for debugging...');
         const rawData = await getAllWorkers();
-        console.log('AuthProvider: Raw worker data received:', rawData);
-        setRawWorkerData(rawData);
+        setRawWorkerData({
+          success: true,
+          data: rawData,
+          timestamp: new Date().toISOString(),
+          dataType: typeof rawData,
+          isArray: Array.isArray(rawData),
+          length: Array.isArray(rawData) ? rawData.length : 'N/A'
+        });
       } catch (debugError) {
-        console.error('AuthProvider: Error fetching raw worker data:', debugError);
-        setRawWorkerData({ error: debugError.message || 'Failed to fetch workers' });
+        setRawWorkerData({
+          success: false,
+          error: debugError.message || 'Failed to fetch workers',
+          timestamp: new Date().toISOString(),
+          debugError
+        });
       }
       
       setLoading(false);
