@@ -8,6 +8,20 @@ export const getAllWorkers = async (): Promise<Worker[]> => {
   try {
     console.log('WorkersAPI: Fetching all workers');
     
+    // Test connection first
+    console.log('WorkersAPI: Testing connection...');
+    const { data: testData, error: testError } = await supabase
+      .from('workers')
+      .select('count(*)')
+      .limit(1);
+      
+    if (testError) {
+      console.error('WorkersAPI: Connection test failed:', testError);
+      throw new Error(`Database connection failed: ${testError.message}`);
+    }
+    
+    console.log('WorkersAPI: Connection test passed');
+    
     // Log immediately before the actual Supabase call
     console.log('WorkersAPI: CRITICAL - About to execute supabase.from("workers").select()');
     console.time('WorkersAPI: workers query execution time');
@@ -24,7 +38,7 @@ export const getAllWorkers = async (): Promise<Worker[]> => {
     if (error) {
       console.error('WorkersAPI: CRITICAL ERROR - Failed to fetch workers:', error);
       console.log('WorkersAPI: Error details:', JSON.stringify(error, null, 2));
-      throw error;
+      throw new Error(`Failed to fetch workers: ${error.message}`);
     }
     
     console.log('WorkersAPI: Workers data received, count:', data?.length || 0);

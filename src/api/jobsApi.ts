@@ -7,6 +7,21 @@ import { Job } from '../types';
 export const getAllJobs = async (): Promise<Job[]> => {
   try {
     console.log('JobsAPI: Fetching all jobs');
+    console.log('JobsAPI: Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+    
+    // Test connection first
+    console.log('JobsAPI: Testing connection...');
+    const { data: testData, error: testError } = await supabase
+      .from('workers')
+      .select('count(*)')
+      .limit(1);
+      
+    if (testError) {
+      console.error('JobsAPI: Connection test failed:', testError);
+      throw new Error(`Database connection failed: ${testError.message}`);
+    }
+    
+    console.log('JobsAPI: Connection test passed, workers count:', testData);
     
     // Log immediately before the actual Supabase call
     console.log('JobsAPI: CRITICAL - About to execute supabase.from("jobs").select()');
@@ -23,8 +38,11 @@ export const getAllJobs = async (): Promise<Job[]> => {
     
     if (jobsError) {
       console.error('JobsAPI: CRITICAL ERROR - Failed to fetch jobs:', jobsError);
-      console.log('JobsAPI: Error details:', JSON.stringify(jobsError, null, 2));
-      throw jobsError;
+      console.error('JobsAPI: Error details:', JSON.stringify(jobsError, null, 2));
+      console.error('JobsAPI: Error code:', jobsError.code);
+      console.error('JobsAPI: Error hint:', jobsError.hint);
+      console.error('JobsAPI: Error details:', jobsError.details);
+      throw new Error(`Failed to fetch jobs: ${jobsError.message}`);
     }
 
     console.log('JobsAPI: Jobs data received, count:', jobs?.length || 0);
@@ -74,6 +92,14 @@ export const getAllJobs = async (): Promise<Job[]> => {
     return jobsWithSecondaryWorkers;
   } catch (error) {
     console.error('JobsAPI: CRITICAL - Exception during job fetching:', error);
+    console.error('JobsAPI: Error type:', typeof error);
+    console.error('JobsAPI: Error instanceof Error:', error instanceof Error);
+    
+    if (error instanceof Error) {
+      console.error('JobsAPI: Error message:', error.message);
+      console.error('JobsAPI: Error stack:', error.stack);
+    }
+    
     throw handleSupabaseError(error);
   }
 };
@@ -84,19 +110,30 @@ export const getAllJobs = async (): Promise<Job[]> => {
 export const createJob = async (jobData: Omit<Job, 'id' | 'created_at'>): Promise<Job> => {
   try {
     console.log('JobsAPI: Creating new job');
+    console.log('JobsAPI: Job data to create:', JSON.stringify(jobData, null, 2));
+    
     const { secondary_worker_ids, ...jobBase } = jobData as any;
     
     // Insert the main job record
     console.log('JobsAPI: CRITICAL - About to insert new job');
-    const { data: newJob, error: jobError } = await supabase
+    console.time('JobsAPI: job creation time');
+    
+    const { data: newJob, error: jobError, status, statusText } = await supabase
       .from('jobs')
       .insert([jobBase])
       .select()
       .single();
     
+    console.timeEnd('JobsAPI: job creation time');
+    console.log('JobsAPI: Job creation completed with status:', status, statusText);
+    
     if (jobError) {
       console.error('JobsAPI: Error creating job:', jobError);
-      throw jobError;
+      console.error('JobsAPI: Job error details:', JSON.stringify(jobError, null, 2));
+      console.error('JobsAPI: Job error code:', jobError.code);
+      console.error('JobsAPI: Job error hint:', jobError.hint);
+      console.error('JobsAPI: Job error details:', jobError.details);
+      throw new Error(`Failed to create job: ${jobError.message}`);
     }
 
     console.log('JobsAPI: Job created successfully with ID:', newJob.id);
@@ -128,6 +165,13 @@ export const createJob = async (jobData: Omit<Job, 'id' | 'created_at'>): Promis
     };
   } catch (error) {
     console.error('JobsAPI: Exception during job creation:', error);
+    console.error('JobsAPI: Create error type:', typeof error);
+    
+    if (error instanceof Error) {
+      console.error('JobsAPI: Create error message:', error.message);
+      console.error('JobsAPI: Create error stack:', error.stack);
+    }
+    
     throw handleSupabaseError(error);
   }
 };
@@ -166,6 +210,7 @@ export const getJobsForWorker = async (workerId: string): Promise<Job[]> => {
 export const updateJob = async (id: string, updates: Partial<Job>): Promise<Job> => {
   try {
     console.log('JobsAPI: Updating job:', id);
+    console.log('JobsAPI: Update data:', JSON.stringify(updates, null, 2));
     
     const { secondary_worker_ids, ...jobUpdates } = updates as any;
     
