@@ -11,11 +11,10 @@ import {
   differenceInDays
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Job } from '../../types';
+import { Job, Worker } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
 import { useJobsStore } from '../../store/jobsStore';
-import { useWorkerStore } from '../../store/workersStore';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
@@ -26,9 +25,13 @@ const WeekView: React.FC = () => {
   const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   
-  // Use store to fetch data - no auth dependency needed
+  // Local state for workers - using edge function instead of store
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workersLoading, setWorkersLoading] = useState(true);
+  const [workersError, setWorkersError] = useState<string | null>(null);
+  
+  // Use store for jobs only
   const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobsStore();
-  const { workers, fetchWorkers, addWorker } = useWorkerStore();
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -42,12 +45,73 @@ const WeekView: React.FC = () => {
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
   
+  // Fetch workers using the working edge function
+  const fetchWorkers = async () => {
+    setWorkersLoading(true);
+    setWorkersError(null);
+    
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/get-workers`;
+      
+      console.log('WeekView: Fetching workers from edge function:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('WeekView: Workers response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('WeekView: Workers response:', data);
+      
+      if (data.success && data.data) {
+        setWorkers(data.data);
+        console.log('WeekView: Set workers:', data.data.length);
+      } else {
+        throw new Error(data.error || 'Failed to fetch workers');
+      }
+    } catch (err) {
+      console.error('WeekView: Error fetching workers:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch workers';
+      setWorkersError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setWorkersLoading(false);
+    }
+  };
+
+  // Add worker using edge function (for future implementation)
+  const handleAddWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>) => {
+    try {
+      console.log('WeekView: Adding worker:', workerData);
+      // For now, just show success and refresh the list
+      // TODO: Implement add worker edge function
+      toast.success('Worker functionality will be implemented soon');
+      setIsWorkerFormOpen(false);
+      
+      // Refresh the workers list
+      fetchWorkers();
+    } catch (error) {
+      console.error('WeekView: Error adding worker:', error);
+      toast.error('Failed to add worker: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+  
   // Fetch data when component mounts
   useEffect(() => {
     console.log('WeekView: Initial data load');
     fetchJobs();
     fetchWorkers();
-  }, [fetchJobs, fetchWorkers]);
+  }, [fetchJobs]);
   
   // Debug log jobs data
   useEffect(() => {
@@ -125,25 +189,6 @@ const WeekView: React.FC = () => {
     } catch (error) {
       toast.error('Failed to delete job');
       console.error('Error deleting job:', error);
-    }
-  };
-
-  const handleSubmitWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>) => {
-    try {
-      console.log('WeekView: Submitting worker:', workerData);
-      
-      // Wait for the worker to be added
-      await addWorker(workerData);
-      
-      console.log('WeekView: Worker added successfully');
-      setIsWorkerFormOpen(false);
-      toast.success('Worker added successfully');
-      
-      // Fetch the updated worker list
-      fetchWorkers();
-    } catch (error) {
-      console.error('WeekView: Error adding worker:', error);
-      toast.error('Failed to add worker: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
   
@@ -238,7 +283,25 @@ const WeekView: React.FC = () => {
       </div>
       
       {/* Warning messages */}
-      {workers.length === 0 && (
+      {workersLoading && (
+        <div className="p-4 bg-blue-50 border-b border-blue-200">
+          <p className="text-blue-800 font-medium">Loading workers...</p>
+        </div>
+      )}
+      
+      {workersError && (
+        <div className="p-4 bg-red-50 border-b border-red-200">
+          <p className="text-red-800 font-medium">Error loading workers: {workersError}</p>
+          <button 
+            onClick={fetchWorkers}
+            className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      
+      {!workersLoading && !workersError && workers.length === 0 && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No workers found in database. Add a worker to start scheduling jobs.</p>
         </div>
@@ -296,7 +359,7 @@ const WeekView: React.FC = () => {
       {isWorkerFormOpen && (
         <WorkerForm
           onClose={() => setIsWorkerFormOpen(false)}
-          onSubmit={handleSubmitWorker}
+          onSubmit={handleAddWorker}
         />
       )}
     </div>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Job, JobStatus, Worker } from '../../types';
-import { useWorkerStore } from '../../store/workersStore';
 import { X, Trash2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -13,7 +12,8 @@ interface JobFormProps {
 }
 
 const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJob }) => {
-  const { workers, fetchWorkers } = useWorkerStore();
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workersLoading, setWorkersLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -48,11 +48,52 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     }
   }, [initialJob]);
 
-  // Force refresh workers when form opens
+  // Fetch workers using the working edge function
+  const fetchWorkers = async () => {
+    setWorkersLoading(true);
+    
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/get-workers`;
+      
+      console.log('JobForm: Fetching workers from edge function:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('JobForm: Workers response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('JobForm: Workers response:', data);
+      
+      if (data.success && data.data) {
+        setWorkers(data.data);
+        console.log('JobForm: Set workers:', data.data.length);
+      } else {
+        throw new Error(data.error || 'Failed to fetch workers');
+      }
+    } catch (err) {
+      console.error('JobForm: Error fetching workers:', err);
+      toast.error('Failed to load workers: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setWorkersLoading(false);
+    }
+  };
+
+  // Fetch workers when form opens
   useEffect(() => {
     console.log('JobForm: Fetching workers...');
     fetchWorkers();
-  }, [fetchWorkers]);
+  }, []);
 
   // Debug workers data
   useEffect(() => {
@@ -323,20 +364,26 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
               <label className="block text-sm font-medium text-gray-700">
                 Lead Worker
               </label>
-              <select
-                name="worker_id"
-                value={formData.worker_id || ''}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 disabled:bg-gray-100"
-              >
-                <option value="">Select Worker</option>
-                {workers.map((worker: Worker) => (
-                  <option key={worker.id} value={worker.id}>
-                    {worker.name}
-                  </option>
-                ))}
-              </select>
+              {workersLoading ? (
+                <div className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-100 text-gray-500">
+                  Loading workers...
+                </div>
+              ) : (
+                <select
+                  name="worker_id"
+                  value={formData.worker_id || ''}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 disabled:bg-gray-100"
+                >
+                  <option value="">Select Worker</option>
+                  {workers.map((worker: Worker) => (
+                    <option key={worker.id} value={worker.id}>
+                      {worker.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
@@ -344,7 +391,11 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 Secondary Workers
               </label>
               <div className="mt-1 border rounded-md divide-y max-h-48 overflow-y-auto">
-                {workers.length === 0 ? (
+                {workersLoading ? (
+                  <div className="p-3 text-sm text-gray-500 italic">
+                    Loading workers...
+                  </div>
+                ) : workers.length === 0 ? (
                   <div className="p-3 text-sm text-gray-500 italic">
                     No workers available. Add workers first.
                   </div>

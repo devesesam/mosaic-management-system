@@ -17,7 +17,7 @@ import {
   isWithinInterval
 } from 'date-fns';
 import { useDrop } from 'react-dnd';
-import { Job } from '../../types';
+import { Job, Worker } from '../../types';
 import { useJobsStore } from '../../store/jobsStore';
 import UnscheduledPanel from './UnscheduledPanel';
 import JobForm from '../jobs/JobForm';
@@ -32,7 +32,12 @@ const MonthView: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   
-  // Use store for data access - no auth dependency
+  // Local state for workers - using edge function instead of store
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workersLoading, setWorkersLoading] = useState(true);
+  const [workersError, setWorkersError] = useState<string | null>(null);
+  
+  // Use store for jobs only
   const { jobs, fetchJobs, updateJob, deleteJob } = useJobsStore();
   
   // Debug log the jobs data
@@ -76,10 +81,55 @@ const MonthView: React.FC = () => {
     return result;
   }, [calendarDays]);
 
+  // Fetch workers using the working edge function
+  const fetchWorkers = async () => {
+    setWorkersLoading(true);
+    setWorkersError(null);
+    
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/get-workers`;
+      
+      console.log('MonthView: Fetching workers from edge function:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('MonthView: Workers response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('MonthView: Workers response:', data);
+      
+      if (data.success && data.data) {
+        setWorkers(data.data);
+        console.log('MonthView: Set workers:', data.data.length);
+      } else {
+        throw new Error(data.error || 'Failed to fetch workers');
+      }
+    } catch (err) {
+      console.error('MonthView: Error fetching workers:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch workers';
+      setWorkersError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setWorkersLoading(false);
+    }
+  };
+
   // Fetch data when component mounts
   useEffect(() => {
     console.log('MonthView: Initial data load');
     fetchJobs();
+    fetchWorkers();
   }, [fetchJobs]);
 
   // Get unscheduled jobs (no date and no worker)
@@ -401,6 +451,24 @@ const MonthView: React.FC = () => {
         </div>
         
         {/* Warning messages */}
+        {workersLoading && (
+          <div className="p-4 bg-blue-50 border-b border-blue-200">
+            <p className="text-blue-800 font-medium">Loading workers...</p>
+          </div>
+        )}
+        
+        {workersError && (
+          <div className="p-4 bg-red-50 border-b border-red-200">
+            <p className="text-red-800 font-medium">Error loading workers: {workersError}</p>
+            <button 
+              onClick={fetchWorkers}
+              className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        
         {jobs.length === 0 && (
           <div className="p-4 bg-yellow-50 border-b border-yellow-200">
             <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
