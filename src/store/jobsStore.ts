@@ -50,9 +50,9 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     console.log('jobsStore: Adding job:', jobData);
     
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging - increased to 60 seconds
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout - job creation took too long')), 30000);
+        setTimeout(() => reject(new Error('Request timeout - job creation took too long')), 60000);
       });
       
       const newJob = await Promise.race([
@@ -101,9 +101,9 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     console.log('jobsStore: Updating job:', id, updates);
     
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging - increased to 60 seconds
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout - job update took too long')), 30000);
+        setTimeout(() => reject(new Error('Request timeout - job update took too long')), 60000);
       });
       
       const updatedJob = await Promise.race([
@@ -152,9 +152,9 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     console.log('jobsStore: Deleting job:', id);
     
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging - increased to 60 seconds
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout - job deletion took too long')), 30000);
+        setTimeout(() => reject(new Error('Request timeout - job deletion took too long')), 60000);
       });
       
       await Promise.race([
