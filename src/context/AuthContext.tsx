@@ -132,7 +132,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (signInError) {
-        console.error('AuthProvider: Sign in error:', signInError);
+        // Use less alarming console method for invalid credentials since it's expected user behavior
+        if (signInError.message === 'Invalid login credentials' || signInError.message?.includes('invalid_credentials')) {
+          console.log('AuthProvider: Invalid credentials provided');
+        } else {
+          console.error('AuthProvider: Sign in error:', signInError);
+        }
         setError('Invalid login credentials');
         setLoading(false);
         return false;
