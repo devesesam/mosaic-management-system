@@ -14,7 +14,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Job, Worker } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
-import { useJobsStore } from '../../store/jobsStore';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
@@ -25,13 +24,14 @@ const WeekView: React.FC = () => {
   const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   
-  // Local state for workers - using edge function instead of store
+  // Local state for both workers and jobs - using edge functions instead of stores
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [workersLoading, setWorkersLoading] = useState(true);
   const [workersError, setWorkersError] = useState<string | null>(null);
   
-  // Use store for jobs only
-  const { jobs, fetchJobs, addJob, updateJob, deleteJob } = useJobsStore();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState<string | null>(null);
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -89,6 +89,50 @@ const WeekView: React.FC = () => {
     }
   };
 
+  // Fetch jobs using the working edge function
+  const fetchJobs = async () => {
+    setJobsLoading(true);
+    setJobsError(null);
+    
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/get-jobs`;
+      
+      console.log('WeekView: Fetching jobs from edge function:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('WeekView: Jobs response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('WeekView: Jobs response:', data);
+      
+      if (data.success && data.data) {
+        setJobs(data.data);
+        console.log('WeekView: Set jobs:', data.data.length);
+      } else {
+        throw new Error(data.error || 'Failed to fetch jobs');
+      }
+    } catch (err) {
+      console.error('WeekView: Error fetching jobs:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch jobs';
+      setJobsError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
   // Add worker using edge function (for future implementation)
   const handleAddWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>) => {
     try {
@@ -111,7 +155,7 @@ const WeekView: React.FC = () => {
     console.log('WeekView: Initial data load');
     fetchJobs();
     fetchWorkers();
-  }, [fetchJobs]);
+  }, []);
   
   // Debug log jobs data
   useEffect(() => {
@@ -166,14 +210,17 @@ const WeekView: React.FC = () => {
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
     try {
       if (selectedJob) {
-        await updateJob(selectedJob.id, jobData);
-        toast.success('Job updated successfully');
+        // TODO: Implement job update via edge function
+        toast.success('Job update functionality will be implemented soon');
       } else {
-        await addJob(jobData);
-        toast.success('Job created successfully');
+        // TODO: Implement job creation via edge function
+        toast.success('Job creation functionality will be implemented soon');
       }
       setIsJobFormOpen(false);
       setSelectedJob(null);
+      
+      // Refresh jobs list
+      fetchJobs();
     } catch (error) {
       toast.error('Failed to save job');
       console.error('Error saving job:', error);
@@ -182,10 +229,13 @@ const WeekView: React.FC = () => {
 
   const handleDeleteJob = async (id: string) => {
     try {
-      await deleteJob(id);
-      toast.success('Job deleted successfully');
+      // TODO: Implement job deletion via edge function
+      toast.success('Job deletion functionality will be implemented soon');
       setIsJobFormOpen(false);
       setSelectedJob(null);
+      
+      // Refresh jobs list
+      fetchJobs();
     } catch (error) {
       toast.error('Failed to delete job');
       console.error('Error deleting job:', error);
@@ -194,31 +244,11 @@ const WeekView: React.FC = () => {
   
   const handleJobDrop = async (job: Job, workerId: string | null, date: Date | null) => {
     try {
-      let updates: Partial<Job> = {
-        worker_id: workerId,
-        start_date: date ? date.toISOString() : null
-      };
-
-      // Calculate end date based on duration or set single day
-      if (date && job.start_date && job.end_date) {
-        const originalDuration = differenceInDays(
-          parseISO(job.end_date),
-          parseISO(job.start_date)
-        );
-        updates.end_date = addDays(date, originalDuration).toISOString();
-      } else if (date) {
-        updates.end_date = date.toISOString();
-      } else {
-        updates.end_date = null;
-      }
+      // TODO: Implement job update via edge function
+      toast.success('Job scheduling functionality will be implemented soon');
       
-      console.log('WeekView: Updating job with drop info:', {
-        job_id: job.id,
-        updates
-      });
-      
-      await updateJob(job.id, updates);
-      toast.success('Job updated successfully');
+      // Refresh jobs list
+      fetchJobs();
     } catch (error) {
       toast.error('Failed to update job');
       console.error('Error updating job:', error);
@@ -227,25 +257,11 @@ const WeekView: React.FC = () => {
 
   const handleJobResize = async (job: Job, days: number) => {
     try {
-      if (!job.start_date) {
-        console.error('Cannot resize job without start_date');
-        return;
-      }
+      // TODO: Implement job resize via edge function
+      toast.success('Job resize functionality will be implemented soon');
       
-      const startDate = parseISO(job.start_date);
-      const newEndDate = addDays(startDate, days - 1);
-      
-      console.log('WeekView: Resizing job:', {
-        job_id: job.id,
-        days,
-        start_date: job.start_date,
-        new_end_date: newEndDate.toISOString()
-      });
-      
-      await updateJob(job.id, {
-        end_date: newEndDate.toISOString()
-      });
-      toast.success('Job duration updated');
+      // Refresh jobs list
+      fetchJobs();
     } catch (error) {
       toast.error('Failed to update job duration');
       console.error('Error resizing job:', error);
@@ -307,7 +323,25 @@ const WeekView: React.FC = () => {
         </div>
       )}
       
-      {jobs.length === 0 && (
+      {jobsLoading && (
+        <div className="p-4 bg-blue-50 border-b border-blue-200">
+          <p className="text-blue-800 font-medium">Loading jobs...</p>
+        </div>
+      )}
+      
+      {jobsError && (
+        <div className="p-4 bg-red-50 border-b border-red-200">
+          <p className="text-red-800 font-medium">Error loading jobs: {jobsError}</p>
+          <button 
+            onClick={fetchJobs}
+            className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      
+      {!jobsLoading && !jobsError && jobs.length === 0 && (
         <div className="p-4 bg-yellow-50 border-b border-yellow-200">
           <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
         </div>
