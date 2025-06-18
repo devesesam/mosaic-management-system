@@ -17,8 +17,9 @@ import {
   isWithinInterval
 } from 'date-fns';
 import { useDrop } from 'react-dnd';
-import { Job, Worker } from '../../types';
+import { Job } from '../../types';
 import UnscheduledPanel from './UnscheduledPanel';
+import { useJobsStore } from '../../store/jobsStore';
 import JobForm from '../jobs/JobForm';
 import DayJobsModal from './DayJobsModal';
 import DraggableJob from './DraggableJob';
@@ -30,15 +31,18 @@ const MonthView: React.FC = () => {
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   
-  // Local state for both workers and jobs - using edge functions instead of stores
-  const [workers, setWorkers] = useState<Worker[]>([]);
-  const [workersLoading, setWorkersLoading] = useState(true);
-  const [workersError, setWorkersError] = useState<string | null>(null);
-  
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [jobsLoading, setJobsLoading] = useState(true);
-  const [jobsError, setJobsError] = useState<string | null>(null);
+  // Use store for data access
+  const { 
+    jobs, 
+    loading: jobsLoading, 
+    error: jobsError, 
+    fetchJobs,
+    addJob,
+    updateJob,
+    deleteJob
+  } = useJobsStore();
   
   // Debug log the jobs data
   useEffect(() => {
@@ -81,100 +85,11 @@ const MonthView: React.FC = () => {
     return result;
   }, [calendarDays]);
 
-  // Fetch workers using the working edge function
-  const fetchWorkers = async () => {
-    setWorkersLoading(true);
-    setWorkersError(null);
-    
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const apiUrl = `${supabaseUrl}/functions/v1/get-workers`;
-      
-      console.log('MonthView: Fetching workers from edge function:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('MonthView: Workers response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('MonthView: Workers response:', data);
-      
-      if (data.success && data.data) {
-        setWorkers(data.data);
-        console.log('MonthView: Set workers:', data.data.length);
-      } else {
-        throw new Error(data.error || 'Failed to fetch workers');
-      }
-    } catch (err) {
-      console.error('MonthView: Error fetching workers:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch workers';
-      setWorkersError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setWorkersLoading(false);
-    }
-  };
-
-  // Fetch jobs using the working edge function
-  const fetchJobs = async () => {
-    setJobsLoading(true);
-    setJobsError(null);
-    
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const apiUrl = `${supabaseUrl}/functions/v1/get-jobs`;
-      
-      console.log('MonthView: Fetching jobs from edge function:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('MonthView: Jobs response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('MonthView: Jobs response:', data);
-      
-      if (data.success && data.data) {
-        setJobs(data.data);
-        console.log('MonthView: Set jobs:', data.data.length);
-      } else {
-        throw new Error(data.error || 'Failed to fetch jobs');
-      }
-    } catch (err) {
-      console.error('MonthView: Error fetching jobs:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch jobs';
-      setJobsError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setJobsLoading(false);
-    }
-  };
-
   // Fetch data when component mounts
   useEffect(() => {
     console.log('MonthView: Initial data load');
     fetchJobs();
-    fetchWorkers();
-  }, []);
+  }, [fetchJobs]);
 
   // Get unscheduled jobs (no date and no worker)
   const unscheduledJobs = useMemo(() => {
@@ -380,13 +295,31 @@ const MonthView: React.FC = () => {
     try {
       console.log('MonthView: Handling job drop:', { job_id: job.id, date });
       
-      // TODO: Implement job update via edge function
-      toast.success('Job scheduling functionality will be implemented soon');
+      let updates: Partial<Job> = {
+        start_date: date.toISOString()
+      };
+
+      // Calculate end date based on original duration
+      if (job.start_date && job.end_date) {
+        try {
+          const originalDuration = differenceInDays(
+            parseISO(job.end_date),
+            parseISO(job.start_date)
+          );
+          updates.end_date = addDays(date, originalDuration).toISOString();
+        } catch (error) {
+          console.error('Error calculating job duration:', error, job);
+          // If we can't calculate duration, make it a single-day job
+          updates.end_date = date.toISOString();
+        }
+      } else {
+        // If it's a new job or didn't have dates before, make it a single-day job
+        updates.end_date = date.toISOString();
+      }
       
-      // Refresh jobs list
-      fetchJobs();
+      console.log('MonthView: Updating job with:', updates);
+      await updateJob(job.id, updates);
     } catch (error) {
-      toast.error('Failed to schedule job');
       console.error('Error updating job:', error);
     }
   };
@@ -394,34 +327,23 @@ const MonthView: React.FC = () => {
   const handleJobSubmit = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
     try {
       if (selectedJob) {
-        // TODO: Implement job update via edge function
-        toast.success('Job update functionality will be implemented soon');
+        await updateJob(selectedJob.id, jobData);
       } else {
-        // TODO: Implement job creation via edge function
-        toast.success('Job creation functionality will be implemented soon');
+        await addJob(jobData);
       }
       setIsJobFormOpen(false);
       setSelectedJob(null);
-      
-      // Refresh jobs list
-      fetchJobs();
     } catch (error) {
-      toast.error('Failed to update job');
       console.error('Error updating job:', error);
     }
   };
 
   const handleDeleteJob = async (id: string) => {
     try {
-      // TODO: Implement job deletion via edge function
-      toast.success('Job deletion functionality will be implemented soon');
+      await deleteJob(id);
       setIsJobFormOpen(false);
       setSelectedJob(null);
-      
-      // Refresh jobs list
-      fetchJobs();
     } catch (error) {
-      toast.error('Failed to delete job');
       console.error('Error deleting job:', error);
     }
   };
@@ -431,13 +353,18 @@ const MonthView: React.FC = () => {
     try {
       console.log('MonthView: Handling job resize:', { job_id: job.id, days });
       
-      // TODO: Implement job resize via edge function
-      toast.success('Job resize functionality will be implemented soon');
+      if (!job.start_date) {
+        console.error('Cannot resize job without start_date');
+        return;
+      }
       
-      // Refresh jobs list
-      fetchJobs();
+      const startDate = parseISO(job.start_date);
+      const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
+      
+      await updateJob(job.id, {
+        end_date: newEndDate.toISOString()
+      });
     } catch (error) {
-      toast.error('Failed to update job duration');
       console.error('Error resizing job:', error);
     }
   };
@@ -477,24 +404,6 @@ const MonthView: React.FC = () => {
         </div>
         
         {/* Warning messages */}
-        {workersLoading && (
-          <div className="p-4 bg-blue-50 border-b border-blue-200">
-            <p className="text-blue-800 font-medium">Loading workers...</p>
-          </div>
-        )}
-        
-        {workersError && (
-          <div className="p-4 bg-red-50 border-b border-red-200">
-            <p className="text-red-800 font-medium">Error loading workers: {workersError}</p>
-            <button 
-              onClick={fetchWorkers}
-              className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-        
         {jobsLoading && (
           <div className="p-4 bg-blue-50 border-b border-blue-200">
             <p className="text-blue-800 font-medium">Loading jobs...</p>
@@ -505,10 +414,22 @@ const MonthView: React.FC = () => {
           <div className="p-4 bg-red-50 border-b border-red-200">
             <p className="text-red-800 font-medium">Error loading jobs: {jobsError}</p>
             <button 
-              onClick={fetchJobs}
-              className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
+              onClick={() => {
+                setIsRetrying(true);
+                fetchJobs();
+                setTimeout(() => setIsRetrying(false), 1000);
+              }}
+              className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 flex items-center"
+              disabled={isRetrying}
             >
-              Retry
+              {isRetrying ? (
+                <>
+                  <div className="w-4 h-4 mr-2 border-t-2 border-b-2 border-red-700 rounded-full animate-spin"></div>
+                  Retrying...
+                </>
+              ) : (
+                'Retry'
+              )}
             </button>
           </div>
         )}
