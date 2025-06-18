@@ -48,6 +48,19 @@ export async function testSupabaseConnection(): Promise<boolean> {
     // Use the dedicated test function we created in the migration
     const { data, error } = await supabase.rpc('test_connection');
     
+    // DETAILED LOGGING - Log the raw connection test response
+    console.log('Supabase connection test - RAW RESPONSE:', {
+      data: data,
+      error: error,
+      dataType: typeof data,
+      errorDetails: error ? {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      } : 'no error'
+    });
+    
     if (error) {
       console.error('Supabase connection test failed:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
@@ -67,9 +80,12 @@ let connectionTested = false;
 export async function ensureConnection(): Promise<void> {
   if (!connectionTested) {
     connectionTested = true;
+    console.log('SupabaseClient: Running initial connection test...');
     const isConnected = await testSupabaseConnection();
     if (!isConnected) {
       console.warn('Supabase connection test failed - but continuing anyway');
+    } else {
+      console.log('SupabaseClient: Initial connection test passed');
     }
   }
 }

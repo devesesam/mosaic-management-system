@@ -77,7 +77,7 @@ export interface Database {
           name: string
           email: string | null
           phone: string | null
-          role: string
+          role: string | null
           created_at: string
         }
         Insert: {
@@ -85,7 +85,7 @@ export interface Database {
           name: string
           email?: string | null
           phone?: string | null
-          role?: string
+          role?: string | null
           created_at?: string
         }
         Update: {
@@ -93,9 +93,35 @@ export interface Database {
           name?: string
           email?: string | null
           phone?: string | null
-          role?: string
+          role?: string | null
           created_at?: string
         }
+      }
+      job_secondary_workers: {
+        Row: {
+          id: string
+          job_id: string
+          worker_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          worker_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          worker_id?: string
+          created_at?: string
+        }
+      }
+    }
+    Functions: {
+      test_connection: {
+        Args: {}
+        Returns: string
       }
     }
   }
