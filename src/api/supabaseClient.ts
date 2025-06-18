@@ -16,57 +16,86 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 console.log('Initializing Supabase client with URL:', supabaseUrl);
 
-// Create and export the Supabase client with more permissive settings
+// Create and export the Supabase client with optimal settings for this use case
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false, // Disable session persistence for now
-    autoRefreshToken: false, // Disable auto refresh
-    detectSessionInUrl: false // Disable URL session detection
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
   },
   global: {
     headers: {
       'X-Client-Info': 'tasman-roofing-scheduler',
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     }
   },
   db: {
     schema: 'public'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 2
+    }
   }
 });
 
-// Test the connection immediately
-async function testConnection() {
+// Test connection function using the dedicated test function
+export async function testSupabaseConnection(): Promise<boolean> {
   try {
     console.log('Testing Supabase connection...');
     
-    // Test basic connectivity
-    const { data, error } = await supabase
-      .from('workers')
-      .select('count(*)')
-      .limit(1);
+    // Use the dedicated test function we created in the migration
+    const { data, error } = await supabase.rpc('test_connection');
     
     if (error) {
       console.error('Supabase connection test failed:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
+      return false;
     } else {
       console.log('Supabase connection test successful:', data);
+      return true;
     }
   } catch (err) {
     console.error('Supabase connection test exception:', err);
+    return false;
   }
 }
 
-// Run connection test after a short delay
-setTimeout(testConnection, 1000);
+// Run connection test after initialization
+let connectionTested = false;
+export async function ensureConnection(): Promise<void> {
+  if (!connectionTested) {
+    connectionTested = true;
+    const isConnected = await testSupabaseConnection();
+    if (!isConnected) {
+      console.warn('Supabase connection test failed - but continuing anyway');
+    }
+  }
+}
+
+// Auto-test connection after a short delay
+setTimeout(() => {
+  ensureConnection();
+}, 500);
 
 // Export a function to handle errors consistently
 export const handleSupabaseError = (error: unknown): Error => {
   console.error('Supabase API error:', error);
   
+  if (error && typeof error === 'object' && 'message' in error) {
+    const supabaseError = error as any;
+    console.error('Error details:', {
+      message: supabaseError.message,
+      code: supabaseError.code,
+      details: supabaseError.details,
+      hint: supabaseError.hint
+    });
+    
+    return new Error(supabaseError.message || 'Database error');
+  }
+  
   if (error instanceof Error) {
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     return error;
   }
   

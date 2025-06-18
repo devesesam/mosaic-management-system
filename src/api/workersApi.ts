@@ -1,4 +1,4 @@
-import { supabase, handleSupabaseError } from './supabaseClient';
+import { supabase, handleSupabaseError, ensureConnection } from './supabaseClient';
 import { Worker } from '../types';
 
 /**
@@ -8,19 +8,8 @@ export const getAllWorkers = async (): Promise<Worker[]> => {
   try {
     console.log('WorkersAPI: Fetching all workers');
     
-    // Test connection first
-    console.log('WorkersAPI: Testing connection...');
-    const { data: testData, error: testError } = await supabase
-      .from('workers')
-      .select('count(*)')
-      .limit(1);
-      
-    if (testError) {
-      console.error('WorkersAPI: Connection test failed:', testError);
-      throw new Error(`Database connection failed: ${testError.message}`);
-    }
-    
-    console.log('WorkersAPI: Connection test passed');
+    // Ensure connection is tested
+    await ensureConnection();
     
     // Log immediately before the actual Supabase call
     console.log('WorkersAPI: CRITICAL - About to execute supabase.from("workers").select()');
@@ -38,7 +27,7 @@ export const getAllWorkers = async (): Promise<Worker[]> => {
     if (error) {
       console.error('WorkersAPI: CRITICAL ERROR - Failed to fetch workers:', error);
       console.log('WorkersAPI: Error details:', JSON.stringify(error, null, 2));
-      throw new Error(`Failed to fetch workers: ${error.message}`);
+      throw new Error(`Failed to fetch workers: ${error.message || 'Unknown database error'}`);
     }
     
     console.log('WorkersAPI: Workers data received, count:', data?.length || 0);
@@ -65,6 +54,8 @@ export const createWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>
   try {
     console.log('WorkersAPI: Creating worker');
     
+    await ensureConnection();
+    
     // Make sure role is set to admin (application requirement)
     const workerWithRole = {
       ...workerData,
@@ -85,7 +76,7 @@ export const createWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>
     if (error) {
       console.error('WorkersAPI: Error creating worker:', error);
       console.log('WorkersAPI: Error details:', JSON.stringify(error, null, 2));
-      throw error;
+      throw new Error(`Failed to create worker: ${error.message || 'Unknown database error'}`);
     }
 
     console.log('WorkersAPI: Worker created successfully:', data.id);
@@ -102,6 +93,8 @@ export const createWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>
 export const deleteWorker = async (id: string): Promise<void> => {
   try {
     console.log('WorkersAPI: Deleting worker:', id);
+    
+    await ensureConnection();
     
     // First update any jobs assigned to this worker
     console.log('WorkersAPI: CRITICAL - About to unassign worker from jobs');
@@ -143,7 +136,7 @@ export const deleteWorker = async (id: string): Promise<void> => {
     if (error) {
       console.error('WorkersAPI: Error deleting worker:', error);
       console.log('WorkersAPI: Error details:', JSON.stringify(error, null, 2));
-      throw error;
+      throw new Error(`Failed to delete worker: ${error.message || 'Unknown database error'}`);
     }
 
     console.log('WorkersAPI: Worker deleted successfully:', id);
@@ -160,6 +153,8 @@ export const getWorkerByEmail = async (email: string): Promise<Worker | null> =>
   try {
     console.log('WorkersAPI: Fetching worker by email:', email);
     
+    await ensureConnection();
+    
     console.log('WorkersAPI: CRITICAL - About to query worker by email');
     const { data, error, status } = await supabase
       .from('workers')
@@ -172,7 +167,7 @@ export const getWorkerByEmail = async (email: string): Promise<Worker | null> =>
     if (error) {
       console.error('WorkersAPI: Error fetching worker by email:', error);
       console.log('WorkersAPI: Error details:', JSON.stringify(error, null, 2));
-      throw error;
+      throw new Error(`Failed to fetch worker: ${error.message || 'Unknown database error'}`);
     }
     
     if (data) {
@@ -194,6 +189,8 @@ export const getWorkerByEmail = async (email: string): Promise<Worker | null> =>
 export const createOrUpdateWorkerProfile = async (email: string, name?: string): Promise<Worker> => {
   try {
     console.log(`WorkersAPI: Creating/updating worker profile for ${email}`);
+    
+    await ensureConnection();
     
     const workerData = {
       name: name || email.split('@')[0],
@@ -221,7 +218,7 @@ export const createOrUpdateWorkerProfile = async (email: string, name?: string):
     if (error) {
       console.error('WorkersAPI: Error creating/updating worker profile:', error);
       console.log('WorkersAPI: Error details:', JSON.stringify(error, null, 2));
-      throw error;
+      throw new Error(`Failed to create/update worker: ${error.message || 'Unknown database error'}`);
     }
     
     console.log('WorkersAPI: Worker profile created/updated:', data.id);
