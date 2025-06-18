@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from '../api/supabaseClient';
-import { getWorkerByEmail, createOrUpdateWorkerProfile } from '../api/workersApi';
+import { getWorkerByEmail, createOrUpdateWorkerProfile, getAllWorkers } from '../api/workersApi';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 
@@ -17,6 +17,8 @@ interface AuthContextProps {
   setError: (error: string | null) => void;
   isAdmin: boolean;
   authError: string | null;
+  rawWorkerData: any;
+  setRawWorkerData: (data: any) => void;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -28,6 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [rawWorkerData, setRawWorkerData] = useState<any>(null);
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
@@ -37,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentWorker(null);
       setError(null);
       setAuthError(null);
+      setRawWorkerData(null);
       localStorage.removeItem('supabase.auth.token');
       await supabase.auth.signOut();
     } catch (err) {
@@ -144,6 +148,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       console.log('AuthProvider: Sign in successful');
+      
+      // DEBUG: Fetch raw worker data after successful login
+      try {
+        console.log('AuthProvider: Fetching raw worker data for debugging...');
+        const rawData = await getAllWorkers();
+        console.log('AuthProvider: Raw worker data received:', rawData);
+        setRawWorkerData(rawData);
+      } catch (debugError) {
+        console.error('AuthProvider: Error fetching raw worker data:', debugError);
+        setRawWorkerData({ error: debugError.message || 'Failed to fetch workers' });
+      }
+      
       setLoading(false);
       return true;
     } catch (err) {
@@ -199,7 +215,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     setError,
     isAdmin,
-    authError
+    authError,
+    rawWorkerData,
+    setRawWorkerData
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
