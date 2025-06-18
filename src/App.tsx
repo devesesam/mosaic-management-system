@@ -8,6 +8,7 @@ import WeekView from './components/scheduler/WeekView';
 import MonthView from './components/scheduler/MonthView';
 import JobForm from './components/jobs/JobForm';
 import HelloModal from './components/HelloModal';
+import WorkersDebugModal from './components/WorkersDebugModal';
 import { useJobsStore } from './store/jobsStore';
 import { useWorkerStore } from './store/workersStore';
 import { Toaster } from 'react-hot-toast';
@@ -18,6 +19,7 @@ function App() {
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
+  const [showWorkersDebug, setShowWorkersDebug] = useState(false);
   
   const { 
     jobs, 
@@ -127,6 +129,12 @@ function App() {
                 'Refresh Data'
               )}
             </button>
+            <button
+              onClick={() => setShowWorkersDebug(true)}
+              className="w-full py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md"
+            >
+              Debug Workers Data
+            </button>
           </div>
         </div>
       </div>
@@ -161,6 +169,13 @@ function App() {
         {showHelloModal && (
           <HelloModal
             onClose={() => setShowHelloModal(false)}
+          />
+        )}
+
+        {/* Workers Debug Modal */}
+        {showWorkersDebug && (
+          <WorkersDebugModal
+            onClose={() => setShowWorkersDebug(false)}
           />
         )}
 
