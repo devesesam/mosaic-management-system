@@ -14,6 +14,7 @@ interface JobsState {
   deleteJob: (id: string) => Promise<void>;
   setSelectedJob: (job: Job | null) => void;
   unassignWorkerJobs: (workerId: string) => Promise<void>;
+  isLoading: boolean;
 }
 
 export const useJobsStore = create<JobsState>((set, get) => ({
@@ -21,6 +22,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   loading: false,
   error: null,
   selectedJob: null,
+  isLoading: false,
   
   fetchJobs: async () => {
     set({ loading: true, error: null });
@@ -44,16 +46,28 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   },
   
   addJob: async (jobData) => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, isLoading: true });
+    console.log('jobsStore: Adding job:', jobData);
     
     try {
-      const newJob = await createJob(jobData);
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout - job creation took too long')), 30000);
+      });
+      
+      const newJob = await Promise.race([
+        createJob(jobData),
+        timeoutPromise
+      ]);
+      
+      console.log('jobsStore: Job created successfully:', newJob.id);
       
       // Update local state immediately
       set((state) => ({ 
         jobs: [newJob, ...state.jobs],
         loading: false,
-        error: null
+        error: null,
+        isLoading: false
       }));
       
       // Then refresh all jobs to ensure consistency
@@ -64,27 +78,47 @@ export const useJobsStore = create<JobsState>((set, get) => ({
       console.error('jobsStore: Error adding job:', error);
       
       // Create a user-friendly error message
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Failed to add job - check your network connection';
+      let errorMessage = 'Failed to add job - please try again';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out - please check your connection and try again';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error - please check your connection';
+        } else {
+          errorMessage = error.message;
+        }
+      }
         
-      set({ error: errorMessage, loading: false });
+      set({ error: errorMessage, loading: false, isLoading: false });
       toast.error(errorMessage);
       throw error;
     }
   },
   
   updateJob: async (id, updates) => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, isLoading: true });
+    console.log('jobsStore: Updating job:', id, updates);
     
     try {
-      const updatedJob = await updateJob(id, updates);
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout - job update took too long')), 30000);
+      });
+      
+      const updatedJob = await Promise.race([
+        updateJob(id, updates),
+        timeoutPromise
+      ]);
+      
+      console.log('jobsStore: Job updated successfully:', id);
       
       // Update local state immediately
       set((state) => ({
         jobs: state.jobs.map(job => job.id === id ? updatedJob : job),
         loading: false,
-        error: null
+        error: null,
+        isLoading: false
       }));
       
       // Then refresh all jobs to ensure consistency
@@ -95,27 +129,47 @@ export const useJobsStore = create<JobsState>((set, get) => ({
       console.error('jobsStore: Error updating job:', error);
       
       // Create a user-friendly error message
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Failed to update job - check your network connection';
+      let errorMessage = 'Failed to update job - please try again';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out - please check your connection and try again';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error - please check your connection';
+        } else {
+          errorMessage = error.message;
+        }
+      }
         
-      set({ error: errorMessage, loading: false });
+      set({ error: errorMessage, loading: false, isLoading: false });
       toast.error(errorMessage);
       throw error;
     }
   },
 
   deleteJob: async (id) => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, isLoading: true });
+    console.log('jobsStore: Deleting job:', id);
     
     try {
-      await deleteJob(id);
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout - job deletion took too long')), 30000);
+      });
+      
+      await Promise.race([
+        deleteJob(id),
+        timeoutPromise
+      ]);
+      
+      console.log('jobsStore: Job deleted successfully:', id);
       
       // Update local state
       set((state) => ({
         jobs: state.jobs.filter(job => job.id !== id),
         loading: false,
-        error: null
+        error: null,
+        isLoading: false
       }));
       
       // Then refresh all jobs to ensure consistency
@@ -124,11 +178,19 @@ export const useJobsStore = create<JobsState>((set, get) => ({
       console.error('jobsStore: Error deleting job:', error);
       
       // Create a user-friendly error message
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Failed to delete job - check your network connection';
+      let errorMessage = 'Failed to delete job - please try again';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out - please check your connection and try again';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error - please check your connection';
+        } else {
+          errorMessage = error.message;
+        }
+      }
         
-      set({ error: errorMessage, loading: false });
+      set({ error: errorMessage, loading: false, isLoading: false });
       toast.error(errorMessage);
       throw error;
     }
