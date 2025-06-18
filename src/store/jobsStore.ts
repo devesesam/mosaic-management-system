@@ -75,18 +75,50 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     console.log('jobsStore: Adding job:', jobData);
     
     try {
-      // TODO: Implement add job edge function
-      toast.success('Job creation functionality will be implemented soon');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/add-job`;
       
-      // Refresh all jobs to ensure consistency
-      await get().fetchJobs();
+      console.log('jobsStore: Adding job via edge function:', apiUrl);
       
-      // Return a mock job for now
-      return {
-        id: 'mock-id',
-        ...jobData,
-        created_at: new Date().toISOString()
-      } as Job;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jobData)
+      });
+
+      console.log('jobsStore: Add job response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('jobsStore: Add job response:', data);
+      
+      if (data.success && data.data) {
+        const newJob = data.data;
+        console.log('jobsStore: Job created successfully:', newJob.id);
+        
+        // Update local state immediately
+        set((state) => ({ 
+          jobs: [newJob, ...state.jobs],
+          loading: false,
+          error: null,
+          isLoading: false
+        }));
+        
+        toast.success('Job created successfully');
+        
+        // Then refresh all jobs to ensure consistency
+        get().fetchJobs();
+        
+        return newJob;
+      } else {
+        throw new Error(data.error || 'Failed to create job');
+      }
     } catch (error) {
       console.error('jobsStore: Error adding job:', error);
       
@@ -114,19 +146,50 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     console.log('jobsStore: Updating job:', id, updates);
     
     try {
-      // TODO: Implement update job edge function
-      toast.success('Job update functionality will be implemented soon');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/update-job`;
       
-      // Refresh all jobs to ensure consistency
-      await get().fetchJobs();
+      console.log('jobsStore: Updating job via edge function:', apiUrl);
       
-      // Return a mock updated job for now
-      const currentJob = get().jobs.find(job => job.id === id);
-      return {
-        ...currentJob,
-        ...updates,
-        id
-      } as Job;
+      const response = await fetch(apiUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, updates })
+      });
+
+      console.log('jobsStore: Update job response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('jobsStore: Update job response:', data);
+      
+      if (data.success && data.data) {
+        const updatedJob = data.data;
+        console.log('jobsStore: Job updated successfully:', id);
+        
+        // Update local state immediately
+        set((state) => ({
+          jobs: state.jobs.map(job => job.id === id ? updatedJob : job),
+          loading: false,
+          error: null,
+          isLoading: false
+        }));
+        
+        toast.success('Job updated successfully');
+        
+        // Then refresh all jobs to ensure consistency
+        get().fetchJobs();
+        
+        return updatedJob;
+      } else {
+        throw new Error(data.error || 'Failed to update job');
+      }
     } catch (error) {
       console.error('jobsStore: Error updating job:', error);
       
@@ -154,11 +217,46 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     console.log('jobsStore: Deleting job:', id);
     
     try {
-      // TODO: Implement delete job edge function
-      toast.success('Job deletion functionality will be implemented soon');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/delete-job/${id}`;
       
-      // Refresh all jobs to ensure consistency
-      await get().fetchJobs();
+      console.log('jobsStore: Deleting job via edge function:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('jobsStore: Delete job response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('jobsStore: Delete job response:', data);
+      
+      if (data.success) {
+        console.log('jobsStore: Job deleted successfully:', id);
+        
+        // Update local state
+        set((state) => ({
+          jobs: state.jobs.filter(job => job.id !== id),
+          loading: false,
+          error: null,
+          isLoading: false
+        }));
+        
+        toast.success('Job deleted successfully');
+        
+        // Then refresh all jobs to ensure consistency
+        get().fetchJobs();
+      } else {
+        throw new Error(data.error || 'Failed to delete job');
+      }
     } catch (error) {
       console.error('jobsStore: Error deleting job:', error);
       
@@ -191,8 +289,18 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     
     console.log('jobsStore: Unassigning', jobsToUpdate.length, 'jobs from worker', workerId);
     
-    // TODO: Implement unassign worker jobs edge function
-    toast.success('Worker job unassignment functionality will be implemented soon');
+    // Update each job to unassign the worker
+    for (const job of jobsToUpdate) {
+      try {
+        await get().updateJob(job.id, {
+          worker_id: null,
+          start_date: null,
+          end_date: null
+        });
+      } catch (error) {
+        console.error(`Failed to unassign job ${job.id}:`, error);
+      }
+    }
     
     // Refresh jobs after unassigning
     await get().fetchJobs();

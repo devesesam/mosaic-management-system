@@ -71,22 +71,50 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     try {
       console.log('workerStore: Adding worker:', workerData);
       
-      // TODO: Implement add worker edge function
-      // For now, just show success and refresh the list
-      toast.success('Worker functionality will be implemented soon');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/add-worker`;
       
-      // Refresh worker list to ensure consistency
-      await get().fetchWorkers();
+      console.log('workerStore: Adding worker via edge function:', apiUrl);
       
-      // Return a mock worker for now
-      return { 
-        id: 'mock-id', 
-        name: workerData.name, 
-        email: workerData.email,
-        phone: workerData.phone,
-        role: workerData.role || 'admin',
-        created_at: new Date().toISOString() 
-      } as Worker;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(workerData)
+      });
+
+      console.log('workerStore: Add worker response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('workerStore: Add worker response:', data);
+      
+      if (data.success && data.data) {
+        const newWorker = data.data;
+        console.log('workerStore: Worker created successfully:', newWorker.id);
+        
+        // Update local state
+        set((state) => ({ 
+          workers: [...state.workers, newWorker],
+          loading: false,
+          error: null,
+          isLoading: false
+        }));
+        
+        toast.success('Worker added successfully');
+        
+        // Refresh worker list to ensure consistency
+        await get().fetchWorkers();
+        
+        return newWorker;
+      } else {
+        throw new Error(data.error || 'Failed to create worker');
+      }
     } catch (error) {
       console.error('WorkerStore: Error adding worker:', error);
       
@@ -107,11 +135,46 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     try {
       console.log('workerStore: Deleting worker:', id);
       
-      // TODO: Implement delete worker edge function
-      toast.success('Worker deletion functionality will be implemented soon');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/delete-worker/${id}`;
       
-      // Refresh worker list to ensure consistency
-      await get().fetchWorkers();
+      console.log('workerStore: Deleting worker via edge function:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('workerStore: Delete worker response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('workerStore: Delete worker response:', data);
+      
+      if (data.success) {
+        console.log('workerStore: Worker deleted successfully:', id);
+        
+        // Update local state
+        set((state) => ({
+          workers: state.workers.filter((worker) => worker.id !== id),
+          loading: false,
+          error: null,
+          isLoading: false
+        }));
+        
+        toast.success('Worker deleted successfully');
+        
+        // Refresh worker list to ensure consistency
+        await get().fetchWorkers();
+      } else {
+        throw new Error(data.error || 'Failed to delete worker');
+      }
     } catch (error) {
       console.error('WorkerStore: Error deleting worker:', error);
       
