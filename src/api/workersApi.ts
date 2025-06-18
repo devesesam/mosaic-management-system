@@ -24,6 +24,22 @@ export const getAllWorkers = async (): Promise<Worker[]> => {
     console.timeEnd('WorkersAPI: workers query execution time');
     console.log('WorkersAPI: CRITICAL - Supabase workers query completed with status:', status, statusText);
     
+    // DETAILED LOGGING - Log the raw response
+    console.log('WorkersAPI: RAW RESPONSE DATA:', {
+      data: data,
+      error: error,
+      status: status,
+      statusText: statusText,
+      dataType: typeof data,
+      dataLength: data ? data.length : 'null/undefined',
+      errorDetails: error ? {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      } : 'no error'
+    });
+    
     if (error) {
       console.error('WorkersAPI: CRITICAL ERROR - Failed to fetch workers:', error);
       console.log('WorkersAPI: Error details:', JSON.stringify(error, null, 2));
@@ -38,6 +54,21 @@ export const getAllWorkers = async (): Promise<Worker[]> => {
         name: data[0].name,
         email: data[0].email || 'null'
       });
+      console.log('WorkersAPI: All worker names:', data.map(w => w.name));
+    } else {
+      console.warn('WorkersAPI: NO WORKERS RETURNED - data is empty or null');
+      console.log('WorkersAPI: Checking if this is a permissions issue...');
+      
+      // Try a simple count query to test permissions
+      try {
+        const { count, error: countError } = await supabase
+          .from('workers')
+          .select('*', { count: 'exact', head: true });
+        
+        console.log('WorkersAPI: Count query result:', { count, countError });
+      } catch (countErr) {
+        console.error('WorkersAPI: Count query failed:', countErr);
+      }
     }
     
     return data || [];
