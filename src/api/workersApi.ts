@@ -128,6 +128,10 @@ export const deleteWorker = async (id: string): Promise<void> => {
     await ensureConnection();
     
     // First update any jobs assigned to this worker
+    // The database foreign key constraint `ON DELETE SET NULL` on `jobs.worker_id`
+    // will automatically set `worker_id` to null when the worker is deleted.
+    // However, explicitly updating here ensures the application's intent is clear
+    // and handles cases where the DB constraint might be different or for immediate UI updates.
     console.log('WorkersAPI: CRITICAL - About to unassign worker from jobs');
     const { error: jobsError, status: jobsStatus } = await supabase
       .from('jobs')
@@ -141,19 +145,9 @@ export const deleteWorker = async (id: string): Promise<void> => {
       // Continue despite error
     }
     
-    // Delete secondary worker assignments
-    console.log('WorkersAPI: CRITICAL - About to delete secondary worker assignments');
-    const { error: secondaryError, status: secondaryStatus } = await supabase
-      .from('job_secondary_workers')
-      .delete()
-      .eq('worker_id', id);
-    
-    console.log('WorkersAPI: Secondary assignments deletion completed with status:', secondaryStatus);
-      
-    if (secondaryError) {
-      console.error('WorkersAPI: Error deleting secondary assignments:', secondaryError);
-      // Continue despite error
-    }
+    // Secondary worker assignments will be cascade deleted by the foreign key
+    // constraint `ON DELETE CASCADE` on `job_secondary_workers.worker_id`.
+    console.log('WorkersAPI: Secondary assignments will be cascade deleted by DB');
     
     // Finally delete the worker
     console.log('WorkersAPI: CRITICAL - About to delete worker');
