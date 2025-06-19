@@ -263,7 +263,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               job={mainJob}
               onClick={() => onJobClick(mainJob)}
               isScheduled={true}
-              onResize={(days) => onJobResize(mainJob, days)}
+              onResize={onJobResize}
               isWeekView={true}
               showText={showText}
             />
