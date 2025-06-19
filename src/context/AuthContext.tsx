@@ -17,8 +17,6 @@ interface AuthContextProps {
   setError: (error: string | null) => void;
   isAdmin: boolean;
   authError: string | null;
-  showHelloModal: boolean;
-  setShowHelloModal: (show: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -30,7 +28,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [showHelloModal, setShowHelloModal] = useState(false);
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
@@ -40,7 +37,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentWorker(null);
       setError(null);
       setAuthError(null);
-      setShowHelloModal(false);
       localStorage.removeItem('supabase.auth.token');
       await supabase.auth.signOut();
     } catch (err) {
@@ -100,9 +96,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         setSession(session);
         
-        // SHOW HELLO MODAL AFTER LOGIN
-        setShowHelloModal(true);
-        
         // Initialize worker profile
         if (session.user.email) {
           try {
@@ -147,9 +140,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         return false;
       }
-      
-      // SHOW HELLO MODAL IMMEDIATELY AFTER SUCCESSFUL LOGIN
-      setShowHelloModal(true);
       
       setLoading(false);
       return true;
@@ -206,9 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     setError,
     isAdmin,
-    authError,
-    showHelloModal,
-    setShowHelloModal
+    authError
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
