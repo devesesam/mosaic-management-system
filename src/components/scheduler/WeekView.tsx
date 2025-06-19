@@ -186,14 +186,29 @@ const WeekView: React.FC = () => {
 
   const handleJobResize = async (job: Job, days: number) => {
     try {
+      console.log('WeekView: Resize started with:', {
+        job_id: job.id,
+        days,
+        days_type: typeof days,
+        start_date: job.start_date
+      });
+
+      // Validate the days parameter
+      if (typeof days !== 'number' || isNaN(days) || days < 1) {
+        console.error('Invalid days parameter for job resize:', days);
+        toast.error('Cannot resize job: invalid duration');
+        return;
+      }
+
       if (!job.start_date) {
         console.error('Cannot resize job without start_date');
+        toast.error('Cannot resize job: no start date');
         return;
       }
       
       const startDate = parseISO(job.start_date);
       
-      // Check if the parsed date is valid
+      // Check if the parsed start date is valid
       if (isNaN(startDate.getTime())) {
         console.error('Invalid start_date for job:', job.start_date);
         toast.error('Cannot resize job: invalid start date');
@@ -202,10 +217,22 @@ const WeekView: React.FC = () => {
       
       const newEndDate = addDays(startDate, days - 1);
       
+      // Check if the calculated end date is valid
+      if (isNaN(newEndDate.getTime())) {
+        console.error('Invalid calculated end date:', {
+          start_date: job.start_date,
+          days,
+          calculation: `addDays(${startDate}, ${days - 1})`
+        });
+        toast.error('Cannot resize job: invalid end date calculation');
+        return;
+      }
+      
       console.log('WeekView: Resizing job:', {
         job_id: job.id,
         days,
         start_date: job.start_date,
+        parsed_start_date: startDate.toISOString(),
         new_end_date: newEndDate.toISOString()
       });
       
@@ -214,6 +241,7 @@ const WeekView: React.FC = () => {
       });
     } catch (error) {
       console.error('Error resizing job:', error);
+      toast.error('Failed to resize job. Please try again.');
     }
   };
 
