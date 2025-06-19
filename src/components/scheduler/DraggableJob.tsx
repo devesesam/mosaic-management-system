@@ -13,6 +13,7 @@ interface DraggableJobProps {
   days?: Date[];
   dayIndex?: number;
   span?: number;
+  readOnly?: boolean;
 }
 
 const DraggableJob: React.FC<DraggableJobProps> = ({ 
@@ -24,7 +25,8 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
   showText = true,
   days,
   dayIndex,
-  span
+  span,
+  readOnly = false
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
@@ -35,11 +37,11 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging()
     }),
-    canDrag: () => !isResizing
+    canDrag: () => !isResizing && !readOnly
   });
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    if (!onResize || !isScheduled || !ref.current?.parentElement) return;
+    if (!onResize || !isScheduled || !ref.current?.parentElement || readOnly) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -48,56 +50,95 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     
     const startX = e.clientX;
     const parentElement = ref.current.parentElement;
-    const originalWidth = parentElement.getBoundingClientRect().width;
+    const startRect = parentElement.getBoundingClientRect();
+    const originalWidth = startRect.width;
     
-    // Get cell width for calculations
+    // Get cell width from the calendar grid
     const gridCells = document.querySelectorAll('[data-date]');
-    if (gridCells.length === 0) return;
+    if (gridCells.length === 0) {
+      console.warn('No grid cells found for resize calculation');
+      setIsResizing(false);
+      return;
+    }
     
-    const cellWidth = (gridCells[0] as HTMLElement).getBoundingClientRect().width;
-    if (cellWidth <= 0) return;
+    const cellRect = (gridCells[0] as HTMLElement).getBoundingClientRect();
+    const cellWidth = cellRect.width;
     
+    if (cellWidth <= 0) {
+      console.warn('Invalid cell width for resize:', cellWidth);
+      setIsResizing(false);
+      return;
+    }
+    
+    // Calculate initial days from current width
     const initialDays = Math.max(1, Math.round(originalWidth / cellWidth));
+    
+    console.log('DraggableJob: Resize start:', {
+      job_id: job.id,
+      startX,
+      originalWidth,
+      cellWidth,
+      initialDays,
+      calculation: `${originalWidth} / ${cellWidth} = ${originalWidth / cellWidth}`
+    });
     
     const handleMouseMove = (e: MouseEvent) => {
       if (!parentElement) return;
       
       const currentX = e.clientX;
-      const diff = currentX - startX;
+      const deltaX = currentX - startX;
       
-      // Calculate new days based on cursor movement
-      const additionalDays = Math.round(diff / cellWidth);
-      const newDays = Math.max(1, initialDays + additionalDays);
+      // Calculate how many cells we've moved (can be negative for shrinking)
+      const cellsMoved = deltaX / cellWidth;
+      const newDays = Math.max(1, Math.round(initialDays + cellsMoved));
       
-      // Update visual width
-      parentElement.style.width = `calc(${newDays} * 100% - 0.5rem)`;
+      // Calculate the new width in pixels
+      const newWidthPx = newDays * cellWidth;
+      
+      console.log('DraggableJob: Resize move:', {
+        job_id: job.id,
+        currentX,
+        deltaX,
+        cellsMoved,
+        newDays,
+        newWidthPx
+      });
+      
+      // Update visual width immediately
+      parentElement.style.width = `${newWidthPx}px`;
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
       if (!parentElement) return;
 
-      console.log('DraggableJob: Resize end - Initial measurements:', {
+      const currentX = e.clientX;
+      const deltaX = currentX - startX;
+      const cellsMoved = deltaX / cellWidth;
+      const finalDays = Math.max(1, Math.round(initialDays + cellsMoved));
+      
+      console.log('DraggableJob: Resize end:', {
         job_id: job.id,
+        startX,
+        currentX,
+        deltaX,
         cellWidth,
-        initialWidth: originalWidth,
-        initialDays
+        initialDays,
+        cellsMoved,
+        finalDays,
+        changed: finalDays !== initialDays
       });
 
       setIsResizing(false);
       
-      // Calculate final width in days
-      const finalWidth = parentElement.getBoundingClientRect().width;
-      const finalDays = Math.max(1, Math.round(finalWidth / cellWidth));
+      // Reset the style and let the layout handle the width
+      parentElement.style.width = '';
       
-      console.log('DraggableJob: Resize end - Final calculations:', {
-        job_id: job.id,
-        finalWidth,
-        finalDays,
-        raw_calculation: finalWidth / cellWidth
-      });
-
+      // Only call onResize if the size actually changed
       if (finalDays !== initialDays) {
+        console.log('DraggableJob: Calling onResize with', finalDays, 'days');
         onResize(job, finalDays);
+      } else {
+        console.log('DraggableJob: No size change, not calling onResize');
       }
       
       window.removeEventListener('mousemove', handleMouseMove);
@@ -106,9 +147,11 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [isScheduled, job, onResize]);
+  }, [isScheduled, job, onResize, readOnly]);
   
-  drag(ref);
+  if (!readOnly) {
+    drag(ref);
+  }
   
   return (
     <div 
@@ -125,7 +168,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         position: 'relative',
         width: isScheduled ? '100%' : 'auto',
         height: isWeekView && isScheduled ? '100%' : isScheduled ? '22px' : 'auto',
-        cursor: isResizing ? 'ew-resize' : 'grab',
+        cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none'
       }}
@@ -139,12 +182,16 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         showText={showText}
       />
       
-      {isScheduled && onResize && (
+      {/* Resize handle - only show if not read-only and resizing is available */}
+      {isScheduled && onResize && !readOnly && (
         <div
-          className="absolute right-0 top-0 h-full w-6 cursor-ew-resize hover:bg-gray-400/20 z-20"
+          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-30 z-20 flex items-center justify-center"
           onMouseDown={handleResizeStart}
           onClick={(e) => e.stopPropagation()}
-        />
+          title="Drag to resize job duration"
+        >
+          <div className="w-1 h-6 bg-white bg-opacity-50 rounded-full"></div>
+        </div>
       )}
     </div>
   );
