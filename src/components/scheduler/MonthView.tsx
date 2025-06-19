@@ -308,14 +308,37 @@ const MonthView: React.FC = () => {
         start_date: date.toISOString()
       };
 
-      // Calculate end date based on original duration
+      // Calculate end date to preserve the job's duration
       if (job.start_date && job.end_date) {
         try {
-          const originalDuration = differenceInDays(
-            parseISO(job.end_date),
-            parseISO(job.start_date)
-          );
-          updates.end_date = addDays(date, originalDuration).toISOString();
+          const originalStartDate = parseISO(job.start_date);
+          const originalEndDate = parseISO(job.end_date);
+          
+          // Calculate the duration in days (inclusive)
+          // For calendar purposes, if start and end are the same day, it's 1 day
+          // If end is 1 day after start, it's 2 days, etc.
+          let durationInDays: number;
+          
+          if (isSameDay(originalStartDate, originalEndDate)) {
+            // Single day job
+            durationInDays = 1;
+          } else {
+            // Multi-day job - calculate the span
+            durationInDays = differenceInDays(originalEndDate, originalStartDate) + 1;
+          }
+          
+          // Set the new end date to preserve the duration
+          const newEndDate = addDays(date, durationInDays - 1);
+          updates.end_date = newEndDate.toISOString();
+          
+          console.log('MonthView: Preserving job duration:', {
+            job_id: job.id,
+            original_start: job.start_date,
+            original_end: job.end_date,
+            original_duration_days: durationInDays,
+            new_start: date.toISOString(),
+            new_end: newEndDate.toISOString()
+          });
         } catch (error) {
           console.error('Error calculating job duration:', error, job);
           // If we can't calculate duration, make it a single-day job
@@ -330,6 +353,7 @@ const MonthView: React.FC = () => {
       await updateJob(job.id, updates);
     } catch (error) {
       console.error('Error updating job:', error);
+      toast.error('Failed to move job. Please try again.');
     }
   };
 

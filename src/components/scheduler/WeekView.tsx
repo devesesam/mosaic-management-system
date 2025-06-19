@@ -8,7 +8,8 @@ import {
   subWeeks,
   parseISO,
   addDays,
-  differenceInDays
+  differenceInDays,
+  isSameDay
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Job, Worker } from '../../types';
@@ -177,16 +178,47 @@ const WeekView: React.FC = () => {
         start_date: date ? date.toISOString() : null
       };
 
-      // Calculate end date based on duration or set single day
+      // Calculate end date to preserve the job's duration
       if (date && job.start_date && job.end_date) {
-        const originalDuration = differenceInDays(
-          parseISO(job.end_date),
-          parseISO(job.start_date)
-        );
-        updates.end_date = addDays(date, originalDuration).toISOString();
+        try {
+          const originalStartDate = parseISO(job.start_date);
+          const originalEndDate = parseISO(job.end_date);
+          
+          // Calculate the duration in days (inclusive)
+          // For calendar purposes, if start and end are the same day, it's 1 day
+          // If end is 1 day after start, it's 2 days, etc.
+          let durationInDays: number;
+          
+          if (isSameDay(originalStartDate, originalEndDate)) {
+            // Single day job
+            durationInDays = 1;
+          } else {
+            // Multi-day job - calculate the span
+            durationInDays = differenceInDays(originalEndDate, originalStartDate) + 1;
+          }
+          
+          // Set the new end date to preserve the duration
+          const newEndDate = addDays(date, durationInDays - 1);
+          updates.end_date = newEndDate.toISOString();
+          
+          console.log('WeekView: Preserving job duration:', {
+            job_id: job.id,
+            original_start: job.start_date,
+            original_end: job.end_date,
+            original_duration_days: durationInDays,
+            new_start: date.toISOString(),
+            new_end: newEndDate.toISOString()
+          });
+        } catch (error) {
+          console.error('Error calculating job duration:', error);
+          // Fallback to single-day job
+          updates.end_date = date.toISOString();
+        }
       } else if (date) {
+        // New job or job without existing dates - make it a single-day job
         updates.end_date = date.toISOString();
       } else {
+        // Unscheduling the job
         updates.end_date = null;
       }
       
@@ -198,6 +230,7 @@ const WeekView: React.FC = () => {
       await updateJob(job.id, updates);
     } catch (error) {
       console.error('Error updating job:', error);
+      toast.error('Failed to move job. Please try again.');
     }
   };
 
