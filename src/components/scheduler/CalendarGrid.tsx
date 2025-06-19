@@ -221,22 +221,42 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Fixed cell height
   const cellHeight = 100;
   
+  // Determine if this cell should render the job and how it should span
+  let shouldRenderJob = false;
   let jobSpan = 1;
   let showText = false;
+  let isLastDay = false;
   
   if (mainJob && mainJob.start_date && mainJob.end_date) {
     const startDate = parseISO(mainJob.start_date);
     const endDate = parseISO(mainJob.end_date);
     
-    const shouldRender = isSameDay(day, startDate) || 
-                        (dayIndex === 0 && isBefore(startDate, day));
+    // Only render on the start day (or first day of week if job started before)
+    const isStartDay = isSameDay(day, startDate);
+    const isFirstDayOfWeek = dayIndex === 0;
+    const jobStartsBeforeWeek = isBefore(startDate, days[0]);
     
-    showText = isSameDay(day, startDate) || (dayIndex === 0 && isBefore(startDate, day));
+    shouldRenderJob = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
     
-    if (shouldRender) {
-      const remainingDays = days.length - dayIndex;
-      const jobDaysRemaining = differenceInDays(endDate, day) + 1;
-      jobSpan = Math.min(jobDaysRemaining, remainingDays);
+    if (shouldRenderJob) {
+      // Calculate how many days this job should span from this day
+      const remainingDaysInWeek = days.length - dayIndex;
+      let jobDaysFromThisDay: number;
+      
+      if (isStartDay) {
+        // Job starts on this day
+        jobDaysFromThisDay = differenceInDays(endDate, startDate) + 1;
+      } else {
+        // Job started before this week
+        jobDaysFromThisDay = differenceInDays(endDate, day) + 1;
+      }
+      
+      jobSpan = Math.min(jobDaysFromThisDay, remainingDaysInWeek);
+      showText = true;
+      
+      // Check if this is the last day of the job (for resize handle)
+      const actualEndDayIndex = days.findIndex(d => isSameDay(d, endDate));
+      isLastDay = actualEndDayIndex === dayIndex + jobSpan - 1 || actualEndDayIndex === -1;
     }
   }
   
@@ -251,11 +271,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       style={{ height: `${cellHeight}px` }}
     >
       <div className="h-full relative p-1">
-        {mainJob && (
+        {mainJob && shouldRenderJob && (
           <div 
             className="absolute left-0 right-0 top-0 mx-1 mt-1"
             style={{ 
-              width: `calc(${jobSpan} * 100% - 0.5rem)`,
+              width: `calc(${jobSpan * 100}% - 0.5rem)`,
               height: "calc(100% - 6px)"
             }}
           >
@@ -263,9 +283,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               job={mainJob}
               onClick={() => onJobClick(mainJob)}
               isScheduled={true}
-              onResize={onJobResize}
+              onResize={isLastDay ? onJobResize : undefined} // Only allow resize on last day
               isWeekView={true}
               showText={showText}
+              dayIndex={dayIndex}
+              days={days}
             />
           </div>
         )}

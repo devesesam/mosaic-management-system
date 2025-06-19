@@ -53,15 +53,18 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     const startRect = parentElement.getBoundingClientRect();
     const originalWidth = startRect.width;
     
-    // Get cell width from the calendar grid
-    const gridCells = document.querySelectorAll('[data-date]');
-    if (gridCells.length === 0) {
+    // Get cell width from the calendar grid - use a more specific selector
+    const gridContainer = parentElement.closest('.min-w-fit');
+    const cellElements = gridContainer?.querySelectorAll('[data-date]');
+    
+    if (!cellElements || cellElements.length === 0) {
       console.warn('No grid cells found for resize calculation');
       setIsResizing(false);
       return;
     }
     
-    const cellRect = (gridCells[0] as HTMLElement).getBoundingClientRect();
+    const firstCell = cellElements[0] as HTMLElement;
+    const cellRect = firstCell.getBoundingClientRect();
     const cellWidth = cellRect.width;
     
     if (cellWidth <= 0) {
@@ -89,20 +92,11 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
       const deltaX = currentX - startX;
       
       // Calculate how many cells we've moved (can be negative for shrinking)
-      const cellsMoved = deltaX / cellWidth;
-      const newDays = Math.max(1, Math.round(initialDays + cellsMoved));
+      const cellsMoved = Math.round(deltaX / cellWidth);
+      const newDays = Math.max(1, initialDays + cellsMoved);
       
       // Calculate the new width in pixels
-      const newWidthPx = newDays * cellWidth;
-      
-      console.log('DraggableJob: Resize move:', {
-        job_id: job.id,
-        currentX,
-        deltaX,
-        cellsMoved,
-        newDays,
-        newWidthPx
-      });
+      const newWidthPx = newDays * cellWidth - 8; // Subtract margin
       
       // Update visual width immediately
       parentElement.style.width = `${newWidthPx}px`;
@@ -113,8 +107,10 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
 
       const currentX = e.clientX;
       const deltaX = currentX - startX;
-      const cellsMoved = deltaX / cellWidth;
-      const finalDays = Math.max(1, Math.round(initialDays + cellsMoved));
+      
+      // Use the same calculation as in mousemove for consistency
+      const cellsMoved = Math.round(deltaX / cellWidth);
+      const finalDays = Math.max(1, initialDays + cellsMoved);
       
       console.log('DraggableJob: Resize end:', {
         job_id: job.id,
@@ -185,12 +181,12 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
       {/* Resize handle - only show if not read-only and resizing is available */}
       {isScheduled && onResize && !readOnly && (
         <div
-          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-30 z-20 flex items-center justify-center"
+          className="absolute right-0 top-0 h-full w-3 cursor-ew-resize hover:bg-white hover:bg-opacity-30 z-20 flex items-center justify-end pr-1"
           onMouseDown={handleResizeStart}
           onClick={(e) => e.stopPropagation()}
           title="Drag to resize job duration"
         >
-          <div className="w-1 h-6 bg-white bg-opacity-50 rounded-full"></div>
+          <div className="w-0.5 h-4 bg-white bg-opacity-70 rounded-full"></div>
         </div>
       )}
     </div>
