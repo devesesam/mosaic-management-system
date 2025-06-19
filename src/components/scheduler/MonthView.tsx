@@ -404,7 +404,7 @@ const MonthView: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Main calendar area with flex-1 to take remaining space */}
+      {/* Main content area with flex layout */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Month navigation header */}
         <div className="flex items-center justify-between p-2 bg-white border-b border-gray-200">
@@ -470,53 +470,57 @@ const MonthView: React.FC = () => {
           </div>
         )}
         
-        <div className="flex-1 grid grid-rows-[auto_1fr] overflow-hidden bg-white">
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 gap-px bg-gray-200">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-gray-700 py-1 bg-gray-100">
-                {day}
-              </div>
-            ))}
+        {/* Main calendar and sidebar layout */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Calendar area - takes remaining space */}
+          <div className="flex-1 flex flex-col min-w-0 bg-white">
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 gap-px bg-gray-200">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                <div key={day} className="text-center text-xs font-medium text-gray-700 py-1 bg-gray-100">
+                  {day}
+                </div>
+              ))}
+            </div>
+            
+            {/* Calendar grid */}
+            <div className="flex-1 grid grid-cols-7 grid-rows-[repeat(6,auto)] gap-px bg-gray-200 overflow-auto">
+              {weeks.map((week, weekIndex) => 
+                week.map((day, dayIndex) => (
+                  <CalendarDay
+                    key={`${weekIndex}-${dayIndex}`}
+                    day={day}
+                    currentDate={currentDate}
+                    jobs={getDayJobs(day)}
+                    onJobDrop={handleJobDrop}
+                    onJobClick={(job) => {
+                      setSelectedJob(job);
+                      setIsJobFormOpen(true);
+                    }}
+                    onShowMore={() => setSelectedDay(day)}
+                    isInCurrentMonth={isSameMonth(day, currentDate)}
+                    weekIdx={weekIndex}
+                    dayIdx={dayIndex}
+                    multiDayJobs={multiDayJobs}
+                    weekHeight={weekHeights[weekIndex]}
+                    onJobResize={handleJobResize}
+                  />
+                ))
+              )}
+            </div>
           </div>
-          
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 grid-rows-[repeat(6,auto)] gap-px bg-gray-200 overflow-auto">
-            {weeks.map((week, weekIndex) => 
-              week.map((day, dayIndex) => (
-                <CalendarDay
-                  key={`${weekIndex}-${dayIndex}`}
-                  day={day}
-                  currentDate={currentDate}
-                  jobs={getDayJobs(day)}
-                  onJobDrop={handleJobDrop}
-                  onJobClick={(job) => {
-                    setSelectedJob(job);
-                    setIsJobFormOpen(true);
-                  }}
-                  onShowMore={() => setSelectedDay(day)}
-                  isInCurrentMonth={isSameMonth(day, currentDate)}
-                  weekIdx={weekIndex}
-                  dayIdx={dayIndex}
-                  multiDayJobs={multiDayJobs}
-                  weekHeight={weekHeights[weekIndex]}
-                  onJobResize={handleJobResize}
-                />
-              ))
-            )}
-          </div>
+
+          {/* Fixed-width unscheduled jobs panel as right sidebar */}
+          <UnscheduledPanel
+            jobs={unscheduledJobs}
+            onJobDrop={(job) => handleJobDrop(job, new Date())}
+            onJobClick={(job) => {
+              setSelectedJob(job);
+              setIsJobFormOpen(true);
+            }}
+          />
         </div>
       </div>
-
-      {/* Fixed-width unscheduled jobs panel */}
-      <UnscheduledPanel
-        jobs={unscheduledJobs}
-        onJobDrop={(job) => handleJobDrop(job, new Date())}
-        onJobClick={(job) => {
-          setSelectedJob(job);
-          setIsJobFormOpen(true);
-        }}
-      />
 
       {/* Job form modal */}
       {isJobFormOpen && (
