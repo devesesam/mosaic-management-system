@@ -91,6 +91,15 @@ const MonthView: React.FC = () => {
     fetchJobs();
   }, [fetchJobs]);
 
+  // Show toast notifications for loading states
+  useEffect(() => {
+    if (jobsLoading) {
+      toast.loading('Updating jobs...', { id: 'jobs-loading' });
+    } else {
+      toast.dismiss('jobs-loading');
+    }
+  }, [jobsLoading]);
+
   // Get unscheduled jobs (no date and no worker)
   const unscheduledJobs = useMemo(() => {
     return jobs.filter(job => !job.start_date && !job.worker_id);
@@ -403,40 +412,37 @@ const MonthView: React.FC = () => {
           </button>
         </div>
         
-        {/* Warning messages */}
-        {jobsLoading && (
-          <div className="p-4 bg-blue-50 border-b border-blue-200">
-            <p className="text-blue-800 font-medium">Loading jobs...</p>
-          </div>
-        )}
-        
+        {/* Error messages - keep these but make them less prominent */}
         {jobsError && (
-          <div className="p-4 bg-red-50 border-b border-red-200">
-            <p className="text-red-800 font-medium">Error loading jobs: {jobsError}</p>
-            <button 
-              onClick={() => {
-                setIsRetrying(true);
-                fetchJobs();
-                setTimeout(() => setIsRetrying(false), 1000);
-              }}
-              className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 flex items-center"
-              disabled={isRetrying}
-            >
-              {isRetrying ? (
-                <>
-                  <div className="w-4 h-4 mr-2 border-t-2 border-b-2 border-red-700 rounded-full animate-spin"></div>
-                  Retrying...
-                </>
-              ) : (
-                'Retry'
-              )}
-            </button>
+          <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-red-700">Error loading jobs: {jobsError}</span>
+              <button 
+                onClick={() => {
+                  setIsRetrying(true);
+                  fetchJobs();
+                  setTimeout(() => setIsRetrying(false), 1000);
+                }}
+                className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex items-center"
+                disabled={isRetrying}
+              >
+                {isRetrying ? (
+                  <>
+                    <div className="w-3 h-3 mr-1 border-t-2 border-b-2 border-red-700 rounded-full animate-spin"></div>
+                    Retrying...
+                  </>
+                ) : (
+                  'Retry'
+                )}
+              </button>
+            </div>
           </div>
         )}
         
+        {/* Info messages - keep these as they're informational */}
         {!jobsLoading && !jobsError && jobs.length === 0 && (
-          <div className="p-4 bg-yellow-50 border-b border-yellow-200">
-            <p className="text-yellow-800 font-medium">No jobs found in database. Add jobs to start scheduling.</p>
+          <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-100 text-sm">
+            <span className="text-yellow-700">No jobs found. Add jobs to start scheduling.</span>
           </div>
         )}
         
