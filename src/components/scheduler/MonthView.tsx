@@ -295,8 +295,8 @@ const MonthView: React.FC = () => {
       // Max rows needed is the greater of multi-day rows or single-day jobs count
       const maxRows = Math.max(maxMultiDayRow + 1, maxSingleDayCount);
       
-      // Calculate cell height: min 100px + 24px per row + 40px padding
-      return Math.max(100, (maxRows * 24) + 40);
+      // Calculate cell height: min 120px + 26px per row + 40px padding
+      return Math.max(120, (maxRows * 26) + 40);
     });
   }, [weeks, multiDayJobs, getDayJobs]);
 
@@ -474,39 +474,41 @@ const MonthView: React.FC = () => {
         <div className="flex flex-1 overflow-hidden">
           {/* Calendar area - takes remaining space */}
           <div className="flex-1 flex flex-col min-w-0 bg-white">
-            {/* Weekday headers */}
-            <div className="grid grid-cols-7 gap-px bg-gray-200">
+            {/* Weekday headers - fixed position */}
+            <div className="grid grid-cols-7 gap-px bg-gray-200 flex-shrink-0">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                <div key={day} className="text-center text-xs font-medium text-gray-700 py-1 bg-gray-100">
+                <div key={day} className="text-center text-xs font-medium text-gray-700 py-2 bg-gray-100">
                   {day}
                 </div>
               ))}
             </div>
             
-            {/* Calendar grid with explicit scrollbar */}
-            <div className="flex-1 grid grid-cols-7 grid-rows-[repeat(6,auto)] gap-px bg-gray-200 overflow-y-auto overflow-x-hidden min-h-0">
-              {weeks.map((week, weekIndex) => 
-                week.map((day, dayIndex) => (
-                  <CalendarDay
-                    key={`${weekIndex}-${dayIndex}`}
-                    day={day}
-                    currentDate={currentDate}
-                    jobs={getDayJobs(day)}
-                    onJobDrop={handleJobDrop}
-                    onJobClick={(job) => {
-                      setSelectedJob(job);
-                      setIsJobFormOpen(true);
-                    }}
-                    onShowMore={() => setSelectedDay(day)}
-                    isInCurrentMonth={isSameMonth(day, currentDate)}
-                    weekIdx={weekIndex}
-                    dayIdx={dayIndex}
-                    multiDayJobs={multiDayJobs}
-                    weekHeight={weekHeights[weekIndex]}
-                    onJobResize={handleJobResize}
-                  />
-                ))
-              )}
+            {/* Calendar grid with proper scrolling */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-200">
+              <div className="grid grid-cols-7 gap-px" style={{ minHeight: 'fit-content' }}>
+                {weeks.map((week, weekIndex) => 
+                  week.map((day, dayIndex) => (
+                    <CalendarDay
+                      key={`${weekIndex}-${dayIndex}`}
+                      day={day}
+                      currentDate={currentDate}
+                      jobs={getDayJobs(day)}
+                      onJobDrop={handleJobDrop}
+                      onJobClick={(job) => {
+                        setSelectedJob(job);
+                        setIsJobFormOpen(true);
+                      }}
+                      onShowMore={() => setSelectedDay(day)}
+                      isInCurrentMonth={isSameMonth(day, currentDate)}
+                      weekIdx={weekIndex}
+                      dayIdx={dayIndex}
+                      multiDayJobs={multiDayJobs}
+                      weekHeight={weekHeights[weekIndex]}
+                      onJobResize={handleJobResize}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
@@ -612,28 +614,28 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     <div 
       ref={drop}
       className={`
-        flex flex-col relative
+        flex flex-col relative border-b border-gray-200
         ${!isInCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
         ${isToday(day) ? 'bg-blue-50' : ''}
         ${isOver ? 'bg-blue-100' : ''}
       `}
-      style={{ height: `${weekHeight}px` }}
+      style={{ height: `${weekHeight}px`, minHeight: '120px' }}
     >
-      <div className="text-right px-1.5 py-0.5 text-xs font-medium border-b border-gray-100">
+      <div className="text-right px-2 py-1 text-sm font-medium border-b border-gray-100 flex-shrink-0">
         {format(day, 'd')}
       </div>
       
       {/* Container for both single-day and multi-day jobs */}
       <div 
-        className="flex-1 p-0.5 mt-0.5 overflow-hidden relative"
-        style={{ height: 'calc(100% - 20px)' }}
+        className="flex-1 p-1 overflow-hidden relative"
+        style={{ minHeight: 'calc(100% - 28px)' }}
       >
         {/* Single-day jobs */}
         {singleDayJobs.slice(0, visibleRows).map((job, index) => (
           <div 
             key={`single-${job.id}`} 
-            className="mb-0.5 h-6"
-            style={{ marginTop: index * 24 + 'px' }}
+            className="mb-1 h-6"
+            style={{ marginTop: index * 26 + 'px' }}
           >
             <DraggableJob
               job={job}
@@ -648,7 +650,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         {hasMoreJobs && (
           <button
             onClick={onShowMore}
-            className="text-xs text-gray-500 absolute bottom-1 left-1 hover:text-gray-700 hover:underline mt-1"
+            className="text-xs text-gray-500 absolute bottom-1 left-1 hover:text-gray-700 hover:underline"
           >
             +{totalSingleDayJobs - visibleRows} more
           </button>
@@ -664,7 +666,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
             className="absolute left-0 z-10"
             style={{
               width: `calc(${spanDays} * 100%)`,
-              top: `${24 + rowIdx * 24}px`, // Position based on row index
+              top: `${30 + rowIdx * 26}px`, // Position based on row index
+              height: '24px'
             }}
           >
             <DraggableJob
