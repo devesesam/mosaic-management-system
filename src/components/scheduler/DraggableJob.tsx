@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, memo, useEffect } from 'react';
+import React, { useRef, useState, useCallback, memo } from 'react';
 import { useDrag } from 'react-dnd';
 import { Job } from '../../types';
 import JobTile from '../jobs/JobTile';
@@ -30,7 +30,6 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
   
   const [{ isDragging }, drag] = useDrag({
     type: 'JOB',
@@ -40,11 +39,6 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     }),
     canDrag: () => !isResizing && !readOnly
   });
-
-  // Force a re-render to ensure correct visual state
-  const triggerUpdate = useCallback(() => {
-    setForceUpdate(prev => prev + 1);
-  }, []);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     if (!onResize || !isScheduled || !ref.current?.parentElement || readOnly) return;
@@ -135,19 +129,12 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
       // Reset the style and let the layout handle the width
       parentElement.style.width = '';
       
-      // Force a visual update to ensure correct rendering
-      setTimeout(() => {
-        triggerUpdate();
-      }, 0);
-      
       // Only call onResize if the size actually changed
       if (finalDays !== initialDays) {
         console.log('DraggableJob: Calling onResize with', finalDays, 'days');
         onResize(job, finalDays);
       } else {
         console.log('DraggableJob: No size change, not calling onResize');
-        // Even if no change, ensure visual state is correct
-        triggerUpdate();
       }
       
       window.removeEventListener('mousemove', handleMouseMove);
@@ -156,14 +143,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [isScheduled, job, onResize, readOnly, triggerUpdate]);
-
-  // Reset visual state when job data changes
-  useEffect(() => {
-    if (ref.current?.parentElement) {
-      ref.current.parentElement.style.width = '';
-    }
-  }, [job.start_date, job.end_date, forceUpdate]);
+  }, [isScheduled, job, onResize, readOnly]);
   
   if (!readOnly) {
     drag(ref);
