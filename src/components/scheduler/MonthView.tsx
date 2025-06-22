@@ -483,8 +483,8 @@ const MonthView: React.FC = () => {
               ))}
             </div>
             
-            {/* Calendar grid */}
-            <div className="flex-1 grid grid-cols-7 grid-rows-[repeat(6,auto)] gap-px bg-gray-200 overflow-auto">
+            {/* Calendar grid with explicit scrollbar */}
+            <div className="flex-1 grid grid-cols-7 grid-rows-[repeat(6,auto)] gap-px bg-gray-200 overflow-y-auto overflow-x-hidden min-h-0">
               {weeks.map((week, weekIndex) => 
                 week.map((day, dayIndex) => (
                   <CalendarDay
