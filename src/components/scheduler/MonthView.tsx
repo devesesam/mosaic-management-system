@@ -475,7 +475,7 @@ const MonthView: React.FC = () => {
           {/* Calendar area - takes remaining space */}
           <div className="flex-1 flex flex-col min-w-0 bg-white">
             {/* Weekday headers - fixed position */}
-            <div className="grid grid-cols-7 gap-px bg-gray-200 flex-shrink-0">
+            <div className="grid grid-cols-7 gap-px bg-gray-200 flex-shrink-0 sticky top-0 z-10">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
                 <div key={day} className="text-center text-xs font-medium text-gray-700 py-2 bg-gray-100">
                   {day}
@@ -483,9 +483,16 @@ const MonthView: React.FC = () => {
               ))}
             </div>
             
-            {/* Calendar grid with proper scrolling */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-200">
-              <div className="grid grid-cols-7 gap-px" style={{ minHeight: 'fit-content' }}>
+            {/* Calendar grid with guaranteed vertical scroll */}
+            <div 
+              className="flex-1 bg-gray-200 overflow-y-scroll overflow-x-hidden" 
+              style={{ 
+                maxHeight: 'calc(100vh - 200px)', // Force a max height to ensure scrollbar
+                scrollbarWidth: 'thin', // For Firefox
+                scrollbarColor: '#cbd5e1 #f1f5f9' // For Firefox
+              }}
+            >
+              <div className="grid grid-cols-7 gap-px">
                 {weeks.map((week, weekIndex) => 
                   week.map((day, dayIndex) => (
                     <CalendarDay
@@ -614,7 +621,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     <div 
       ref={drop}
       className={`
-        flex flex-col relative border-b border-gray-200
+        flex flex-col relative border-b border-r border-gray-200
         ${!isInCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
         ${isToday(day) ? 'bg-blue-50' : ''}
         ${isOver ? 'bg-blue-100' : ''}
