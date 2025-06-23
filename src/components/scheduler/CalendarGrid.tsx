@@ -410,14 +410,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       style={{ height: `${cellHeight}px` }}
     >
       <div className="h-full relative p-1">
-        {/* Conditional Drop Zone - Only show when dragging AND not read-only */}
-        {isDragging && !readOnly && (
-          <div
-            ref={drop}
-            className={`absolute inset-0 z-20 ${isOver ? 'bg-blue-50' : ''}`}
-          />
-        )}
-        
         {mainJob && shouldRenderJob && (
           <div 
             className={`absolute left-0 right-0 top-0 mx-1 mt-1 ${isSecondaryAssignment ? 'opacity-80' : ''}`}
@@ -442,6 +434,20 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             />
           </div>
         )}
+        
+        {/* Drop Zone - Always present but only visible/active during drag */}
+        <div
+          ref={drop}
+          className={`absolute inset-0 ${
+            isDragging && !readOnly 
+              ? `z-[15] ${isOver ? 'bg-blue-50' : 'bg-transparent'}` 
+              : 'z-0 pointer-events-none'
+          }`}
+          style={{
+            // Use pointer-events to control interaction
+            pointerEvents: isDragging && !readOnly ? 'auto' : 'none'
+          }}
+        />
         
         {/* SIMPLIFIED: Show "See All Jobs" if there are any jobs on this day - reduced z-index to stay below header */}
         {hasJobs && (
