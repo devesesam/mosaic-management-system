@@ -309,52 +309,49 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Fixed cell height
   const cellHeight = 100;
   
-  // Determine if this cell should render the job and how it should span
-  let shouldRenderJob = false;
+  // NEW LOGIC: Always render the main job if it exists and has dates
+  // Calculate the appropriate span from the current day
   let jobSpan = 1;
   let showText = false;
   let isLastDay = false;
   let isSecondaryAssignment = false;
+  let effectiveStartDate = day; // The date from which we start rendering this job segment
   
   if (mainJob && mainJob.start_date && mainJob.end_date) {
-    const startDate = parseISO(mainJob.start_date);
-    const endDate = parseISO(mainJob.end_date);
+    const jobStartDate = parseISO(mainJob.start_date);
+    const jobEndDate = parseISO(mainJob.end_date);
     
-    // Check if this is a secondary assignment (job's primary worker is not the current row's worker)
+    // Check if this is a secondary assignment
     isSecondaryAssignment = currentRowWorkerId !== null && 
                            mainJob.worker_id !== currentRowWorkerId &&
                            mainJob.secondary_worker_ids?.includes(currentRowWorkerId);
     
-    // For secondary assignments, we need to ensure proper spanning across all days of the job
-    // Only render on the start day (or first day of week if job started before)
-    const isStartDay = isSameDay(day, startDate);
-    const isFirstDayOfWeek = dayIndex === 0;
-    const jobStartsBeforeWeek = isBefore(startDate, days[0]);
+    // Calculate the effective start date for this segment
+    // This is either the job's actual start date or the current day (whichever is later)
+    effectiveStartDate = jobStartDate > day ? jobStartDate : day;
     
-    shouldRenderJob = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
+    // Calculate how many days this job should span from the effective start date
+    const remainingDaysInWeek = days.length - dayIndex;
+    const daysFromEffectiveStart = differenceInDays(jobEndDate, effectiveStartDate) + 1;
     
-    if (shouldRenderJob) {
-      // Calculate how many days this job should span from this day
-      const remainingDaysInWeek = days.length - dayIndex;
-      let jobDaysFromThisDay: number;
-      
-      if (isStartDay) {
-        // Job starts on this day - calculate full duration
-        jobDaysFromThisDay = differenceInDays(endDate, startDate) + 1;
-      } else {
-        // Job started before this week - calculate remaining days from today
-        jobDaysFromThisDay = differenceInDays(endDate, day) + 1;
-      }
-      
-      // Ensure we don't span beyond the current week
-      jobSpan = Math.min(Math.max(1, jobDaysFromThisDay), remainingDaysInWeek);
-      showText = true;
-      
-      // Check if this is the last day of the job (for resize handle)
-      const actualEndDayIndex = days.findIndex(d => isSameDay(d, endDate));
-      isLastDay = actualEndDayIndex === dayIndex + jobSpan - 1 || 
-                  (actualEndDayIndex === -1 && dayIndex + jobSpan - 1 === days.length - 1);
-    }
+    // Ensure we don't span beyond the current week
+    jobSpan = Math.min(Math.max(1, daysFromEffectiveStart), remainingDaysInWeek);
+    showText = true;
+    
+    // Check if this is the last day of the job within this week
+    const jobEndDayIndex = days.findIndex(d => isSameDay(d, jobEndDate));
+    isLastDay = jobEndDayIndex === dayIndex + jobSpan - 1 || 
+                (jobEndDayIndex === -1 && dayIndex + jobSpan - 1 === days.length - 1);
+    
+    console.log(`CalendarCell: Job ${mainJob.id} on ${format(day, 'yyyy-MM-dd')}:`, {
+      jobStart: format(jobStartDate, 'yyyy-MM-dd'),
+      jobEnd: format(jobEndDate, 'yyyy-MM-dd'),
+      effectiveStart: format(effectiveStartDate, 'yyyy-MM-dd'),
+      dayIndex,
+      jobSpan,
+      isSecondary: isSecondaryAssignment,
+      isLastDay
+    });
   }
   
   // Determine z-index: secondary assignments should be behind primary assignments
@@ -372,7 +369,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       style={{ height: `${cellHeight}px` }}
     >
       <div className="h-full relative p-1">
-        {mainJob && shouldRenderJob && (
+        {mainJob && mainJob.start_date && mainJob.end_date && (
           <div 
             className={`absolute left-0 right-0 top-0 mx-1 mt-1 ${isSecondaryAssignment ? 'opacity-80' : ''}`}
             style={{ 

@@ -187,7 +187,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   // Calculate multi-day job positions for the entire month view
   const getMultiDayJobs = useCallback(() => {
     // For multiple weeks, we need to calculate row positions for multi-day jobs
-    const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number, isSecondary: boolean}[] = [];
+    const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number, isSecondary: boolean, effectiveStartCol: number}[] = [];
     const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
     
     // Get all multi-day jobs - filter for read-only mode
@@ -275,50 +275,78 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             return;
           }
           
-          // Find start and end column within this week
-          let startCol = 0;
-          let endCol = 6;
+          // Find the actual start and end columns for the job within this week
+          let actualStartCol = 0;
+          let actualEndCol = 6;
           
-          // Adjust start column if job starts during or after this week
-          if (startDate >= weekStart) {
-            for (let i = 0; i < 7; i++) {
-              if (isSameDay(week[i], startDate) || (i > 0 && week[i-1] < startDate && week[i] > startDate)) {
-                startCol = i;
-                break;
-              }
+          // Find the actual job start column
+          for (let i = 0; i < 7; i++) {
+            if (isSameDay(week[i], startDate) || (i > 0 && week[i-1] < startDate && week[i] > startDate)) {
+              actualStartCol = i;
+              break;
             }
           }
           
-          // Adjust end column if job ends during this week
-          if (endDate <= weekEnd) {
-            for (let i = 6; i >= 0; i--) {
-              if (isSameDay(week[i], endDate) || (i < 6 && week[i+1] > endDate && week[i] < endDate)) {
-                endCol = i;
-                break;
-              }
+          // Find the actual job end column
+          for (let i = 6; i >= 0; i--) {
+            if (isSameDay(week[i], endDate) || (i < 6 && week[i+1] > endDate && week[i] < endDate)) {
+              actualEndCol = i;
+              break;
             }
           }
           
-          // Find an available row in this week
-          let rowIdx = 0;
-          while (isRowOccupied(rowAssignments[weekIdx], rowIdx, startCol, endCol)) {
-            rowIdx++;
+          // NEW LOGIC: Find the effective start column for rendering
+          // This considers jobs that are already active on this day but started before this week
+          let effectiveStartCol = actualStartCol;
+          
+          // If job started before this week, we need to find the first day where it's actually visible
+          if (startDate < weekStart) {
+            effectiveStartCol = 0; // Start rendering from the beginning of the week
           }
           
-          // Mark this row as occupied for these columns
-          for (let col = startCol; col <= endCol; col++) {
-            rowAssignments[weekIdx][col].push(rowIdx);
+          // For each day in the week where this job is active, check if we should render it
+          for (let dayCol = effectiveStartCol; dayCol <= actualEndCol; dayCol++) {
+            const currentDay = week[dayCol];
+            
+            // Check if this job is active on this day
+            const isJobActiveOnDay = isWithinInterval(currentDay, { start: startDate, end: endDate }) ||
+                                    isSameDay(currentDay, startDate) ||
+                                    isSameDay(currentDay, endDate);
+            
+            if (isJobActiveOnDay) {
+              // Calculate the span from this day
+              const remainingDaysInWeek = 7 - dayCol;
+              const daysFromThisDay = differenceInDays(endDate, currentDay) + 1;
+              const spanFromThisDay = Math.min(daysFromThisDay, remainingDaysInWeek);
+              
+              // Find an available row for this segment
+              let rowIdx = 0;
+              while (isRowOccupied(rowAssignments[weekIdx], rowIdx, dayCol, dayCol + spanFromThisDay - 1)) {
+                rowIdx++;
+              }
+              
+              // Mark this row as occupied for these columns
+              for (let col = dayCol; col < dayCol + spanFromThisDay; col++) {
+                if (col >= 0 && col < 7) {
+                  rowAssignments[weekIdx][col].push(rowIdx);
+                }
+              }
+              
+              // Add this segment to our list
+              multiDayJobs.push({
+                job,
+                startCol: actualStartCol,
+                endCol: actualEndCol,
+                weekIdx,
+                rowIdx,
+                isSecondary,
+                effectiveStartCol: dayCol
+              });
+              
+              // Only add one segment per job per week
+              break;
+            }
           }
-          
-          // Add this segment to our list
-          multiDayJobs.push({
-            job,
-            startCol,
-            endCol,
-            weekIdx,
-            rowIdx,
-            isSecondary
-          });
         });
       } catch (error) {
         console.error('Error processing multi-day job:', error, job);
@@ -654,7 +682,7 @@ interface CalendarDayProps {
   isInCurrentMonth: boolean;
   weekIdx: number;
   dayIdx: number;
-  multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number, isSecondary: boolean}[];
+  multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number, isSecondary: boolean, effectiveStartCol: number}[];
   weekHeight: number;
   onJobResize: (job: Job, days: number) => void;
   readOnly?: boolean;
@@ -709,9 +737,9 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  // Get the multi-day jobs that start on this day for this week
+  // Get the multi-day jobs that should be rendered starting from this day
   const multiDayJobsForThisDay = multiDayJobs.filter(mj => 
-    mj.startCol === colPosition && mj.weekIdx === weekIdx
+    mj.effectiveStartCol === colPosition && mj.weekIdx === weekIdx
   );
 
   // Sort multi-day jobs: primary assignments first
@@ -793,8 +821,9 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       </div>
 
       {/* Multi-day job segments */}
-      {sortedMultiDayJobs.map(({ job, startCol, endCol, rowIdx, isSecondary }) => {
-        const spanDays = endCol - startCol + 1;
+      {sortedMultiDayJobs.map(({ job, startCol, endCol, rowIdx, isSecondary, effectiveStartCol }) => {
+        // Calculate the span from the effective start column to the end
+        const spanDays = endCol - effectiveStartCol + 1;
         const zIndex = isSecondary ? 5 : 10;
         
         return (
@@ -813,8 +842,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
               onClick={() => onJobClick(job)}
               isScheduled={true}
               isWeekView={false}
-              // Only allow resize if not read-only AND not a secondary assignment
-              onResize={!readOnly && !isSecondary ? onJobResize : undefined}
+              // Only allow resize if not read-only AND not a secondary assignment AND this is the last day
+              onResize={!readOnly && !isSecondary && (endCol === dayIdx) ? onJobResize : undefined}
               readOnly={readOnly || isSecondary}
             />
           </div>
