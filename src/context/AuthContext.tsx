@@ -24,7 +24,8 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 // List of email addresses that have edit permissions
 const ADMIN_EMAILS = [
-  'damsevese@gmail.com'
+  'damsevese@gmail.com',
+  'nick@roofingtasman.co.nz'
 ];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
