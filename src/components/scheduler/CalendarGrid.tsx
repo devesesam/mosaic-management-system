@@ -392,16 +392,21 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   return (
     <div
-      ref={drop}
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-        ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
+        ${isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
       style={{ height: `${cellHeight}px` }}
     >
       <div className="h-full relative p-1">
+        {/* Explicit Drop Zone - transparent div that covers the entire cell */}
+        <div
+          ref={drop}
+          className={`absolute inset-0 z-20 ${isOver && !readOnly ? 'bg-blue-50' : ''}`}
+        />
+        
         {mainJob && shouldRenderJob && (
           <div 
             className={`absolute left-0 right-0 top-0 mx-1 mt-1 ${isSecondaryAssignment ? 'opacity-80' : ''}`}
