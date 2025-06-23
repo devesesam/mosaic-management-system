@@ -278,23 +278,30 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
-  // Helper function to check if a job is assigned to the current worker
-  const isJobAssignedToCurrentWorker = (job: Job) => {
+  // CRITICAL FIX: Ensure we ONLY work with jobs for the current worker
+  // This should be redundant since getWorkerDayJobs should already filter,
+  // but we'll be extra explicit to eliminate any edge cases
+  const strictlyFilteredJobs = jobs.filter(job => {
     if (currentRowWorkerId === null) {
-      // For unassigned row, only jobs with no primary worker AND no secondary workers
+      // For unassigned row: only truly unassigned jobs
       return !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0);
     } else {
-      // For specific worker rows, check both primary and secondary assignments
+      // For worker rows: only jobs where this worker is primary or secondary
       return job.worker_id === currentRowWorkerId || 
              (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentRowWorkerId));
     }
-  };
+  });
   
-  // Filter jobs to only include those assigned to current worker (double-check the filtering)
-  const workerJobs = jobs.filter(isJobAssignedToCurrentWorker);
+  console.log(`CalendarCell DEBUG [${format(day, 'MMM dd')} - Worker: ${currentRowWorkerId || 'Unassigned'}]:`, {
+    originalJobsCount: jobs.length,
+    filteredJobsCount: strictlyFilteredJobs.length,
+    jobIds: strictlyFilteredJobs.map(j => j.id),
+    currentRowWorkerId,
+    dayIndex
+  });
   
   // Sort jobs by priority: put editable jobs first, then secondary assignments
-  const sortedJobs = [...workerJobs].sort((a, b) => {
+  const sortedJobs = [...strictlyFilteredJobs].sort((a, b) => {
     // Check if jobs are secondary assignments for current worker
     const aIsSecondary = currentRowWorkerId !== null && 
                          a.worker_id !== currentRowWorkerId &&
@@ -320,9 +327,9 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // FIXED LOGIC: Check if there are hidden jobs on this day for THIS WORKER ONLY
+  // FIXED LOGIC: Check if there are hidden jobs on this day for THIS WORKER'S JOBS ONLY
   // Hidden jobs are jobs that are active on this day but don't get to render their tile here
-  const hiddenJobs = workerJobs.filter(job => {
+  const hiddenJobs = strictlyFilteredJobs.filter(job => {
     if (!job.start_date || !job.end_date) return false;
     
     try {
@@ -354,6 +361,14 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   });
 
   const hasHiddenJobs = hiddenJobs.length > 0;
+  
+  console.log(`CalendarCell HIDDEN JOBS DEBUG [${format(day, 'MMM dd')} - Worker: ${currentRowWorkerId || 'Unassigned'}]:`, {
+    totalJobsForWorker: strictlyFilteredJobs.length,
+    hiddenJobsCount: hiddenJobs.length,
+    hiddenJobIds: hiddenJobs.map(j => j.id),
+    hasHiddenJobs,
+    mainJobId: mainJob?.id || 'none'
+  });
   
   // Fixed cell height
   const cellHeight = 100;
@@ -455,7 +470,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </button>
         )}
         
-        {workerJobs.length === 0 && (
+        {strictlyFilteredJobs.length === 0 && (
           <div className="h-full w-full flex items-center justify-center">
             <div className="w-full h-full" />
           </div>
