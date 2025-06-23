@@ -168,25 +168,21 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     drag(ref);
   }
 
-  // CRITICAL FIX: When THIS job is being dragged, disable pointer events entirely
-  // so it doesn't block drop zones underneath
+  // CORRECTED FIX: Only disable pointer events on OTHER jobs (not the one being dragged)
   const isThisJobBeingDragged = draggingJobId === job.id;
-  const shouldDisablePointerEvents = globalIsDragging && (
-    !isThisJobBeingDragged || // Disable pointer events on other jobs
-    isThisJobBeingDragged    // Also disable on the job being dragged to allow drops underneath
-  );
   
-  // Special case: keep pointer events on OTHER jobs only if they're not dragging
-  const pointerEvents = globalIsDragging 
-    ? (isThisJobBeingDragged ? 'none' : 'none') // Both dragged and non-dragged jobs get 'none'
-    : 'auto'; // Normal state - all jobs interactive
+  // When dragging:
+  // - The job being dragged keeps 'auto' so drag continues to work
+  // - Other jobs get 'none' so they don't interfere with drop zones
+  const pointerEvents = globalIsDragging && !isThisJobBeingDragged 
+    ? 'none'  // Other jobs: disable to allow drops underneath
+    : 'auto'; // The dragged job and normal state: keep interactive
   
-  console.log('DraggableJob: Updated pointer events logic:', {
+  console.log('DraggableJob: Corrected pointer events logic:', {
     jobId: job.id,
     globalIsDragging,
     draggingJobId,
     isThisJobBeingDragged,
-    shouldDisablePointerEvents,
     pointerEvents,
     isDragging,
     readOnly
@@ -210,7 +206,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        // CRITICAL FIX: When dragging, disable pointer events to allow drops underneath
+        // CORRECTED FIX: Only disable pointer events on non-dragged jobs during drag
         pointerEvents: pointerEvents
       }}
     >
