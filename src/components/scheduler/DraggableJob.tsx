@@ -35,14 +35,14 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
   
   const [{ isDragging }, drag] = useDrag({
     type: 'JOB',
-    item: { job },
+    item: () => {
+      setDragging(true, job.id);
+      return { job };
+    },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging()
     }),
     canDrag: () => !isResizing && !readOnly,
-    begin: () => {
-      setDragging(true, job.id);
-    },
     end: () => {
       setDragging(false);
     }
