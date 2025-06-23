@@ -2,7 +2,6 @@ import React, { useRef, useState, useCallback, memo } from 'react';
 import { useDrag } from 'react-dnd';
 import { Job } from '../../types';
 import JobTile from '../jobs/JobTile';
-import { useDragContext } from '../../context/DragContext';
 
 interface DraggableJobProps {
   job: Job;
@@ -31,32 +30,14 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
-  const { isDragging: globalIsDragging, draggingJobId, setDragging } = useDragContext();
   
   const [{ isDragging }, drag] = useDrag({
     type: 'JOB',
-    item: () => {
-      console.log('DraggableJob: Starting drag for job:', job.id);
-      setDragging(true, job.id);
-      return { job };
-    },
+    item: { job },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging()
     }),
-    canDrag: () => {
-      const canDrag = !isResizing && !readOnly;
-      console.log('DraggableJob: canDrag check:', {
-        jobId: job.id,
-        isResizing,
-        readOnly,
-        canDrag
-      });
-      return canDrag;
-    },
-    end: () => {
-      console.log('DraggableJob: Ending drag for job:', job.id);
-      setDragging(false);
-    }
+    canDrag: () => !isResizing && !readOnly
   });
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -167,38 +148,6 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
   if (!readOnly) {
     drag(ref);
   }
-
-  // FIXED: Determine z-index and pointer events based on drag state
-  const isThisJobBeingDragged = draggingJobId === job.id;
-  
-  // Z-index logic:
-  // - Job being dragged: highest (50)
-  // - Other jobs during drag: lowest (-10) to stay below drop zones
-  // - Normal state: normal (10)
-  let zIndex = 10; // Normal state
-  if (globalIsDragging) {
-    if (isThisJobBeingDragged) {
-      zIndex = 50; // Highest - the dragged job
-    } else {
-      zIndex = -10; // Lowest - other jobs during drag (below drop zones)
-    }
-  }
-  
-  // Pointer events: disable for non-dragged jobs during drag
-  const pointerEvents = globalIsDragging && !isThisJobBeingDragged 
-    ? 'none'  // Other jobs: disable to allow drops underneath
-    : 'auto'; // The dragged job and normal state: keep interactive
-  
-  console.log('DraggableJob: Z-index and pointer events logic:', {
-    jobId: job.id,
-    globalIsDragging,
-    draggingJobId,
-    isThisJobBeingDragged,
-    zIndex,
-    pointerEvents,
-    isDragging,
-    readOnly
-  });
   
   return (
     <div 
@@ -208,6 +157,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         transition-all duration-200
         touch-none
         relative
+        z-10
         ${isWeekView ? 'h-full' : ''}
       `}
       style={{
@@ -216,11 +166,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         height: isWeekView && isScheduled ? '100%' : isScheduled ? '22px' : 'auto',
         cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
-        WebkitUserSelect: 'none',
-        // CRITICAL FIX: Adjust z-index during drag to ensure proper layering
-        zIndex: zIndex,
-        // Only disable pointer events on non-dragged jobs during drag
-        pointerEvents: pointerEvents
+        WebkitUserSelect: 'none'
       }}
     >
       <JobTile 
@@ -235,11 +181,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
       {/* Resize handle - only show if not read-only and resizing is available */}
       {isScheduled && onResize && !readOnly && (
         <div
-          className="absolute right-0 top-0 h-full w-3 cursor-ew-resize hover:bg-white hover:bg-opacity-30 flex items-center justify-end pr-1"
-          style={{ 
-            zIndex: 100, // Always highest to remain functional
-            pointerEvents: 'auto' // Always interactive
-          }}
+          className="absolute right-0 top-0 h-full w-3 cursor-ew-resize hover:bg-white hover:bg-opacity-30 z-20 flex items-center justify-end pr-1"
           onMouseDown={handleResizeStart}
           onClick={(e) => e.stopPropagation()}
           title="Drag to resize job duration"
