@@ -37,13 +37,15 @@ Deno.serve(async (req: Request) => {
     const jobData = await req.json();
     console.log('Edge Function: add-job - Received data:', jobData);
 
-    // Extract secondary workers if present
-    const { secondary_worker_ids, ...jobBase } = jobData;
+    // Extract secondary workers and prepare job data for insertion
+    const secondary_worker_ids = jobData.secondary_worker_ids;
+    const jobToInsert = { ...jobData };
+    delete jobToInsert.secondary_worker_ids;
 
     // Insert the main job record
     const { data: newJob, error: jobError } = await supabase
       .from('jobs')
-      .insert([jobBase])
+      .insert([jobToInsert])
       .select()
       .single();
 

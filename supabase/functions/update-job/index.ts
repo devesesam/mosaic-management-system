@@ -47,8 +47,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Extract secondary workers if present
-    const { secondary_worker_ids, ...jobUpdates } = updates;
+    // Extract secondary workers and prepare job updates for database
+    const secondary_worker_ids = updates.secondary_worker_ids;
+    const jobUpdates = { ...updates };
+    delete jobUpdates.secondary_worker_ids;
 
     // Update the main job record
     const { data: updatedJob, error: jobError } = await supabase
