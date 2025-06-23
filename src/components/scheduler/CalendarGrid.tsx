@@ -305,45 +305,42 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // NEW LOGIC: Calculate "+X more" by counting jobs that should be visible but aren't rendered
-  let tilesRenderedCount = 0;
-  let tilesHiddenCount = 0;
+  // SIMPLIFIED LOGIC: Count buried jobs
+  let buriedJobsCount = 0;
 
   jobs.forEach(job => {
-    if (!job.start_date || !job.end_date) {
-      // Jobs without dates are always hidden in the calendar
-      tilesHiddenCount++;
-      return;
-    }
+    if (!job.start_date || !job.end_date) return;
     
     try {
       const startDate = parseISO(job.start_date);
       const endDate = parseISO(job.end_date);
       
-      // Check if this job should render its tile on this day
+      // Check if job is active on this day
+      const isActiveOnThisDay = (
+        isSameDay(day, startDate) || 
+        isSameDay(day, endDate) || 
+        (day > startDate && day < endDate)
+      );
+      
+      if (!isActiveOnThisDay) return;
+      
+      // Check if the job's tile should render on this day
       const isStartDay = isSameDay(day, startDate);
       const isFirstDayOfWeek = dayIndex === 0;
       const jobStartsBeforeWeek = isBefore(startDate, days[0]);
       
-      const shouldRenderTile = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
+      const shouldRenderTileHere = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
       
-      if (shouldRenderTile) {
-        tilesRenderedCount++;
-      } else {
-        // Job is active on this day but tile is rendered elsewhere (buried)
-        tilesHiddenCount++;
+      // If job is active but tile doesn't render here, it's buried
+      if (!shouldRenderTileHere) {
+        buriedJobsCount++;
       }
     } catch (error) {
-      tilesHiddenCount++;
+      // If there's an error parsing dates, don't count this job
     }
   });
 
-  // We only actually render one tile (the mainJob), so any additional tiles that should render are hidden
-  const actuallyRenderedCount = mainJob && shouldRenderJobInCell(mainJob, day, days, dayIndex) ? 1 : 0;
-  const additionalHiddenTiles = Math.max(0, tilesRenderedCount - actuallyRenderedCount);
-
-  const totalHiddenCount = tilesHiddenCount + additionalHiddenTiles;
-  const hasMoreJobs = totalHiddenCount > 0;
+  const hasMoreJobs = buriedJobsCount > 0;
   
   // Fixed cell height
   const cellHeight = 100;
@@ -441,7 +438,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             onClick={() => onShowMore(day)}
             className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-20"
           >
-            +{totalHiddenCount} more
+            +{buriedJobsCount} more
           </button>
         )}
         
@@ -454,25 +451,5 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     </div>
   );
 };
-
-// Helper function to determine if a job should be rendered in this specific cell
-function shouldRenderJobInCell(job: Job, day: Date, days: Date[], dayIndex: number): boolean {
-  if (!job.start_date || !job.end_date) return false;
-  
-  try {
-    const startDate = parseISO(job.start_date);
-    const endDate = parseISO(job.end_date);
-    
-    // Only render on the start day (or first day of week if job started before)
-    const isStartDay = isSameDay(day, startDate);
-    const isFirstDayOfWeek = dayIndex === 0;
-    const jobStartsBeforeWeek = isBefore(startDate, days[0]);
-    
-    return isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
-  } catch (error) {
-    console.error('Error checking if job should render in cell:', error, job);
-    return false;
-  }
-}
 
 export default CalendarGrid;
