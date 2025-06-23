@@ -83,8 +83,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   return (
     <div className="min-w-fit">
-      {/* Header row with days */}
-      <div className="flex sticky top-0 z-20 bg-white">
+      {/* Header row with days - Increased z-index to stay above all content */}
+      <div className="flex sticky top-0 z-30 bg-white">
         {/* Worker column header */}
         <div className="w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-gray-100 flex items-center justify-between px-3">
           <div className="flex items-center space-x-2 flex-1">
@@ -427,11 +427,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </div>
         )}
         
-        {/* SIMPLIFIED: Show "See All Jobs" if there are any jobs on this day */}
+        {/* SIMPLIFIED: Show "See All Jobs" if there are any jobs on this day - reduced z-index to stay below header */}
         {hasJobs && (
           <button
             onClick={() => onShowMore(day)}
-            className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-20"
+            className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-10"
           >
             See All Jobs
           </button>
