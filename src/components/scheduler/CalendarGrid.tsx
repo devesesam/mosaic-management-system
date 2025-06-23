@@ -12,7 +12,6 @@ interface CalendarGridProps {
   days: Date[];
   workers: Worker[];
   getWorkerDayJobs: (workerId: string | null, day: Date) => Job[];
-  getAllJobsSpanningDay: (day: Date) => Job[];
   onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
@@ -24,7 +23,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   days,
   workers,
   getWorkerDayJobs,
-  getAllJobsSpanningDay,
   onJobDrop,
   onJobClick,
   onJobResize,
@@ -180,7 +178,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 day={day}
                 days={days}
                 jobs={getWorkerDayJobs(null, day)}
-                allJobsSpanningDay={getAllJobsSpanningDay(day)}
                 onJobDrop={onJobDrop}
                 onJobClick={onJobClick}
                 onJobResize={onJobResize}
@@ -205,7 +202,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 day={day}
                 days={days}
                 jobs={getWorkerDayJobs(worker.id, day)}
-                allJobsSpanningDay={getAllJobsSpanningDay(day)}
                 onJobDrop={onJobDrop}
                 onJobClick={onJobClick}
                 onJobResize={onJobResize}
@@ -248,7 +244,6 @@ interface CalendarCellProps {
   day: Date;
   days: Date[];
   jobs: Job[];
-  allJobsSpanningDay: Job[];
   onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
@@ -262,7 +257,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   day,
   days,
   jobs,
-  allJobsSpanningDay,
   onJobDrop,
   onJobClick,
   onJobResize,
@@ -311,17 +305,17 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // Calculate "+X more" using ALL jobs spanning this day
-  const totalJobsOnDay = allJobsSpanningDay.length;
+  // Calculate "+X more" using only the jobs for this worker row
+  const totalJobsForThisWorker = jobs.length;
   
-  // Count how many jobs are rendered in this cell
+  // Count how many jobs are rendered in this cell (1 if main job renders, 0 otherwise)
   let renderedJobsCount = 0;
   if (mainJob && shouldRenderJobInCell(mainJob, day, days, dayIndex)) {
     renderedJobsCount = 1;
   }
   
   // Calculate hidden jobs count
-  const hiddenJobsCount = totalJobsOnDay - renderedJobsCount;
+  const hiddenJobsCount = totalJobsForThisWorker - renderedJobsCount;
   const hasMoreJobs = hiddenJobsCount > 0;
   
   // Fixed cell height

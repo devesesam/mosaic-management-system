@@ -164,44 +164,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     
     return allDayJobs;
   }, [jobs, readOnly, currentWorker]);
-
-  // Get ALL jobs spanning a specific day (for +X more calculation) - filter for read-only mode
-  const getAllJobsSpanningDay = useCallback((day: Date) => {
-    const allDayJobs = jobs.filter(job => {
-      // If job has no start date, it can't be displayed on a specific day
-      if (!job.start_date) return false;
-      
-      try {
-        const jobStart = parseISO(job.start_date);
-        
-        // If job has an end date, check if the day falls within the range
-        if (job.end_date) {
-          const jobEnd = parseISO(job.end_date);
-          
-          // Check if this day is within the job's date range
-          return isWithinInterval(day, { start: jobStart, end: jobEnd }) || 
-                 isSameDay(jobStart, day) || 
-                 isSameDay(jobEnd, day);
-        }
-        
-        // If no end date, just check if the day matches the start date
-        return isSameDay(jobStart, day);
-      } catch (error) {
-        console.error('Error parsing job dates:', error, job);
-        return false;
-      }
-    });
-
-    // Filter for read-only mode: only show jobs where current worker is primary or secondary
-    if (readOnly && currentWorker) {
-      return allDayJobs.filter(job => 
-        job.worker_id === currentWorker.id || 
-        (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
-      );
-    }
-    
-    return allDayJobs;
-  }, [jobs, readOnly, currentWorker]);
   
   // Helper function to check if a date is within a range (inclusive)
   const isWithinRange = (date: Date, start: Date, end: Date) => {
@@ -616,7 +578,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
                       day={day}
                       currentDate={currentDate}
                       jobs={getDayJobs(day)}
-                      allJobsSpanningDay={getAllJobsSpanningDay(day)}
                       onJobDrop={handleJobDrop}
                       onJobClick={(job) => {
                         setSelectedJob(job);
@@ -687,7 +648,6 @@ interface CalendarDayProps {
   day: Date;
   currentDate: Date;
   jobs: Job[];
-  allJobsSpanningDay: Job[];
   onJobDrop: (job: Job, date: Date) => void;
   onJobClick: (job: Job) => void;
   onShowMore: () => void;
@@ -705,7 +665,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   day, 
   currentDate, 
   jobs, 
-  allJobsSpanningDay,
   onJobDrop, 
   onJobClick, 
   onShowMore, 
@@ -765,14 +724,15 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   // Show a "more" button if there are too many jobs to display
   const visibleRows = 2; // Number of rows to display before showing "more" button
   
-  // Calculate "+X more" using ALL jobs spanning this day
-  const totalJobsOnDay = allJobsSpanningDay.length;
+  // Calculate "+X more" based on ONLY the jobs that are visible on this day
+  // This includes both single-day jobs AND the multi-day jobs that are rendered on this day
+  const totalJobsVisibleOnDay = sortedSingleDayJobs.length + sortedMultiDayJobs.length;
   
   // Count how many jobs are actually rendered in this cell
   const renderedJobsCount = Math.min(sortedSingleDayJobs.length, visibleRows) + sortedMultiDayJobs.length;
   
   // Calculate hidden jobs count
-  const hiddenJobsCount = totalJobsOnDay - renderedJobsCount;
+  const hiddenJobsCount = totalJobsVisibleOnDay - renderedJobsCount;
   const hasMoreJobs = hiddenJobsCount > 0;
 
   // Helper function to determine if a job is a secondary assignment for current worker
