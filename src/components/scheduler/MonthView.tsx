@@ -187,7 +187,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   // Calculate multi-day job positions for the entire month view
   const getMultiDayJobs = useCallback(() => {
     // For multiple weeks, we need to calculate row positions for multi-day jobs
-    const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number}[] = [];
+    const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number, isSecondary: boolean}[] = [];
     const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
     
     // Get all multi-day jobs - filter for read-only mode
@@ -221,9 +221,18 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       );
     }
 
-    // Sort jobs
+    // Sort jobs: primary assignments first, then secondary assignments, then by date and duration
     jobsWithDates.sort((a, b) => {
       try {
+        // In read-only mode, prioritize primary assignments over secondary
+        if (readOnly && currentWorker) {
+          const aIsPrimary = a.worker_id === currentWorker.id;
+          const bIsPrimary = b.worker_id === currentWorker.id;
+          
+          if (aIsPrimary && !bIsPrimary) return -1;
+          if (!aIsPrimary && bIsPrimary) return 1;
+        }
+        
         // Sort primarily by start date (earlier first)
         const startA = parseISO(a.start_date!);
         const startB = parseISO(b.start_date!);
@@ -250,6 +259,11 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       try {
         const startDate = parseISO(job.start_date!);
         const endDate = parseISO(job.end_date!);
+        
+        // Check if this is a secondary assignment
+        const isSecondary = readOnly && currentWorker && 
+                           job.worker_id !== currentWorker.id &&
+                           job.secondary_worker_ids?.includes(currentWorker.id);
         
         // For each week, check if the job spans days within that week
         weeks.forEach((week, weekIdx) => {
@@ -302,7 +316,8 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             startCol,
             endCol,
             weekIdx,
-            rowIdx
+            rowIdx,
+            isSecondary
           });
         });
       } catch (error) {
@@ -639,7 +654,7 @@ interface CalendarDayProps {
   isInCurrentMonth: boolean;
   weekIdx: number;
   dayIdx: number;
-  multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number}[];
+  multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number, isSecondary: boolean}[];
   weekHeight: number;
   onJobResize: (job: Job, days: number) => void;
   readOnly?: boolean;
@@ -681,14 +696,34 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     !multiDayJobs.some(mj => mj.job.id === job.id)
   );
 
+  // Sort single-day jobs: put primary assignments first, then secondary
+  const sortedSingleDayJobs = [...singleDayJobs].sort((a, b) => {
+    if (currentWorker) {
+      const aIsPrimary = a.worker_id === currentWorker.id;
+      const bIsPrimary = b.worker_id === currentWorker.id;
+      
+      if (aIsPrimary && !bIsPrimary) return -1;
+      if (!aIsPrimary && bIsPrimary) return 1;
+    }
+    
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   // Get the multi-day jobs that start on this day for this week
   const multiDayJobsForThisDay = multiDayJobs.filter(mj => 
     mj.startCol === colPosition && mj.weekIdx === weekIdx
   );
 
+  // Sort multi-day jobs: primary assignments first
+  const sortedMultiDayJobs = [...multiDayJobsForThisDay].sort((a, b) => {
+    if (a.isSecondary && !b.isSecondary) return 1;
+    if (!a.isSecondary && b.isSecondary) return -1;
+    return a.rowIdx - b.rowIdx;
+  });
+
   // Show a "more" button if there are too many jobs to display
   const visibleRows = 2; // Number of rows to display before showing "more" button
-  const totalSingleDayJobs = singleDayJobs.length;
+  const totalSingleDayJobs = sortedSingleDayJobs.length;
   const hasMoreJobs = totalSingleDayJobs > visibleRows;
 
   // Helper function to determine if a job is a secondary assignment for current worker
@@ -720,27 +755,37 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         style={{ minHeight: 'calc(100% - 28px)' }}
       >
         {/* Single-day jobs */}
-        {singleDayJobs.slice(0, visibleRows).map((job, index) => (
-          <div 
-            key={`single-${job.id}`} 
-            className={`mb-1 h-6 ${isSecondaryAssignment(job) ? 'opacity-80' : ''}`}
-            style={{ marginTop: index * 26 + 'px' }}
-          >
-            <DraggableJob
-              job={job}
-              onClick={() => onJobClick(job)}
-              isScheduled={true}
-              isWeekView={false}
-              readOnly={readOnly || isSecondaryAssignment(job)}
-            />
-          </div>
-        ))}
+        {sortedSingleDayJobs.slice(0, visibleRows).map((job, index) => {
+          const isSecondary = isSecondaryAssignment(job);
+          const zIndex = isSecondary ? 5 : 10;
+          
+          return (
+            <div 
+              key={`single-${job.id}`} 
+              className={`mb-1 h-6 ${isSecondary ? 'opacity-80' : ''}`}
+              style={{ 
+                marginTop: index * 26 + 'px',
+                zIndex: zIndex,
+                position: 'relative'
+              }}
+            >
+              <DraggableJob
+                job={job}
+                onClick={() => onJobClick(job)}
+                isScheduled={true}
+                isWeekView={false}
+                readOnly={readOnly || isSecondary}
+              />
+            </div>
+          );
+        })}
         
         {/* More jobs indicator */}
         {hasMoreJobs && (
           <button
             onClick={onShowMore}
             className="text-xs text-gray-500 absolute bottom-1 left-1 hover:text-gray-700 hover:underline"
+            style={{ zIndex: 20 }}
           >
             +{totalSingleDayJobs - visibleRows} more
           </button>
@@ -748,17 +793,19 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       </div>
 
       {/* Multi-day job segments */}
-      {multiDayJobsForThisDay.map(({ job, startCol, endCol, rowIdx }) => {
+      {sortedMultiDayJobs.map(({ job, startCol, endCol, rowIdx, isSecondary }) => {
         const spanDays = endCol - startCol + 1;
-        const isSecondary = isSecondaryAssignment(job);
+        const zIndex = isSecondary ? 5 : 10;
+        
         return (
           <div 
             key={`multiday-${job.id}`}
-            className={`absolute left-0 z-10 ${isSecondary ? 'opacity-80' : ''}`}
+            className={`absolute left-0 ${isSecondary ? 'opacity-80' : ''}`}
             style={{
               width: `calc(${spanDays} * 100%)`,
               top: `${30 + rowIdx * 26}px`, // Position based on row index
-              height: '24px'
+              height: '24px',
+              zIndex: zIndex
             }}
           >
             <DraggableJob

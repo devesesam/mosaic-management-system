@@ -278,14 +278,28 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
-  // Sort jobs by priority
+  // Sort jobs by priority: put editable jobs first, then secondary assignments
   const sortedJobs = [...jobs].sort((a, b) => {
+    // Check if jobs are secondary assignments for current worker
+    const aIsSecondary = currentRowWorkerId !== null && 
+                         a.worker_id !== currentRowWorkerId &&
+                         a.secondary_worker_ids?.includes(currentRowWorkerId);
+    const bIsSecondary = currentRowWorkerId !== null && 
+                         b.worker_id !== currentRowWorkerId &&
+                         b.secondary_worker_ids?.includes(currentRowWorkerId);
+    
+    // Primary jobs come before secondary jobs
+    if (!aIsSecondary && bIsSecondary) return -1;
+    if (aIsSecondary && !bIsSecondary) return 1;
+    
+    // Within same category, prioritize jobs with both dates
     const aHasBothDates = !!(a.start_date && a.end_date);
     const bHasBothDates = !!(b.start_date && b.end_date);
     
     if (aHasBothDates && !bHasBothDates) return -1;
     if (!aHasBothDates && bHasBothDates) return 1;
     
+    // Finally sort by creation date
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
   
@@ -311,6 +325,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
                            mainJob.worker_id !== currentRowWorkerId &&
                            mainJob.secondary_worker_ids?.includes(currentRowWorkerId);
     
+    // For secondary assignments, we need to ensure proper spanning across all days of the job
     // Only render on the start day (or first day of week if job started before)
     const isStartDay = isSameDay(day, startDate);
     const isFirstDayOfWeek = dayIndex === 0;
@@ -324,21 +339,26 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       let jobDaysFromThisDay: number;
       
       if (isStartDay) {
-        // Job starts on this day
+        // Job starts on this day - calculate full duration
         jobDaysFromThisDay = differenceInDays(endDate, startDate) + 1;
       } else {
-        // Job started before this week
+        // Job started before this week - calculate remaining days from today
         jobDaysFromThisDay = differenceInDays(endDate, day) + 1;
       }
       
-      jobSpan = Math.min(jobDaysFromThisDay, remainingDaysInWeek);
+      // Ensure we don't span beyond the current week
+      jobSpan = Math.min(Math.max(1, jobDaysFromThisDay), remainingDaysInWeek);
       showText = true;
       
       // Check if this is the last day of the job (for resize handle)
       const actualEndDayIndex = days.findIndex(d => isSameDay(d, endDate));
-      isLastDay = actualEndDayIndex === dayIndex + jobSpan - 1 || actualEndDayIndex === -1;
+      isLastDay = actualEndDayIndex === dayIndex + jobSpan - 1 || 
+                  (actualEndDayIndex === -1 && dayIndex + jobSpan - 1 === days.length - 1);
     }
   }
+  
+  // Determine z-index: secondary assignments should be behind primary assignments
+  const zIndex = isSecondaryAssignment ? 5 : 10;
   
   return (
     <div
@@ -357,7 +377,8 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             className={`absolute left-0 right-0 top-0 mx-1 mt-1 ${isSecondaryAssignment ? 'opacity-80' : ''}`}
             style={{ 
               width: `calc(${jobSpan * 100}% - 0.5rem)`,
-              height: "calc(100% - 6px)"
+              height: "calc(100% - 6px)",
+              zIndex: zIndex
             }}
           >
             <DraggableJob
@@ -379,7 +400,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
-            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-10"
+            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-20"
           >
             +{sortedJobs.length - 1} more
           </button>
