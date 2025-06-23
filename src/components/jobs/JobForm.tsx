@@ -71,18 +71,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     if (readOnly) return;
     
     const { name, value } = e.target;
-    
-    // If unassigning the primary worker, also clear secondary workers
-    if (name === 'worker_id' && value === '') {
-      console.log('JobForm: Primary worker unassigned, clearing secondary workers');
-      setFormData(prev => ({ 
-        ...prev, 
-        [name]: value,
-        secondary_worker_ids: [] // Clear secondary workers when unassigning primary worker
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {

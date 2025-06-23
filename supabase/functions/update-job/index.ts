@@ -47,10 +47,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Extract secondary workers and prepare job updates for database
-    const secondary_worker_ids = updates.secondary_worker_ids;
-    const jobUpdates = { ...updates };
-    delete jobUpdates.secondary_worker_ids;
+    // Extract secondary workers if present
+    const { secondary_worker_ids, ...jobUpdates } = updates;
 
     // Update the main job record
     const { data: updatedJob, error: jobError } = await supabase
@@ -67,22 +65,6 @@ Deno.serve(async (req: Request) => {
           success: false, 
           error: jobError.message,
           details: jobError
-        }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
-    }
-
-    // Check if updatedJob data is null or undefined
-    if (!updatedJob) {
-      console.error('Edge Function: update-job - No job data returned after update');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to update job - no data returned',
-          details: 'Update operation completed but no job data was returned'
         }),
         {
           status: 500,

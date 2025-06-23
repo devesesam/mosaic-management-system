@@ -37,15 +37,13 @@ Deno.serve(async (req: Request) => {
     const jobData = await req.json();
     console.log('Edge Function: add-job - Received data:', jobData);
 
-    // Extract secondary workers and prepare job data for insertion
-    const secondary_worker_ids = jobData.secondary_worker_ids;
-    const jobToInsert = { ...jobData };
-    delete jobToInsert.secondary_worker_ids;
+    // Extract secondary workers if present
+    const { secondary_worker_ids, ...jobBase } = jobData;
 
     // Insert the main job record
     const { data: newJob, error: jobError } = await supabase
       .from('jobs')
-      .insert([jobToInsert])
+      .insert([jobBase])
       .select()
       .single();
 
@@ -56,22 +54,6 @@ Deno.serve(async (req: Request) => {
           success: false, 
           error: jobError.message,
           details: jobError
-        }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
-    }
-
-    // Check if newJob data is null or undefined
-    if (!newJob) {
-      console.error('Edge Function: add-job - No job data returned after insert');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to create job - no data returned',
-          details: 'Insert operation completed but no job data was returned'
         }),
         {
           status: 500,
