@@ -784,7 +784,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         {hasMoreJobs && (
           <button
             onClick={onShowMore}
-            className="text-xs text-gray-500 absolute bottom-1 left-1 hover:text-gray-700 hover:underline"
+            className="text-xs text-black absolute bottom-1 left-1 hover:text-gray-700 hover:underline"
             style={{ zIndex: 20 }}
           >
             +{totalSingleDayJobs - visibleRows} more

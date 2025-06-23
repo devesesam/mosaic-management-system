@@ -400,7 +400,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
-            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-20"
+            className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-20"
           >
             +{sortedJobs.length - 1} more
           </button>
