@@ -305,18 +305,45 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // Calculate "+X more" using only the jobs for this worker row
-  const totalJobsForThisWorker = jobs.length;
-  
-  // Count how many jobs are rendered in this cell (1 if main job renders, 0 otherwise)
-  let renderedJobsCount = 0;
-  if (mainJob && shouldRenderJobInCell(mainJob, day, days, dayIndex)) {
-    renderedJobsCount = 1;
-  }
-  
-  // Calculate hidden jobs count
-  const hiddenJobsCount = totalJobsForThisWorker - renderedJobsCount;
-  const hasMoreJobs = hiddenJobsCount > 0;
+  // NEW LOGIC: Calculate "+X more" by counting jobs that should be visible but aren't rendered
+  let tilesRenderedCount = 0;
+  let tilesHiddenCount = 0;
+
+  jobs.forEach(job => {
+    if (!job.start_date || !job.end_date) {
+      // Jobs without dates are always hidden in the calendar
+      tilesHiddenCount++;
+      return;
+    }
+    
+    try {
+      const startDate = parseISO(job.start_date);
+      const endDate = parseISO(job.end_date);
+      
+      // Check if this job should render its tile on this day
+      const isStartDay = isSameDay(day, startDate);
+      const isFirstDayOfWeek = dayIndex === 0;
+      const jobStartsBeforeWeek = isBefore(startDate, days[0]);
+      
+      const shouldRenderTile = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
+      
+      if (shouldRenderTile) {
+        tilesRenderedCount++;
+      } else {
+        // Job is active on this day but tile is rendered elsewhere (buried)
+        tilesHiddenCount++;
+      }
+    } catch (error) {
+      tilesHiddenCount++;
+    }
+  });
+
+  // We only actually render one tile (the mainJob), so any additional tiles that should render are hidden
+  const actuallyRenderedCount = mainJob && shouldRenderJobInCell(mainJob, day, days, dayIndex) ? 1 : 0;
+  const additionalHiddenTiles = Math.max(0, tilesRenderedCount - actuallyRenderedCount);
+
+  const totalHiddenCount = tilesHiddenCount + additionalHiddenTiles;
+  const hasMoreJobs = totalHiddenCount > 0;
   
   // Fixed cell height
   const cellHeight = 100;
@@ -414,7 +441,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             onClick={() => onShowMore(day)}
             className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-20"
           >
-            +{hiddenJobsCount} more
+            +{totalHiddenCount} more
           </button>
         )}
         
