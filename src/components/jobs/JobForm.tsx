@@ -71,6 +71,20 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     if (readOnly) return;
     
     const { name, value } = e.target;
+    
+    // CRITICAL: If worker_id is being set to null/empty, also clear secondary workers
+    if (name === 'worker_id') {
+      if (!value || value === '') {
+        console.log('JobForm: Primary worker cleared - clearing secondary workers');
+        setFormData(prev => ({ 
+          ...prev, 
+          [name]: null,
+          secondary_worker_ids: []
+        }));
+        return;
+      }
+    }
+    
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -94,6 +108,12 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
 
   const handleSecondaryWorkerToggle = (workerId: string) => {
     if (readOnly) return;
+    
+    // Prevent adding secondary workers if no primary worker is assigned
+    if (!formData.worker_id) {
+      toast.error('Please assign a primary worker before adding secondary workers');
+      return;
+    }
     
     setFormData(prev => {
       const currentIds = prev.secondary_worker_ids || [];
@@ -120,6 +140,13 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
       return;
     }
     
+    // CRITICAL: Ensure secondary workers are cleared if no primary worker
+    let finalFormData = { ...formData };
+    if (!finalFormData.worker_id) {
+      console.log('JobForm: No primary worker - ensuring secondary workers are cleared');
+      finalFormData.secondary_worker_ids = [];
+    }
+    
     try {
       setIsSubmitting(true);
       
@@ -129,7 +156,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
       });
       
       await Promise.race([
-        onSubmit(formData as Omit<Job, 'id' | 'created_at'>),
+        onSubmit(finalFormData as Omit<Job, 'id' | 'created_at'>),
         timeoutPromise
       ]);
       
@@ -391,6 +418,9 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Secondary Workers
+                {!formData.worker_id && (
+                  <span className="text-xs text-amber-600 ml-1">(Requires primary worker)</span>
+                )}
               </label>
               <div className="mt-1 border rounded-md divide-y max-h-48 overflow-y-auto">
                 {workersLoading ? (
@@ -400,6 +430,10 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                 ) : workers.length === 0 ? (
                   <div className="p-3 text-sm text-gray-500 italic">
                     No workers available. Add workers first.
+                  </div>
+                ) : !formData.worker_id ? (
+                  <div className="p-3 text-sm text-amber-600 italic">
+                    Please select a primary worker first.
                   </div>
                 ) : (
                   availableSecondaryWorkers.map((worker) => (
@@ -424,9 +458,9 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                     </label>
                   ))
                 )}
-                {availableSecondaryWorkers.length === 0 && workers.length > 0 && (
+                {availableSecondaryWorkers.length === 0 && workers.length > 0 && formData.worker_id && (
                   <div className="px-3 py-2 text-sm text-gray-500 italic">
-                    No workers available
+                    No additional workers available
                   </div>
                 )}
               </div>

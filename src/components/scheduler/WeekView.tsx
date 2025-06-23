@@ -243,6 +243,12 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         start_date: date ? date.toISOString() : null
       };
 
+      // CRITICAL: If unassigning a job (workerId is null), also clear secondary workers
+      if (workerId === null) {
+        console.log('WeekView: Unassigning job - clearing secondary workers');
+        updates.secondary_worker_ids = [];
+      }
+
       // Calculate end date to preserve the job's duration
       if (date && job.start_date && job.end_date) {
         try {
