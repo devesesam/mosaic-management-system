@@ -36,14 +36,25 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
   const [{ isDragging }, drag] = useDrag({
     type: 'JOB',
     item: () => {
+      console.log('DraggableJob: Starting drag for job:', job.id);
       setDragging(true, job.id);
       return { job };
     },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging()
     }),
-    canDrag: () => !isResizing && !readOnly,
+    canDrag: () => {
+      const canDrag = !isResizing && !readOnly;
+      console.log('DraggableJob: canDrag check:', {
+        jobId: job.id,
+        isResizing,
+        readOnly,
+        canDrag
+      });
+      return canDrag;
+    },
     end: () => {
+      console.log('DraggableJob: Ending drag for job:', job.id);
       setDragging(false);
     }
   });
@@ -157,9 +168,19 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     drag(ref);
   }
 
-  // Determine if this job should be affected by global drag state
-  const isThisJobBeingDragged = isDragging && draggingJobId === job.id;
+  // SIMPLIFIED LOGIC: Only disable pointer events on OTHER jobs during drag
+  const isThisJobBeingDragged = draggingJobId === job.id;
   const shouldDisablePointerEvents = globalIsDragging && !isThisJobBeingDragged;
+  
+  console.log('DraggableJob: Pointer events logic:', {
+    jobId: job.id,
+    globalIsDragging,
+    draggingJobId,
+    isThisJobBeingDragged,
+    shouldDisablePointerEvents,
+    isDragging,
+    readOnly
+  });
   
   return (
     <div 
@@ -179,7 +200,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        // CRITICAL: Disable pointer events on other jobs during drag
+        // SIMPLIFIED: Only disable pointer events on jobs that are NOT being dragged
         pointerEvents: shouldDisablePointerEvents ? 'none' : 'auto'
       }}
     >
