@@ -21,8 +21,8 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView, is
             <span className="ml-2 text-white font-semibold text-lg">Tasman Roofing</span>
             
             {currentWorker && (
-              <div className="ml-4 flex items-center">
-                <span className="text-white/70 text-sm mr-2">
+              <div className="ml-4 flex items-center space-x-2">
+                <span className="text-white/70 text-sm">
                   {currentWorker.name}
                 </span>
                 {!isEditable && (
@@ -35,28 +35,31 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView, is
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="bg-white/10 rounded-lg p-1">
-              <button
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  activeView === 'week'
-                    ? 'bg-white text-[#0a2342]'
-                    : 'text-white hover:bg-white/20'
-                }`}
-                onClick={() => setActiveView('week')}
-              >
-                Week
-              </button>
-              <button
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  activeView === 'month'
-                    ? 'bg-white text-[#0a2342]'
-                    : 'text-white hover:bg-white/20'
-                }`}
-                onClick={() => setActiveView('month')}
-              >
-                Month
-              </button>
-            </div>
+            {/* Only show view toggle for users with edit permissions */}
+            {isEditable && (
+              <div className="bg-white/10 rounded-lg p-1">
+                <button
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    activeView === 'week'
+                      ? 'bg-white text-[#0a2342]'
+                      : 'text-white hover:bg-white/20'
+                  }`}
+                  onClick={() => setActiveView('week')}
+                >
+                  Week
+                </button>
+                <button
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    activeView === 'month'
+                      ? 'bg-white text-[#0a2342]'
+                      : 'text-white hover:bg-white/20'
+                  }`}
+                  onClick={() => setActiveView('month')}
+                >
+                  Month
+                </button>
+              </div>
+            )}
             
             <button
               onClick={onNewJob}

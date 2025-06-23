@@ -66,6 +66,14 @@ function App() {
     }
   }, [currentWorker, isEditable]);
 
+  // Force week view for read-only users
+  useEffect(() => {
+    if (!isEditable && activeView !== 'week') {
+      console.log('App: Forcing week view for read-only user');
+      setActiveView('week');
+    }
+  }, [isEditable, activeView]);
+
   const handleNewJob = () => {
     if (!isEditable) {
       console.log('App: New job creation blocked - read-only mode');
@@ -85,6 +93,15 @@ function App() {
     } catch (error) {
       console.error('Error creating job:', error);
     }
+  };
+
+  const handleSetActiveView = (view: 'week' | 'month') => {
+    // Only allow view changes for users with edit permissions
+    if (!isEditable) {
+      console.log('App: View change blocked - read-only mode forces week view');
+      return;
+    }
+    setActiveView(view);
   };
 
   // Show login form if no user
@@ -157,7 +174,7 @@ function App() {
         <Navbar 
           onNewJob={handleNewJob} 
           activeView={activeView}
-          setActiveView={setActiveView}
+          setActiveView={handleSetActiveView}
           isEditable={isEditable}
         />
 

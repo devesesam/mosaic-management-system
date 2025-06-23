@@ -17,6 +17,7 @@ import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
 import { useJobsStore } from '../../store/jobsStore';
 import { useWorkerStore } from '../../store/workersStore';
+import { useAuth } from '../../context/AuthContext';
 import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
@@ -50,6 +51,8 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     fetchWorkers,
     addWorker
   } = useWorkerStore();
+
+  const { user, currentWorker } = useAuth();
   
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -101,8 +104,22 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     }
   }, [workers]);
   
-  // Get unscheduled jobs
-  const unscheduledJobs = jobs.filter(job => !job.worker_id || !job.start_date);
+  // Get unscheduled jobs - filter for read-only mode
+  const unscheduledJobs = React.useMemo(() => {
+    const baseUnscheduled = jobs.filter(job => !job.worker_id || !job.start_date);
+    
+    if (readOnly && currentWorker) {
+      // In read-only mode, show jobs that are either:
+      // 1. Completely unassigned (no worker, no date)
+      // 2. Assigned to current worker but no date
+      return jobs.filter(job => 
+        (!job.start_date && !job.worker_id) || 
+        (!job.start_date && job.worker_id === currentWorker.id)
+      );
+    }
+    
+    return baseUnscheduled;
+  }, [jobs, readOnly, currentWorker]);
   
   // Get jobs for a worker on a specific day
   const getWorkerDayJobs = useCallback((workerId: string | null, day: Date) => {
@@ -439,16 +456,18 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           />
         </div>
         
-        {/* Fixed-width unscheduled jobs panel */}
-        <UnscheduledPanel 
-          jobs={unscheduledJobs}
-          onJobDrop={handleJobDrop}
-          onJobClick={(job) => {
-            setSelectedJob(job);
-            setIsJobFormOpen(true);
-          }}
-          readOnly={readOnly}
-        />
+        {/* Fixed-width unscheduled jobs panel - only show for edit mode */}
+        {!readOnly && (
+          <UnscheduledPanel 
+            jobs={unscheduledJobs}
+            onJobDrop={handleJobDrop}
+            onJobClick={(job) => {
+              setSelectedJob(job);
+              setIsJobFormOpen(true);
+            }}
+            readOnly={readOnly}
+          />
+        )}
       </div>
       
       {/* Job form modal */}

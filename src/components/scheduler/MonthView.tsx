@@ -20,6 +20,7 @@ import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
 import UnscheduledPanel from './UnscheduledPanel';
 import { useJobsStore } from '../../store/jobsStore';
+import { useAuth } from '../../context/AuthContext';
 import JobForm from '../jobs/JobForm';
 import DayJobsModal from './DayJobsModal';
 import DraggableJob from './DraggableJob';
@@ -47,6 +48,8 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     updateJob,
     deleteJob
   } = useJobsStore();
+
+  const { user, currentWorker } = useAuth();
   
   // Debug log the jobs data
   useEffect(() => {
@@ -104,14 +107,26 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     }
   }, [jobsLoading]);
 
-  // Get unscheduled jobs (no date and no worker)
+  // Get unscheduled jobs - filter for read-only mode
   const unscheduledJobs = useMemo(() => {
-    return jobs.filter(job => !job.start_date && !job.worker_id);
-  }, [jobs]);
+    const baseUnscheduled = jobs.filter(job => !job.start_date && !job.worker_id);
+    
+    if (readOnly && currentWorker) {
+      // In read-only mode, show jobs that are either:
+      // 1. Completely unassigned (no worker, no date)
+      // 2. Assigned to current worker but no date
+      return jobs.filter(job => 
+        (!job.start_date && !job.worker_id) || 
+        (!job.start_date && job.worker_id === currentWorker.id)
+      );
+    }
+    
+    return baseUnscheduled;
+  }, [jobs, readOnly, currentWorker]);
 
-  // Get jobs for a specific day - less restrictive to show more jobs
+  // Get jobs for a specific day - filter for read-only mode
   const getDayJobs = useCallback((day: Date) => {
-    return jobs.filter(job => {
+    const allDayJobs = jobs.filter(job => {
       // If job has no start date, it can't be displayed on a specific day
       if (!job.start_date) return false;
       
@@ -135,7 +150,14 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
         return false;
       }
     });
-  }, [jobs]);
+
+    // Filter for read-only mode: only show jobs assigned to current worker
+    if (readOnly && currentWorker) {
+      return allDayJobs.filter(job => job.worker_id === currentWorker.id);
+    }
+    
+    return allDayJobs;
+  }, [jobs, readOnly, currentWorker]);
   
   // Helper function to check if a date is within a range (inclusive)
   const isWithinRange = (date: Date, start: Date, end: Date) => {
@@ -162,8 +184,8 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number}[] = [];
     const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
     
-    // Get all multi-day jobs
-    const jobsWithDates = jobs.filter(job => {
+    // Get all multi-day jobs - filter for read-only mode
+    let jobsWithDates = jobs.filter(job => {
       if (!job.start_date || !job.end_date) return false;
       
       try {
@@ -171,19 +193,27 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
         const endDate = parseISO(job.end_date);
         
         // Check if this is a multi-day job that's visible in current month
-        return (
-          !isSameDay(startDate, endDate) && 
-          (
-            isWithinRange(startDate, calendarStart, calendarEnd) ||
-            isWithinRange(endDate, calendarStart, calendarEnd) ||
-            (startDate < calendarStart && endDate > calendarEnd)
-          )
+        const isMultiDay = !isSameDay(startDate, endDate);
+        const isVisible = (
+          isWithinRange(startDate, calendarStart, calendarEnd) ||
+          isWithinRange(endDate, calendarStart, calendarEnd) ||
+          (startDate < calendarStart && endDate > calendarEnd)
         );
+        
+        return isMultiDay && isVisible;
       } catch (error) {
         console.error('Error parsing job dates:', error, job);
         return false;
       }
-    }).sort((a, b) => {
+    });
+
+    // Filter for read-only mode: only show jobs assigned to current worker
+    if (readOnly && currentWorker) {
+      jobsWithDates = jobsWithDates.filter(job => job.worker_id === currentWorker.id);
+    }
+
+    // Sort jobs
+    jobsWithDates.sort((a, b) => {
       try {
         // Sort primarily by start date (earlier first)
         const startA = parseISO(a.start_date!);
@@ -272,7 +302,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     });
     
     return multiDayJobs;
-  }, [jobs, weeks, calendarStart, calendarEnd]);
+  }, [jobs, weeks, calendarStart, calendarEnd, readOnly, currentWorker]);
   
   const multiDayJobs = useMemo(() => getMultiDayJobs(), [getMultiDayJobs]);
 
@@ -544,16 +574,18 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             </div>
           </div>
 
-          {/* Fixed-width unscheduled jobs panel as right sidebar */}
-          <UnscheduledPanel
-            jobs={unscheduledJobs}
-            onJobDrop={(job) => handleJobDrop(job, new Date())}
-            onJobClick={(job) => {
-              setSelectedJob(job);
-              setIsJobFormOpen(true);
-            }}
-            readOnly={readOnly}
-          />
+          {/* Fixed-width unscheduled jobs panel as right sidebar - only show for edit mode */}
+          {!readOnly && (
+            <UnscheduledPanel
+              jobs={unscheduledJobs}
+              onJobDrop={(job) => handleJobDrop(job, new Date())}
+              onJobClick={(job) => {
+                setSelectedJob(job);
+                setIsJobFormOpen(true);
+              }}
+              readOnly={readOnly}
+            />
+          )}
         </div>
       </div>
 
