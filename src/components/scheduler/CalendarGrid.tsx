@@ -6,6 +6,7 @@ import DraggableJob from './DraggableJob';
 import { Plus, Minus } from 'lucide-react';
 import WorkerManageModal from './WorkerManageModal';
 import DayJobsModal from './DayJobsModal';
+import { useAuth } from '../../context/AuthContext';
 
 interface CalendarGridProps {
   days: Date[];
@@ -28,6 +29,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   onNewWorker,
   readOnly = false
 }) => {
+  const { currentWorker } = useAuth();
   const [isManageWorkersOpen, setIsManageWorkersOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
@@ -36,13 +38,39 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   useEffect(() => {
     console.log('CalendarGrid: Workers:', {
       count: workers.length,
-      names: workers.map(w => w.name)
+      names: workers.map(w => w.name),
+      readOnly,
+      currentWorker: currentWorker?.name || 'none'
     });
-  }, [workers]);
+  }, [workers, readOnly, currentWorker]);
   
-  const displayedWorkers = selectedWorker === 'all' 
-    ? workers 
-    : workers.filter(w => w.id === selectedWorker);
+  // Filter workers based on read-only mode and current worker
+  const displayedWorkers = React.useMemo(() => {
+    if (readOnly && currentWorker) {
+      // In read-only mode, only show the current worker's row
+      const currentWorkerInList = workers.find(w => w.id === currentWorker.id);
+      return currentWorkerInList ? [currentWorkerInList] : [];
+    }
+    
+    // For admin users, show all workers or filtered workers
+    if (selectedWorker === 'all') {
+      return workers;
+    }
+    
+    return workers.filter(w => w.id === selectedWorker);
+  }, [workers, selectedWorker, readOnly, currentWorker]);
+
+  // Should show unassigned row?
+  const showUnassignedRow = !readOnly;
+
+  console.log('CalendarGrid: Display logic:', {
+    readOnly,
+    currentWorkerId: currentWorker?.id,
+    totalWorkers: workers.length,
+    displayedWorkers: displayedWorkers.length,
+    showUnassignedRow,
+    displayedWorkerNames: displayedWorkers.map(w => w.name)
+  });
 
   return (
     <div className="min-w-fit">
@@ -51,18 +79,24 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         {/* Worker column header */}
         <div className="w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-gray-100 flex items-center justify-between px-3">
           <div className="flex items-center space-x-2 flex-1">
-            <select
-              value={selectedWorker}
-              onChange={(e) => setSelectedWorker(e.target.value)}
-              className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 max-w-[120px]"
-            >
-              <option value="all">All Workers</option>
-              {workers.map((worker) => (
-                <option key={worker.id} value={worker.id}>
-                  {worker.name}
-                </option>
-              ))}
-            </select>
+            {!readOnly ? (
+              <select
+                value={selectedWorker}
+                onChange={(e) => setSelectedWorker(e.target.value)}
+                className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 max-w-[120px]"
+              >
+                <option value="all">All Workers</option>
+                {workers.map((worker) => (
+                  <option key={worker.id} value={worker.id}>
+                    {worker.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm font-medium text-gray-700">
+                {currentWorker ? currentWorker.name : 'Workers'}
+              </span>
+            )}
           </div>
           <div className="flex items-center space-x-1">
             <button
@@ -106,8 +140,15 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         ))}
       </div>
 
-      {/* No workers message */}
-      {workers.length === 0 && (
+      {/* No workers message for read-only users */}
+      {readOnly && displayedWorkers.length === 0 && (
+        <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
+          No worker profile found. Please contact your administrator.
+        </div>
+      )}
+
+      {/* No workers message for admin users */}
+      {!readOnly && workers.length === 0 && (
         <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
           No workers found in the database. Add a worker to start scheduling jobs.
         </div>
@@ -115,26 +156,28 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
       {/* Grid content */}
       <div className="flex flex-col">
-        {/* Unassigned row */}
-        <div className="flex border-b border-gray-200">
-          <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
-            Unassigned
+        {/* Unassigned row - only show for admin users */}
+        {showUnassignedRow && (
+          <div className="flex border-b border-gray-200">
+            <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
+              Unassigned
+            </div>
+            {days.map(day => (
+              <CalendarCell
+                key={`unassigned-${day.toString()}`}
+                workerId={null}
+                day={day}
+                days={days}
+                jobs={getWorkerDayJobs(null, day)}
+                onJobDrop={onJobDrop}
+                onJobClick={onJobClick}
+                onJobResize={onJobResize}
+                onShowMore={(date) => setSelectedDay({ date, workerId: null })}
+                readOnly={readOnly}
+              />
+            ))}
           </div>
-          {days.map(day => (
-            <CalendarCell
-              key={`unassigned-${day.toString()}`}
-              workerId={null}
-              day={day}
-              days={days}
-              jobs={getWorkerDayJobs(null, day)}
-              onJobDrop={onJobDrop}
-              onJobClick={onJobClick}
-              onJobResize={onJobResize}
-              onShowMore={(date) => setSelectedDay({ date, workerId: null })}
-              readOnly={readOnly}
-            />
-          ))}
-        </div>
+        )}
 
         {/* Worker rows */}
         {displayedWorkers.map(worker => (

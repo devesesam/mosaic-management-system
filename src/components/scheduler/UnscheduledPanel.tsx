@@ -3,6 +3,7 @@ import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
 import DraggableJob from './DraggableJob';
 import { Search, X } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface UnscheduledPanelProps {
   jobs: Job[];
@@ -17,6 +18,7 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
   onJobClick,
   readOnly = false
 }) => {
+  const { currentWorker } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
@@ -32,9 +34,25 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
   });
 
   // First filter unscheduled jobs
-  const unscheduledJobs = useMemo(() => {
+  const baseUnscheduledJobs = useMemo(() => {
     return jobs.filter(job => !job.start_date && !job.worker_id);
   }, [jobs]);
+
+  // Filter for read-only mode: only show jobs assigned to current worker or unassigned
+  const unscheduledJobs = useMemo(() => {
+    if (readOnly && currentWorker) {
+      // In read-only mode, show jobs that are either:
+      // 1. Completely unassigned (no worker, no date)
+      // 2. Assigned to current worker but no date
+      return jobs.filter(job => 
+        (!job.start_date && !job.worker_id) || 
+        (!job.start_date && job.worker_id === currentWorker.id)
+      );
+    }
+    
+    // For admin users, show all unscheduled jobs
+    return baseUnscheduledJobs;
+  }, [jobs, readOnly, currentWorker, baseUnscheduledJobs]);
 
   // Get unique tile colors from unscheduled jobs only
   const uniqueColors = useMemo(() => {
@@ -54,6 +72,15 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
       return matchesSearch && matchesColor;
     });
   }, [unscheduledJobs, searchTerm, selectedColor]);
+
+  console.log('UnscheduledPanel: Filter logic:', {
+    readOnly,
+    currentWorkerId: currentWorker?.id,
+    totalJobs: jobs.length,
+    baseUnscheduled: baseUnscheduledJobs.length,
+    filteredUnscheduled: unscheduledJobs.length,
+    finalFiltered: filteredJobs.length
+  });
   
   return (
     <div className="w-[200px] min-w-[200px] border-l border-gray-200 bg-gray-50 flex flex-col">
@@ -70,10 +97,13 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
             placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            disabled={readOnly}
+            className={`w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${
+              readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+            }`}
           />
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-          {searchTerm && (
+          {searchTerm && !readOnly && (
             <button
               onClick={() => setSearchTerm('')}
               className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
@@ -93,12 +123,17 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
               {uniqueColors.map((color) => (
                 <button
                   key={color}
-                  onClick={() => setSelectedColor(selectedColor === color ? null : color)}
-                  className={`w-5 h-5 rounded-full transition-transform hover:scale-110 ${
+                  onClick={() => !readOnly && setSelectedColor(selectedColor === color ? null : color)}
+                  disabled={readOnly}
+                  className={`w-5 h-5 rounded-full transition-transform ${
+                    readOnly 
+                      ? 'cursor-not-allowed opacity-50' 
+                      : 'hover:scale-110 cursor-pointer'
+                  } ${
                     selectedColor === color ? 'ring-2 ring-offset-1 ring-gray-400' : ''
                   }`}
                   style={{ backgroundColor: color }}
-                  title="Filter by this color"
+                  title={readOnly ? 'Read-only mode' : 'Filter by this color'}
                 />
               ))}
             </div>
