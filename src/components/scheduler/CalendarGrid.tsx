@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useDrop, useDragLayer } from 'react-dnd';
+import { useDrop } from 'react-dnd';
 import { format, isToday, differenceInDays, isSameDay, addDays, parseISO, isWithinInterval, isBefore, isAfter } from 'date-fns';
 import { Job, Worker } from '../../types';
 import DraggableJob from './DraggableJob';
@@ -33,11 +33,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   const [isManageWorkersOpen, setIsManageWorkersOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
-  
-  // Track if there's an active drag operation
-  const { isDragging } = useDragLayer((monitor) => ({
-    isDragging: monitor.isDragging()
-  }));
   
   // Log worker data without full objects
   useEffect(() => {
@@ -189,7 +184,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onShowMore={(date) => setSelectedDay({ date, workerId: null })}
                 readOnly={readOnly}
                 currentRowWorkerId={null}
-                isDragging={isDragging}
               />
             ))}
           </div>
@@ -214,7 +208,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
                 readOnly={readOnly}
                 currentRowWorkerId={worker.id}
-                isDragging={isDragging}
               />
             ))}
           </div>
@@ -257,7 +250,6 @@ interface CalendarCellProps {
   onShowMore: (date: Date) => void;
   readOnly?: boolean;
   currentRowWorkerId: string | null;
-  isDragging: boolean;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -270,8 +262,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobResize,
   onShowMore,
   readOnly = false,
-  currentRowWorkerId,
-  isDragging
+  currentRowWorkerId
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -401,10 +392,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   return (
     <div
+      ref={drop}
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-        ${isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
+        ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
       style={{ height: `${cellHeight}px` }}
@@ -434,20 +426,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             />
           </div>
         )}
-        
-        {/* Drop Zone - Always present but only visible/active during drag */}
-        <div
-          ref={drop}
-          className={`absolute inset-0 ${
-            isDragging && !readOnly 
-              ? `z-[15] ${isOver ? 'bg-blue-50' : 'bg-transparent'}` 
-              : 'z-0 pointer-events-none'
-          }`}
-          style={{
-            // Use pointer-events to control interaction
-            pointerEvents: isDragging && !readOnly ? 'auto' : 'none'
-          }}
-        />
         
         {/* SIMPLIFIED: Show "See All Jobs" if there are any jobs on this day - reduced z-index to stay below header */}
         {hasJobs && (
