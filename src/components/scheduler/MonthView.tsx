@@ -721,19 +721,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     return a.rowIdx - b.rowIdx;
   });
 
-  // Show a "more" button if there are too many jobs to display
-  const visibleRows = 2; // Number of rows to display before showing "more" button
-  
-  // Calculate "+X more" based on ONLY the jobs that are visible on this day
-  // This includes both single-day jobs AND the multi-day jobs that are rendered on this day
-  const totalJobsVisibleOnDay = sortedSingleDayJobs.length + sortedMultiDayJobs.length;
-  
-  // Count how many jobs are actually rendered in this cell
-  const renderedJobsCount = Math.min(sortedSingleDayJobs.length, visibleRows) + sortedMultiDayJobs.length;
-  
-  // Calculate hidden jobs count
-  const hiddenJobsCount = totalJobsVisibleOnDay - renderedJobsCount;
-  const hasMoreJobs = hiddenJobsCount > 0;
+  // Simplified logic: Show "See All Jobs" if there are any jobs on this day
+  const hasJobs = jobs.length > 0;
 
   // Helper function to determine if a job is a secondary assignment for current worker
   const isSecondaryAssignment = (job: Job) => {
@@ -763,8 +752,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         className="flex-1 p-1 overflow-hidden relative"
         style={{ minHeight: 'calc(100% - 28px)' }}
       >
-        {/* Single-day jobs */}
-        {sortedSingleDayJobs.slice(0, visibleRows).map((job, index) => {
+        {/* Single-day jobs - show first 2 rows */}
+        {sortedSingleDayJobs.slice(0, 2).map((job, index) => {
           const isSecondary = isSecondaryAssignment(job);
           const zIndex = isSecondary ? 5 : 10;
           
@@ -789,14 +778,14 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
           );
         })}
         
-        {/* More jobs indicator */}
-        {hasMoreJobs && (
+        {/* See All Jobs button - show if there are any jobs on this day */}
+        {hasJobs && (
           <button
             onClick={onShowMore}
             className="text-xs text-black absolute bottom-1 left-1 hover:text-gray-700 hover:underline"
             style={{ zIndex: 20 }}
           >
-            +{hiddenJobsCount} more
+            See All Jobs
           </button>
         )}
       </div>
