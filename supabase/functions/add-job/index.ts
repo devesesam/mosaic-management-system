@@ -62,6 +62,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Check if newJob data is null or undefined
+    if (!newJob) {
+      console.error('Edge Function: add-job - No job data returned after insert');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Failed to create job - no data returned',
+          details: 'Insert operation completed but no job data was returned'
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        }
+      );
+    }
+
     console.log('Edge Function: add-job - Job created successfully:', newJob.id);
 
     // Handle secondary workers if provided

@@ -73,6 +73,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Check if updatedJob data is null or undefined
+    if (!updatedJob) {
+      console.error('Edge Function: update-job - No job data returned after update');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Failed to update job - no data returned',
+          details: 'Update operation completed but no job data was returned'
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        }
+      );
+    }
+
     console.log('Edge Function: update-job - Job updated successfully:', id);
 
     // Handle secondary workers if included in the updates
