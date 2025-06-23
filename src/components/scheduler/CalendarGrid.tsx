@@ -183,6 +183,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onJobResize={onJobResize}
                 onShowMore={(date) => setSelectedDay({ date, workerId: null })}
                 readOnly={readOnly}
+                currentRowWorkerId={null}
               />
             ))}
           </div>
@@ -206,6 +207,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onJobResize={onJobResize}
                 onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
                 readOnly={readOnly}
+                currentRowWorkerId={worker.id}
               />
             ))}
           </div>
@@ -247,6 +249,7 @@ interface CalendarCellProps {
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
   readOnly?: boolean;
+  currentRowWorkerId: string | null;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -258,7 +261,8 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobClick,
   onJobResize,
   onShowMore,
-  readOnly = false
+  readOnly = false,
+  currentRowWorkerId
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -296,10 +300,16 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   let jobSpan = 1;
   let showText = false;
   let isLastDay = false;
+  let isSecondaryAssignment = false;
   
   if (mainJob && mainJob.start_date && mainJob.end_date) {
     const startDate = parseISO(mainJob.start_date);
     const endDate = parseISO(mainJob.end_date);
+    
+    // Check if this is a secondary assignment (job's primary worker is not the current row's worker)
+    isSecondaryAssignment = currentRowWorkerId !== null && 
+                           mainJob.worker_id !== currentRowWorkerId &&
+                           mainJob.secondary_worker_ids?.includes(currentRowWorkerId);
     
     // Only render on the start day (or first day of week if job started before)
     const isStartDay = isSameDay(day, startDate);
@@ -344,7 +354,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       <div className="h-full relative p-1">
         {mainJob && shouldRenderJob && (
           <div 
-            className="absolute left-0 right-0 top-0 mx-1 mt-1"
+            className={`absolute left-0 right-0 top-0 mx-1 mt-1 ${isSecondaryAssignment ? 'opacity-80' : ''}`}
             style={{ 
               width: `calc(${jobSpan * 100}% - 0.5rem)`,
               height: "calc(100% - 6px)"
@@ -354,12 +364,14 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               job={mainJob}
               onClick={() => onJobClick(mainJob)}
               isScheduled={true}
-              onResize={isLastDay ? onJobResize : undefined} // Only allow resize on last day
+              // Only allow resize on last day AND if it's not a secondary assignment
+              onResize={isLastDay && !isSecondaryAssignment ? onJobResize : undefined}
               isWeekView={true}
               showText={showText}
               dayIndex={dayIndex}
               days={days}
-              readOnly={readOnly}
+              // Make read-only if global read-only OR if it's a secondary assignment
+              readOnly={readOnly || isSecondaryAssignment}
             />
           </div>
         )}

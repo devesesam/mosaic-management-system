@@ -114,17 +114,20 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     if (readOnly && currentWorker) {
       // In read-only mode, show jobs that are either:
       // 1. Completely unassigned (no worker, no date)
-      // 2. Assigned to current worker but no date
+      // 2. Assigned to current worker (primary or secondary) but no date
       return jobs.filter(job => 
-        (!job.start_date && !job.worker_id) || 
-        (!job.start_date && job.worker_id === currentWorker.id)
+        (!job.start_date && !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0)) || 
+        (!job.start_date && (
+          job.worker_id === currentWorker.id || 
+          (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
+        ))
       );
     }
     
     return baseUnscheduled;
   }, [jobs, readOnly, currentWorker]);
 
-  // Get jobs for a specific day - filter for read-only mode
+  // Get jobs for a specific day - filter for read-only mode and include secondary workers
   const getDayJobs = useCallback((day: Date) => {
     const allDayJobs = jobs.filter(job => {
       // If job has no start date, it can't be displayed on a specific day
@@ -151,9 +154,12 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       }
     });
 
-    // Filter for read-only mode: only show jobs assigned to current worker
+    // Filter for read-only mode: only show jobs where current worker is primary or secondary
     if (readOnly && currentWorker) {
-      return allDayJobs.filter(job => job.worker_id === currentWorker.id);
+      return allDayJobs.filter(job => 
+        job.worker_id === currentWorker.id || 
+        (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
+      );
     }
     
     return allDayJobs;
@@ -207,9 +213,12 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       }
     });
 
-    // Filter for read-only mode: only show jobs assigned to current worker
+    // Filter for read-only mode: only show jobs where current worker is primary or secondary
     if (readOnly && currentWorker) {
-      jobsWithDates = jobsWithDates.filter(job => job.worker_id === currentWorker.id);
+      jobsWithDates = jobsWithDates.filter(job => 
+        job.worker_id === currentWorker.id || 
+        (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
+      );
     }
 
     // Sort jobs
@@ -567,6 +576,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
                       weekHeight={weekHeights[weekIndex]}
                       onJobResize={handleJobResize}
                       readOnly={readOnly}
+                      currentWorker={currentWorker}
                     />
                   ))
                 )}
@@ -633,6 +643,7 @@ interface CalendarDayProps {
   weekHeight: number;
   onJobResize: (job: Job, days: number) => void;
   readOnly?: boolean;
+  currentWorker?: any;
 }
 
 const CalendarDay: React.FC<CalendarDayProps> = ({ 
@@ -648,7 +659,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   multiDayJobs,
   weekHeight,
   onJobResize,
-  readOnly = false
+  readOnly = false,
+  currentWorker
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -679,6 +691,13 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   const totalSingleDayJobs = singleDayJobs.length;
   const hasMoreJobs = totalSingleDayJobs > visibleRows;
 
+  // Helper function to determine if a job is a secondary assignment for current worker
+  const isSecondaryAssignment = (job: Job) => {
+    return readOnly && currentWorker && 
+           job.worker_id !== currentWorker.id &&
+           job.secondary_worker_ids?.includes(currentWorker.id);
+  };
+
   return (
     <div 
       ref={drop}
@@ -704,7 +723,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         {singleDayJobs.slice(0, visibleRows).map((job, index) => (
           <div 
             key={`single-${job.id}`} 
-            className="mb-1 h-6"
+            className={`mb-1 h-6 ${isSecondaryAssignment(job) ? 'opacity-80' : ''}`}
             style={{ marginTop: index * 26 + 'px' }}
           >
             <DraggableJob
@@ -712,7 +731,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
               onClick={() => onJobClick(job)}
               isScheduled={true}
               isWeekView={false}
-              readOnly={readOnly}
+              readOnly={readOnly || isSecondaryAssignment(job)}
             />
           </div>
         ))}
@@ -731,10 +750,11 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       {/* Multi-day job segments */}
       {multiDayJobsForThisDay.map(({ job, startCol, endCol, rowIdx }) => {
         const spanDays = endCol - startCol + 1;
+        const isSecondary = isSecondaryAssignment(job);
         return (
           <div 
             key={`multiday-${job.id}`}
-            className="absolute left-0 z-10"
+            className={`absolute left-0 z-10 ${isSecondary ? 'opacity-80' : ''}`}
             style={{
               width: `calc(${spanDays} * 100%)`,
               top: `${30 + rowIdx * 26}px`, // Position based on row index
@@ -746,8 +766,9 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
               onClick={() => onJobClick(job)}
               isScheduled={true}
               isWeekView={false}
-              onResize={(days) => onJobResize(job, days)}
-              readOnly={readOnly}
+              // Only allow resize if not read-only AND not a secondary assignment
+              onResize={!readOnly && !isSecondary ? onJobResize : undefined}
+              readOnly={readOnly || isSecondary}
             />
           </div>
         );

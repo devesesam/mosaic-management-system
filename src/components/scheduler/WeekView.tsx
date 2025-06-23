@@ -111,24 +111,38 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     if (readOnly && currentWorker) {
       // In read-only mode, show jobs that are either:
       // 1. Completely unassigned (no worker, no date)
-      // 2. Assigned to current worker but no date
+      // 2. Assigned to current worker (primary or secondary) but no date
       return jobs.filter(job => 
-        (!job.start_date && !job.worker_id) || 
-        (!job.start_date && job.worker_id === currentWorker.id)
+        (!job.start_date && !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0)) || 
+        (!job.start_date && (
+          job.worker_id === currentWorker.id || 
+          (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
+        ))
       );
     }
     
     return baseUnscheduled;
   }, [jobs, readOnly, currentWorker]);
   
-  // Get jobs for a worker on a specific day
+  // Get jobs for a worker on a specific day - updated to include secondary workers
   const getWorkerDayJobs = useCallback((workerId: string | null, day: Date) => {
-    return jobs.filter(job => {
-      // Skip if worker doesn't match
-      if (job.worker_id !== workerId) return false;
-      
+    const allJobs = jobs.filter(job => {
       // Skip if no start date
       if (!job.start_date) return false;
+      
+      // Check if the job is assigned to this worker (primary or secondary)
+      let isAssignedToWorker = false;
+      
+      if (workerId === null) {
+        // For unassigned row, only show jobs with no primary worker AND no secondary workers
+        isAssignedToWorker = !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0);
+      } else {
+        // For specific worker rows, check both primary and secondary assignments
+        isAssignedToWorker = job.worker_id === workerId || 
+          (job.secondary_worker_ids && job.secondary_worker_ids.includes(workerId));
+      }
+      
+      if (!isAssignedToWorker) return false;
       
       try {
         const jobStart = parseISO(job.start_date);
@@ -152,7 +166,17 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         return false;
       }
     });
-  }, [jobs]);
+
+    // In read-only mode, filter to only show jobs where current worker is involved
+    if (readOnly && currentWorker) {
+      return allJobs.filter(job => 
+        job.worker_id === currentWorker.id || 
+        (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
+      );
+    }
+    
+    return allJobs;
+  }, [jobs, readOnly, currentWorker]);
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
     if (readOnly) {
