@@ -168,16 +168,26 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     drag(ref);
   }
 
-  // SIMPLIFIED LOGIC: Only disable pointer events on OTHER jobs during drag
+  // CRITICAL FIX: When THIS job is being dragged, disable pointer events entirely
+  // so it doesn't block drop zones underneath
   const isThisJobBeingDragged = draggingJobId === job.id;
-  const shouldDisablePointerEvents = globalIsDragging && !isThisJobBeingDragged;
+  const shouldDisablePointerEvents = globalIsDragging && (
+    !isThisJobBeingDragged || // Disable pointer events on other jobs
+    isThisJobBeingDragged    // Also disable on the job being dragged to allow drops underneath
+  );
   
-  console.log('DraggableJob: Pointer events logic:', {
+  // Special case: keep pointer events on OTHER jobs only if they're not dragging
+  const pointerEvents = globalIsDragging 
+    ? (isThisJobBeingDragged ? 'none' : 'none') // Both dragged and non-dragged jobs get 'none'
+    : 'auto'; // Normal state - all jobs interactive
+  
+  console.log('DraggableJob: Updated pointer events logic:', {
     jobId: job.id,
     globalIsDragging,
     draggingJobId,
     isThisJobBeingDragged,
     shouldDisablePointerEvents,
+    pointerEvents,
     isDragging,
     readOnly
   });
@@ -200,8 +210,8 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        // SIMPLIFIED: Only disable pointer events on jobs that are NOT being dragged
-        pointerEvents: shouldDisablePointerEvents ? 'none' : 'auto'
+        // CRITICAL FIX: When dragging, disable pointer events to allow drops underneath
+        pointerEvents: pointerEvents
       }}
     >
       <JobTile 
@@ -221,7 +231,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
           onClick={(e) => e.stopPropagation()}
           title="Drag to resize job duration"
           style={{
-            // Ensure resize handle is always interactive
+            // CRITICAL: Resize handle must always be interactive even during drag
             pointerEvents: 'auto'
           }}
         >
