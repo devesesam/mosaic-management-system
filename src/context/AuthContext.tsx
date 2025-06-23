@@ -36,20 +36,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
   const [isEditable, setIsEditable] = useState(false);
 
-  // Update isEditable when currentWorker changes
+  // Update isEditable when user or currentWorker changes
   useEffect(() => {
-    if (currentWorker?.email) {
-      const hasEditPermission = ADMIN_EMAILS.includes(currentWorker.email.toLowerCase());
+    if (user?.email) {
+      const userEmail = user.email.toLowerCase();
+      const hasEditPermission = ADMIN_EMAILS.includes(userEmail);
       setIsEditable(hasEditPermission);
       console.log('AuthProvider: Edit permission check:', {
-        email: currentWorker.email,
+        email: userEmail,
         hasEditPermission,
-        adminEmails: ADMIN_EMAILS
+        adminEmails: ADMIN_EMAILS,
+        isAdminEmail: ADMIN_EMAILS.includes(userEmail)
       });
     } else {
       setIsEditable(false);
     }
-  }, [currentWorker]);
+  }, [user, currentWorker]);
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
@@ -64,6 +66,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Error signing out:', err);
+    }
+  };
+
+  // Helper function to handle worker profile logic
+  const handleWorkerProfile = async (userEmail: string) => {
+    const normalizedEmail = userEmail.toLowerCase();
+    
+    // Skip worker profile creation for admin emails
+    if (ADMIN_EMAILS.includes(normalizedEmail)) {
+      console.log('AuthProvider: Skipping worker profile creation for admin email:', normalizedEmail);
+      return;
+    }
+
+    // For non-admin emails, try to get or create worker profile
+    try {
+      const worker = await getWorkerByEmail(userEmail);
+      
+      if (worker) {
+        console.log('AuthProvider: Found existing worker profile');
+        setCurrentWorker(worker);
+      } else {
+        console.log('AuthProvider: No worker profile found, creating one');
+        const newWorker = await createOrUpdateWorkerProfile(userEmail);
+        setCurrentWorker(newWorker);
+      }
+    } catch (err) {
+      console.error('AuthProvider: Error getting/creating worker profile:', err);
+      // Don't throw here - allow auth to continue even if worker profile fails
     }
   };
 
@@ -82,22 +112,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(data.session);
           setUser(data.session.user);
           
-          // Try to get worker profile for this user
+          // Handle worker profile for non-admin users
           if (data.session.user.email) {
-            try {
-              const worker = await getWorkerByEmail(data.session.user.email);
-              
-              if (worker) {
-                console.log('Found existing worker profile');
-                setCurrentWorker(worker);
-              } else {
-                console.log('No worker profile found, creating one');
-                const newWorker = await createOrUpdateWorkerProfile(data.session.user.email);
-                setCurrentWorker(newWorker);
-              }
-            } catch (err) {
-              console.error('Error getting/creating worker profile:', err);
-            }
+            await handleWorkerProfile(data.session.user.email);
           }
         }
       } catch (err) {
@@ -119,20 +136,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         setSession(session);
         
-        // Initialize worker profile
+        // Handle worker profile for non-admin users
         if (session.user.email) {
-          try {
-            const worker = await getWorkerByEmail(session.user.email);
-            
-            if (worker) {
-              setCurrentWorker(worker);
-            } else {
-              const newWorker = await createOrUpdateWorkerProfile(session.user.email);
-              setCurrentWorker(newWorker);
-            }
-          } catch (err) {
-            console.error('Error fetching worker profile:', err);
-          }
+          await handleWorkerProfile(session.user.email);
         }
       }
     });
