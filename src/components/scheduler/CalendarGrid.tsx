@@ -29,7 +29,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   onNewWorker,
   readOnly = false
 }) => {
-  const { currentWorker } = useAuth();
+  const { user, isEditable } = useAuth();
   const [isManageWorkersOpen, setIsManageWorkersOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
@@ -40,36 +40,45 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       count: workers.length,
       names: workers.map(w => w.name),
       readOnly,
-      currentWorker: currentWorker?.name || 'none'
+      isEditable,
+      userEmail: user?.email
     });
-  }, [workers, readOnly, currentWorker]);
+  }, [workers, readOnly, isEditable, user?.email]);
   
-  // Filter workers based on read-only mode and current worker
+  // Filter workers based on edit permissions and current user email
   const displayedWorkers = React.useMemo(() => {
-    if (readOnly && currentWorker) {
-      // In read-only mode, only show the current worker's row
-      const currentWorkerInList = workers.find(w => w.id === currentWorker.id);
-      return currentWorkerInList ? [currentWorkerInList] : [];
+    // If user has edit permissions (admin), show all workers or filtered workers
+    if (isEditable) {
+      if (selectedWorker === 'all') {
+        return workers;
+      }
+      return workers.filter(w => w.id === selectedWorker);
     }
     
-    // For admin users, show all workers or filtered workers
-    if (selectedWorker === 'all') {
-      return workers;
+    // If user is in read-only mode, only show the worker with matching email
+    if (user?.email) {
+      const userEmail = user.email.toLowerCase();
+      const matchingWorker = workers.find(w => 
+        w.email && w.email.toLowerCase() === userEmail
+      );
+      return matchingWorker ? [matchingWorker] : [];
     }
     
-    return workers.filter(w => w.id === selectedWorker);
-  }, [workers, selectedWorker, readOnly, currentWorker]);
+    // No user email or no matching worker - show nothing
+    return [];
+  }, [workers, selectedWorker, isEditable, user?.email]);
 
-  // Should show unassigned row?
-  const showUnassignedRow = !readOnly;
+  // Should show unassigned row? Only for users with edit permissions
+  const showUnassignedRow = isEditable;
 
   console.log('CalendarGrid: Display logic:', {
-    readOnly,
-    currentWorkerId: currentWorker?.id,
+    isEditable,
+    userEmail: user?.email,
     totalWorkers: workers.length,
     displayedWorkers: displayedWorkers.length,
     showUnassignedRow,
-    displayedWorkerNames: displayedWorkers.map(w => w.name)
+    displayedWorkerNames: displayedWorkers.map(w => w.name),
+    displayedWorkerEmails: displayedWorkers.map(w => w.email)
   });
 
   return (
@@ -79,7 +88,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         {/* Worker column header */}
         <div className="w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-gray-100 flex items-center justify-between px-3">
           <div className="flex items-center space-x-2 flex-1">
-            {!readOnly ? (
+            {isEditable ? (
               <select
                 value={selectedWorker}
                 onChange={(e) => setSelectedWorker(e.target.value)}
@@ -94,7 +103,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
               </select>
             ) : (
               <span className="text-sm font-medium text-gray-700">
-                {currentWorker ? currentWorker.name : 'Workers'}
+                {displayedWorkers.length > 0 ? displayedWorkers[0].name : 'Workers'}
               </span>
             )}
           </div>
@@ -102,24 +111,24 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             <button
               onClick={() => setIsManageWorkersOpen(true)}
               className={`p-1.5 rounded-full transition-colors ${
-                readOnly 
+                !isEditable 
                   ? 'text-gray-400 cursor-not-allowed' 
                   : 'hover:bg-gray-200 text-gray-600'
               }`}
-              title={readOnly ? 'Read-only mode' : 'Manage Workers'}
-              disabled={readOnly}
+              title={!isEditable ? 'Read-only mode' : 'Manage Workers'}
+              disabled={!isEditable}
             >
               <Minus className="h-5 w-5" />
             </button>
             <button
               onClick={onNewWorker}
               className={`p-1.5 rounded-full transition-colors ${
-                readOnly 
+                !isEditable 
                   ? 'text-gray-400 cursor-not-allowed' 
                   : 'hover:bg-gray-200 text-gray-600'
               }`}
-              title={readOnly ? 'Read-only mode' : 'Add New Worker'}
-              disabled={readOnly}
+              title={!isEditable ? 'Read-only mode' : 'Add New Worker'}
+              disabled={!isEditable}
             >
               <Plus className="h-5 w-5" />
             </button>
@@ -141,14 +150,14 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       </div>
 
       {/* No workers message for read-only users */}
-      {readOnly && displayedWorkers.length === 0 && (
+      {!isEditable && displayedWorkers.length === 0 && (
         <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
-          No worker profile found. Please contact your administrator.
+          No worker profile found for your email address. Please contact your administrator.
         </div>
       )}
 
       {/* No workers message for admin users */}
-      {!readOnly && workers.length === 0 && (
+      {isEditable && workers.length === 0 && (
         <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
           No workers found in the database. Add a worker to start scheduling jobs.
         </div>
@@ -156,7 +165,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
       {/* Grid content */}
       <div className="flex flex-col">
-        {/* Unassigned row - only show for admin users */}
+        {/* Unassigned row - only show for users with edit permissions */}
         {showUnassignedRow && (
           <div className="flex border-b border-gray-200">
             <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
