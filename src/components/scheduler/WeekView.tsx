@@ -177,6 +177,36 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     
     return allJobs;
   }, [jobs, readOnly, currentWorker]);
+
+  // Get ALL jobs that span a specific day (for +X more calculation)
+  const getAllJobsSpanningDay = useCallback((day: Date) => {
+    return jobs.filter(job => {
+      // Skip if no start date
+      if (!job.start_date) return false;
+      
+      try {
+        const jobStart = parseISO(job.start_date);
+        
+        // Handle jobs with end dates (multi-day jobs)
+        if (job.end_date) {
+          const jobEnd = parseISO(job.end_date);
+          
+          // Check if day is within the job's date range
+          return (
+            (day >= jobStart && day <= jobEnd) || 
+            format(day, 'yyyy-MM-dd') === format(jobStart, 'yyyy-MM-dd') || 
+            format(day, 'yyyy-MM-dd') === format(jobEnd, 'yyyy-MM-dd')
+          );
+        }
+        
+        // For single-day jobs, just check the start date
+        return format(day, 'yyyy-MM-dd') === format(jobStart, 'yyyy-MM-dd');
+      } catch (error) {
+        console.error('Error parsing job dates:', error, job);
+        return false;
+      }
+    });
+  }, [jobs]);
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
     if (readOnly) {
@@ -469,6 +499,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
             days={weekDays}
             workers={workers}
             getWorkerDayJobs={getWorkerDayJobs}
+            getAllJobsSpanningDay={getAllJobsSpanningDay}
             onJobDrop={handleJobDrop}
             onJobClick={(job) => {
               setSelectedJob(job);

@@ -12,6 +12,7 @@ interface CalendarGridProps {
   days: Date[];
   workers: Worker[];
   getWorkerDayJobs: (workerId: string | null, day: Date) => Job[];
+  getAllJobsSpanningDay: (day: Date) => Job[];
   onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
@@ -23,6 +24,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   days,
   workers,
   getWorkerDayJobs,
+  getAllJobsSpanningDay,
   onJobDrop,
   onJobClick,
   onJobResize,
@@ -178,6 +180,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 day={day}
                 days={days}
                 jobs={getWorkerDayJobs(null, day)}
+                allJobsSpanningDay={getAllJobsSpanningDay(day)}
                 onJobDrop={onJobDrop}
                 onJobClick={onJobClick}
                 onJobResize={onJobResize}
@@ -202,6 +205,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 day={day}
                 days={days}
                 jobs={getWorkerDayJobs(worker.id, day)}
+                allJobsSpanningDay={getAllJobsSpanningDay(day)}
                 onJobDrop={onJobDrop}
                 onJobClick={onJobClick}
                 onJobResize={onJobResize}
@@ -244,6 +248,7 @@ interface CalendarCellProps {
   day: Date;
   days: Date[];
   jobs: Job[];
+  allJobsSpanningDay: Job[];
   onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
@@ -257,6 +262,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   day,
   days,
   jobs,
+  allJobsSpanningDay,
   onJobDrop,
   onJobClick,
   onJobResize,
@@ -304,7 +310,19 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   });
   
   const mainJob = sortedJobs[0];
-  const hasMoreJobs = sortedJobs.length > 1;
+  
+  // Calculate "+X more" using ALL jobs spanning this day
+  const totalJobsOnDay = allJobsSpanningDay.length;
+  
+  // Count how many jobs are rendered in this cell
+  let renderedJobsCount = 0;
+  if (mainJob && shouldRenderJobInCell(mainJob, day, days, dayIndex)) {
+    renderedJobsCount = 1;
+  }
+  
+  // Calculate hidden jobs count
+  const hiddenJobsCount = totalJobsOnDay - renderedJobsCount;
+  const hasMoreJobs = hiddenJobsCount > 0;
   
   // Fixed cell height
   const cellHeight = 100;
@@ -402,7 +420,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             onClick={() => onShowMore(day)}
             className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-20"
           >
-            +{sortedJobs.length - 1} more
+            +{hiddenJobsCount} more
           </button>
         )}
         
@@ -415,5 +433,25 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     </div>
   );
 };
+
+// Helper function to determine if a job should be rendered in this specific cell
+function shouldRenderJobInCell(job: Job, day: Date, days: Date[], dayIndex: number): boolean {
+  if (!job.start_date || !job.end_date) return false;
+  
+  try {
+    const startDate = parseISO(job.start_date);
+    const endDate = parseISO(job.end_date);
+    
+    // Only render on the start day (or first day of week if job started before)
+    const isStartDay = isSameDay(day, startDate);
+    const isFirstDayOfWeek = dayIndex === 0;
+    const jobStartsBeforeWeek = isBefore(startDate, days[0]);
+    
+    return isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
+  } catch (error) {
+    console.error('Error checking if job should render in cell:', error, job);
+    return false;
+  }
+}
 
 export default CalendarGrid;
