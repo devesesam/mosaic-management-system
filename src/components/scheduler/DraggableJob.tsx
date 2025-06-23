@@ -168,21 +168,33 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     drag(ref);
   }
 
-  // CORRECTED FIX: Only disable pointer events on OTHER jobs (not the one being dragged)
+  // FIXED: Determine z-index and pointer events based on drag state
   const isThisJobBeingDragged = draggingJobId === job.id;
   
-  // When dragging:
-  // - The job being dragged keeps 'auto' so drag continues to work
-  // - Other jobs get 'none' so they don't interfere with drop zones
+  // Z-index logic:
+  // - Job being dragged: highest (50)
+  // - Other jobs during drag: lowest (-10) to stay below drop zones
+  // - Normal state: normal (10)
+  let zIndex = 10; // Normal state
+  if (globalIsDragging) {
+    if (isThisJobBeingDragged) {
+      zIndex = 50; // Highest - the dragged job
+    } else {
+      zIndex = -10; // Lowest - other jobs during drag (below drop zones)
+    }
+  }
+  
+  // Pointer events: disable for non-dragged jobs during drag
   const pointerEvents = globalIsDragging && !isThisJobBeingDragged 
     ? 'none'  // Other jobs: disable to allow drops underneath
     : 'auto'; // The dragged job and normal state: keep interactive
   
-  console.log('DraggableJob: Corrected pointer events logic:', {
+  console.log('DraggableJob: Z-index and pointer events logic:', {
     jobId: job.id,
     globalIsDragging,
     draggingJobId,
     isThisJobBeingDragged,
+    zIndex,
     pointerEvents,
     isDragging,
     readOnly
@@ -196,7 +208,6 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         transition-all duration-200
         touch-none
         relative
-        z-10
         ${isWeekView ? 'h-full' : ''}
       `}
       style={{
@@ -206,7 +217,9 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        // CORRECTED FIX: Only disable pointer events on non-dragged jobs during drag
+        // CRITICAL FIX: Adjust z-index during drag to ensure proper layering
+        zIndex: zIndex,
+        // Only disable pointer events on non-dragged jobs during drag
         pointerEvents: pointerEvents
       }}
     >
@@ -222,14 +235,14 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
       {/* Resize handle - only show if not read-only and resizing is available */}
       {isScheduled && onResize && !readOnly && (
         <div
-          className="absolute right-0 top-0 h-full w-3 cursor-ew-resize hover:bg-white hover:bg-opacity-30 z-20 flex items-center justify-end pr-1"
+          className="absolute right-0 top-0 h-full w-3 cursor-ew-resize hover:bg-white hover:bg-opacity-30 flex items-center justify-end pr-1"
+          style={{ 
+            zIndex: 100, // Always highest to remain functional
+            pointerEvents: 'auto' // Always interactive
+          }}
           onMouseDown={handleResizeStart}
           onClick={(e) => e.stopPropagation()}
           title="Drag to resize job duration"
-          style={{
-            // CRITICAL: Resize handle must always be interactive even during drag
-            pointerEvents: 'auto'
-          }}
         >
           <div className="w-0.5 h-4 bg-white bg-opacity-70 rounded-full"></div>
         </div>

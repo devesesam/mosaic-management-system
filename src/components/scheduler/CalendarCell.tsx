@@ -15,6 +15,7 @@ interface CalendarCellProps {
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
   readOnly?: boolean;
+  currentRowWorkerId?: string | null;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -26,13 +27,15 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobClick,
   onJobResize,
   onShowMore,
-  readOnly = false
+  readOnly = false,
+  currentRowWorkerId
 }) => {
   const { isDragging: globalIsDragging } = useDragContext();
   
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
     drop: (item: { job: Job }) => {
+      console.log('CalendarCell: Dropping job', item.job.id, 'on date', format(day, 'yyyy-MM-dd'), 'for worker', workerId);
       onJobDrop(item.job, workerId, day);
     },
     collect: monitor => ({
@@ -60,6 +63,15 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   const mainJob = sortedJobs[0];
   const hasMoreJobs = sortedJobs.length > 1;
 
+  console.log('CalendarCell: Render state:', {
+    date: format(day, 'MMM dd'),
+    workerId,
+    jobCount: jobs.length,
+    globalIsDragging,
+    isOver,
+    mainJobId: mainJob?.id
+  });
+
   return (
     <div
       ref={drop}
@@ -68,12 +80,13 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
         ${isOver ? 'bg-blue-50' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
-        ${globalIsDragging ? 'z-20' : 'z-10'}
       `}
       style={{ 
         height: '100px',
+        // CRITICAL FIX: Ensure drop zone is above job tiles during drag
+        zIndex: globalIsDragging ? 20 : 10,
         // Ensure drop zone is always interactive during drag
-        pointerEvents: globalIsDragging ? 'auto' : 'auto'
+        pointerEvents: 'auto'
       }}
     >
       <div className="h-full relative p-1">
@@ -96,10 +109,10 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
-            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-30"
+            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline"
             style={{
-              // Ensure "more" button is always clickable
-              pointerEvents: 'auto'
+              zIndex: 30, // Above everything to remain clickable
+              pointerEvents: 'auto' // Always clickable
             }}
           >
             +{sortedJobs.length - 1} more
