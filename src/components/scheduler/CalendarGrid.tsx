@@ -327,46 +327,12 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // FIXED LOGIC: Check if there are hidden jobs on this day for THIS WORKER'S JOBS ONLY
-  // Hidden jobs are jobs that are active on this day but don't get to render their tile here
-  const hiddenJobs = strictlyFilteredJobs.filter(job => {
-    if (!job.start_date || !job.end_date) return false;
-    
-    try {
-      const startDate = parseISO(job.start_date);
-      const endDate = parseISO(job.end_date);
-      
-      // Check if job is active on this day
-      const isActiveOnThisDay = (
-        isSameDay(day, startDate) || 
-        isSameDay(day, endDate) || 
-        (day > startDate && day < endDate)
-      );
-      
-      if (!isActiveOnThisDay) return false;
-      
-      // Check if this job's tile should render on this day
-      const isStartDay = isSameDay(day, startDate);
-      const isFirstDayOfWeek = dayIndex === 0;
-      const jobStartsBeforeWeek = isBefore(startDate, days[0]);
-      
-      const shouldRenderTileHere = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
-      
-      // If job is active but its tile doesn't render here, it's hidden
-      return !shouldRenderTileHere;
-    } catch (error) {
-      // If there's an error parsing dates, don't count this job as hidden
-      return false;
-    }
-  });
-
-  const hasHiddenJobs = hiddenJobs.length > 0;
+  // SIMPLIFIED LOGIC: Show "See All Jobs" if there are any jobs on this day
+  const hasJobs = strictlyFilteredJobs.length > 0;
   
-  console.log(`CalendarCell HIDDEN JOBS DEBUG [${format(day, 'MMM dd')} - Worker: ${currentRowWorkerId || 'Unassigned'}]:`, {
+  console.log(`CalendarCell SIMPLIFIED LOGIC [${format(day, 'MMM dd')} - Worker: ${currentRowWorkerId || 'Unassigned'}]:`, {
     totalJobsForWorker: strictlyFilteredJobs.length,
-    hiddenJobsCount: hiddenJobs.length,
-    hiddenJobIds: hiddenJobs.map(j => j.id),
-    hasHiddenJobs,
+    hasJobs,
     mainJobId: mainJob?.id || 'none'
   });
   
@@ -461,7 +427,8 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </div>
         )}
         
-        {hasHiddenJobs && (
+        {/* SIMPLIFIED: Show "See All Jobs" if there are any jobs on this day */}
+        {hasJobs && (
           <button
             onClick={() => onShowMore(day)}
             className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-20"
