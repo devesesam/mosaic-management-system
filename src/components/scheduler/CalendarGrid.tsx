@@ -305,11 +305,10 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // SIMPLIFIED LOGIC: Count buried jobs
-  let buriedJobsCount = 0;
-
-  jobs.forEach(job => {
-    if (!job.start_date || !job.end_date) return;
+  // NEW LOGIC: Check if there are hidden jobs on this day
+  // Hidden jobs are jobs that are active on this day but don't get to render their tile here
+  const hiddenJobs = jobs.filter(job => {
+    if (!job.start_date || !job.end_date) return false;
     
     try {
       const startDate = parseISO(job.start_date);
@@ -322,25 +321,24 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         (day > startDate && day < endDate)
       );
       
-      if (!isActiveOnThisDay) return;
+      if (!isActiveOnThisDay) return false;
       
-      // Check if the job's tile should render on this day
+      // Check if this job's tile should render on this day
       const isStartDay = isSameDay(day, startDate);
       const isFirstDayOfWeek = dayIndex === 0;
       const jobStartsBeforeWeek = isBefore(startDate, days[0]);
       
       const shouldRenderTileHere = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
       
-      // If job is active but tile doesn't render here, it's buried
-      if (!shouldRenderTileHere) {
-        buriedJobsCount++;
-      }
+      // If job is active but its tile doesn't render here, it's hidden
+      return !shouldRenderTileHere;
     } catch (error) {
-      // If there's an error parsing dates, don't count this job
+      // If there's an error parsing dates, don't count this job as hidden
+      return false;
     }
   });
 
-  const hasMoreJobs = buriedJobsCount > 0;
+  const hasHiddenJobs = hiddenJobs.length > 0;
   
   // Fixed cell height
   const cellHeight = 100;
@@ -433,12 +431,12 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </div>
         )}
         
-        {hasMoreJobs && (
+        {hasHiddenJobs && (
           <button
             onClick={() => onShowMore(day)}
             className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-20"
           >
-            +{buriedJobsCount} more
+            See All Jobs
           </button>
         )}
         
