@@ -278,8 +278,23 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
+  // Helper function to check if a job is assigned to the current worker
+  const isJobAssignedToCurrentWorker = (job: Job) => {
+    if (currentRowWorkerId === null) {
+      // For unassigned row, only jobs with no primary worker AND no secondary workers
+      return !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0);
+    } else {
+      // For specific worker rows, check both primary and secondary assignments
+      return job.worker_id === currentRowWorkerId || 
+             (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentRowWorkerId));
+    }
+  };
+  
+  // Filter jobs to only include those assigned to current worker (double-check the filtering)
+  const workerJobs = jobs.filter(isJobAssignedToCurrentWorker);
+  
   // Sort jobs by priority: put editable jobs first, then secondary assignments
-  const sortedJobs = [...jobs].sort((a, b) => {
+  const sortedJobs = [...workerJobs].sort((a, b) => {
     // Check if jobs are secondary assignments for current worker
     const aIsSecondary = currentRowWorkerId !== null && 
                          a.worker_id !== currentRowWorkerId &&
@@ -305,9 +320,9 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // NEW LOGIC: Check if there are hidden jobs on this day
+  // FIXED LOGIC: Check if there are hidden jobs on this day for THIS WORKER ONLY
   // Hidden jobs are jobs that are active on this day but don't get to render their tile here
-  const hiddenJobs = jobs.filter(job => {
+  const hiddenJobs = workerJobs.filter(job => {
     if (!job.start_date || !job.end_date) return false;
     
     try {
@@ -440,7 +455,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </button>
         )}
         
-        {jobs.length === 0 && (
+        {workerJobs.length === 0 && (
           <div className="h-full w-full flex items-center justify-center">
             <div className="w-full h-full" />
           </div>
