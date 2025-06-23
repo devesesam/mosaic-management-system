@@ -3,6 +3,7 @@ import { format, isSameDay, parseISO } from 'date-fns';
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
 import DraggableJob from './DraggableJob';
+import { useDragContext } from '../../context/DragContext';
 
 interface CalendarCellProps {
   workerId: string | null;
@@ -27,6 +28,8 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onShowMore,
   readOnly = false
 }) => {
+  const { isDragging: globalIsDragging } = useDragContext();
+  
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
     drop: (item: { job: Job }) => {
@@ -65,8 +68,13 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
         ${isOver ? 'bg-blue-50' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
+        ${globalIsDragging ? 'z-20' : 'z-10'}
       `}
-      style={{ height: '100px' }}
+      style={{ 
+        height: '100px',
+        // Ensure drop zone is always interactive during drag
+        pointerEvents: globalIsDragging ? 'auto' : 'auto'
+      }}
     >
       <div className="h-full relative p-1">
         {mainJob && (
@@ -88,7 +96,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
-            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-10"
+            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-30"
+            style={{
+              // Ensure "more" button is always clickable
+              pointerEvents: 'auto'
+            }}
           >
             +{sortedJobs.length - 1} more
           </button>

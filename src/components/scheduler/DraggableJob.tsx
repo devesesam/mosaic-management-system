@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback, memo } from 'react';
 import { useDrag } from 'react-dnd';
 import { Job } from '../../types';
 import JobTile from '../jobs/JobTile';
+import { useDragContext } from '../../context/DragContext';
 
 interface DraggableJobProps {
   job: Job;
@@ -30,6 +31,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
+  const { isDragging: globalIsDragging, draggingJobId, setDragging } = useDragContext();
   
   const [{ isDragging }, drag] = useDrag({
     type: 'JOB',
@@ -37,7 +39,13 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging()
     }),
-    canDrag: () => !isResizing && !readOnly
+    canDrag: () => !isResizing && !readOnly,
+    begin: () => {
+      setDragging(true, job.id);
+    },
+    end: () => {
+      setDragging(false);
+    }
   });
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -148,6 +156,10 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
   if (!readOnly) {
     drag(ref);
   }
+
+  // Determine if this job should be affected by global drag state
+  const isThisJobBeingDragged = isDragging && draggingJobId === job.id;
+  const shouldDisablePointerEvents = globalIsDragging && !isThisJobBeingDragged;
   
   return (
     <div 
@@ -166,7 +178,9 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         height: isWeekView && isScheduled ? '100%' : isScheduled ? '22px' : 'auto',
         cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
-        WebkitUserSelect: 'none'
+        WebkitUserSelect: 'none',
+        // CRITICAL: Disable pointer events on other jobs during drag
+        pointerEvents: shouldDisablePointerEvents ? 'none' : 'auto'
       }}
     >
       <JobTile 
@@ -185,6 +199,10 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
           onMouseDown={handleResizeStart}
           onClick={(e) => e.stopPropagation()}
           title="Drag to resize job duration"
+          style={{
+            // Ensure resize handle is always interactive
+            pointerEvents: 'auto'
+          }}
         >
           <div className="w-0.5 h-4 bg-white bg-opacity-70 rounded-full"></div>
         </div>
