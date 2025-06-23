@@ -26,7 +26,11 @@ import DraggableJob from './DraggableJob';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-const MonthView: React.FC = () => {
+interface MonthViewProps {
+  readOnly?: boolean;
+}
+
+const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -301,6 +305,11 @@ const MonthView: React.FC = () => {
   }, [weeks, multiDayJobs, getDayJobs]);
 
   const handleJobDrop = async (job: Job, date: Date) => {
+    if (readOnly) {
+      toast.error('Cannot move jobs in read-only mode');
+      return;
+    }
+    
     try {
       console.log('MonthView: Handling job drop:', { job_id: job.id, date });
       
@@ -358,6 +367,11 @@ const MonthView: React.FC = () => {
   };
 
   const handleJobSubmit = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
+    if (readOnly) {
+      toast.error('Cannot modify jobs in read-only mode');
+      return;
+    }
+    
     try {
       if (selectedJob) {
         await updateJob(selectedJob.id, jobData);
@@ -372,6 +386,11 @@ const MonthView: React.FC = () => {
   };
 
   const handleDeleteJob = async (id: string) => {
+    if (readOnly) {
+      toast.error('Cannot delete jobs in read-only mode');
+      return;
+    }
+    
     try {
       await deleteJob(id);
       setIsJobFormOpen(false);
@@ -383,6 +402,11 @@ const MonthView: React.FC = () => {
 
   // Handle job resize
   const handleJobResize = async (job: Job, days: number) => {
+    if (readOnly) {
+      toast.error('Cannot resize jobs in read-only mode');
+      return;
+    }
+    
     try {
       console.log('MonthView: Handling job resize:', { job_id: job.id, days });
       
@@ -512,6 +536,7 @@ const MonthView: React.FC = () => {
                       multiDayJobs={multiDayJobs}
                       weekHeight={weekHeights[weekIndex]}
                       onJobResize={handleJobResize}
+                      readOnly={readOnly}
                     />
                   ))
                 )}
@@ -527,6 +552,7 @@ const MonthView: React.FC = () => {
               setSelectedJob(job);
               setIsJobFormOpen(true);
             }}
+            readOnly={readOnly}
           />
         </div>
       </div>
@@ -541,6 +567,7 @@ const MonthView: React.FC = () => {
           onSubmit={handleJobSubmit}
           onDelete={handleDeleteJob}
           initialJob={selectedJob || undefined}
+          readOnly={readOnly}
         />
       )}
 
@@ -573,6 +600,7 @@ interface CalendarDayProps {
   multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number}[];
   weekHeight: number;
   onJobResize: (job: Job, days: number) => void;
+  readOnly?: boolean;
 }
 
 const CalendarDay: React.FC<CalendarDayProps> = ({ 
@@ -587,7 +615,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   dayIdx,
   multiDayJobs,
   weekHeight,
-  onJobResize
+  onJobResize,
+  readOnly = false
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -596,7 +625,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     },
     collect: monitor => ({
       isOver: !!monitor.isOver()
-    })
+    }),
+    canDrop: () => !readOnly
   });
 
   // This day's column position in the grid (0-6)
@@ -624,7 +654,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         flex flex-col relative border-b border-r border-gray-200
         ${!isInCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
         ${isToday(day) ? 'bg-blue-50' : ''}
-        ${isOver ? 'bg-blue-100' : ''}
+        ${isOver && !readOnly ? 'bg-blue-100' : ''}
+        ${readOnly ? 'cursor-default' : ''}
       `}
       style={{ height: `${weekHeight}px`, minHeight: '120px' }}
     >
@@ -649,6 +680,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
               onClick={() => onJobClick(job)}
               isScheduled={true}
               isWeekView={false}
+              readOnly={readOnly}
             />
           </div>
         ))}
@@ -683,6 +715,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
               isScheduled={true}
               isWeekView={false}
               onResize={(days) => onJobResize(job, days)}
+              readOnly={readOnly}
             />
           </div>
         );

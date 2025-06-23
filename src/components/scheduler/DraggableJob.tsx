@@ -164,7 +164,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         position: 'relative',
         width: isScheduled ? '100%' : 'auto',
         height: isWeekView && isScheduled ? '100%' : isScheduled ? '22px' : 'auto',
-        cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : 'grab',
+        cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none'
       }}

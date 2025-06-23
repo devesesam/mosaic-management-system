@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Worker } from '../../types';
-import { X, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Trash2, AlertTriangle, Lock } from 'lucide-react';
 import { useWorkerStore } from '../../store/workersStore';
 import { getJobsForWorker } from '../../api/jobsApi';
 
 interface WorkerManageModalProps {
   onClose: () => void;
   workers: Worker[];
+  readOnly?: boolean;
 }
 
-const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers }) => {
+const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers, readOnly = false }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +18,8 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers 
   const { deleteWorker } = useWorkerStore();
 
   const checkWorkerJobs = async (worker: Worker) => {
+    if (readOnly) return;
+    
     setIsLoading(true);
     try {
       const jobs = await getJobsForWorker(worker.id);
@@ -31,7 +34,7 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers 
   };
 
   const handleDelete = async () => {
-    if (!selectedWorker) return;
+    if (!selectedWorker || readOnly) return;
     try {
       await deleteWorker(selectedWorker.id);
       setShowDeleteConfirm(false);
@@ -46,9 +49,17 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers 
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
-            Manage Workers
-          </h2>
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xl font-semibold text-gray-800">
+              Manage Workers
+            </h2>
+            {readOnly && (
+              <div className="flex items-center text-amber-600">
+                <Lock className="h-4 w-4 mr-1" />
+                <span className="text-sm">Read Only</span>
+              </div>
+            )}
+          </div>
           <button 
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -58,6 +69,14 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers 
         </div>
         
         <div className="p-4">
+          {readOnly && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-amber-700 text-sm">
+                You are in read-only mode. Worker management is disabled.
+              </p>
+            </div>
+          )}
+          
           {workers.length === 0 ? (
             <p className="text-gray-500 text-center py-4">No workers available</p>
           ) : (
@@ -75,9 +94,13 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers 
                   </div>
                   <button
                     onClick={() => checkWorkerJobs(worker)}
-                    disabled={isLoading}
-                    className="p-2 text-red-600 hover:text-red-700 transition-colors disabled:opacity-50"
-                    title="Delete Worker"
+                    disabled={isLoading || readOnly}
+                    className={`p-2 transition-colors ${
+                      readOnly 
+                        ? 'text-gray-400 cursor-not-allowed' 
+                        : 'text-red-600 hover:text-red-700'
+                    } disabled:opacity-50`}
+                    title={readOnly ? 'Read-only mode' : 'Delete Worker'}
                   >
                     <Trash2 size={18} />
                   </button>
@@ -89,7 +112,7 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers 
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && selectedWorker && (
+      {showDeleteConfirm && selectedWorker && !readOnly && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-center mb-4 text-red-600">

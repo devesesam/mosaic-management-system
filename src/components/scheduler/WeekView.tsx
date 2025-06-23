@@ -21,7 +21,11 @@ import JobForm from '../jobs/JobForm';
 import WorkerForm from '../workers/WorkerForm';
 import toast from 'react-hot-toast';
 
-const WeekView: React.FC = () => {
+interface WeekViewProps {
+  readOnly?: boolean;
+}
+
+const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
@@ -134,6 +138,11 @@ const WeekView: React.FC = () => {
   }, [jobs]);
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
+    if (readOnly) {
+      toast.error('Cannot modify jobs in read-only mode');
+      return;
+    }
+    
     try {
       if (selectedJob) {
         await updateJob(selectedJob.id, jobData);
@@ -148,6 +157,11 @@ const WeekView: React.FC = () => {
   };
 
   const handleDeleteJob = async (id: string) => {
+    if (readOnly) {
+      toast.error('Cannot delete jobs in read-only mode');
+      return;
+    }
+    
     try {
       await deleteJob(id);
       setIsJobFormOpen(false);
@@ -158,6 +172,11 @@ const WeekView: React.FC = () => {
   };
 
   const handleSubmitWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>) => {
+    if (readOnly) {
+      toast.error('Cannot add workers in read-only mode');
+      return;
+    }
+    
     try {
       console.log('WeekView: Submitting worker:', workerData);
       
@@ -172,6 +191,11 @@ const WeekView: React.FC = () => {
   };
   
   const handleJobDrop = async (job: Job, workerId: string | null, date: Date | null) => {
+    if (readOnly) {
+      toast.error('Cannot move jobs in read-only mode');
+      return;
+    }
+    
     try {
       let updates: Partial<Job> = {
         worker_id: workerId,
@@ -235,6 +259,11 @@ const WeekView: React.FC = () => {
   };
 
   const handleJobResize = async (job: Job, days: number) => {
+    if (readOnly) {
+      toast.error('Cannot resize jobs in read-only mode');
+      return;
+    }
+    
     try {
       console.log('WeekView: Resize started with:', {
         job_id: job.id,
@@ -406,6 +435,7 @@ const WeekView: React.FC = () => {
             }}
             onJobResize={handleJobResize}
             onNewWorker={() => setIsWorkerFormOpen(true)}
+            readOnly={readOnly}
           />
         </div>
         
@@ -417,6 +447,7 @@ const WeekView: React.FC = () => {
             setSelectedJob(job);
             setIsJobFormOpen(true);
           }}
+          readOnly={readOnly}
         />
       </div>
       
@@ -430,6 +461,7 @@ const WeekView: React.FC = () => {
           onSubmit={handleSubmitJob}
           onDelete={handleDeleteJob}
           initialJob={selectedJob || undefined}
+          readOnly={readOnly}
         />
       )}
 
@@ -438,6 +470,7 @@ const WeekView: React.FC = () => {
         <WorkerForm
           onClose={() => setIsWorkerFormOpen(false)}
           onSubmit={handleSubmitWorker}
+          readOnly={readOnly}
         />
       )}
     </div>

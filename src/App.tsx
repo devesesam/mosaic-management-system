@@ -13,7 +13,7 @@ import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 
 function App() {
-  const { user, authError, currentWorker, signOut } = useAuth();
+  const { user, authError, currentWorker, signOut, isEditable } = useAuth();
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
@@ -55,11 +55,30 @@ function App() {
     return () => clearInterval(interval);
   }, [fetchJobs, fetchWorkers]);
 
+  // Log edit permission status
+  useEffect(() => {
+    if (currentWorker) {
+      console.log('App: User edit permissions:', {
+        email: currentWorker.email,
+        isEditable,
+        mode: isEditable ? 'EDIT' : 'READ-ONLY'
+      });
+    }
+  }, [currentWorker, isEditable]);
+
   const handleNewJob = () => {
+    if (!isEditable) {
+      console.log('App: New job creation blocked - read-only mode');
+      return;
+    }
     setIsJobFormOpen(true);
   };
 
   const handleSubmitJob = async (jobData: any) => {
+    if (!isEditable) {
+      console.log('App: Job submission blocked - read-only mode');
+      return;
+    }
     try {
       await addJob(jobData);
       setIsJobFormOpen(false);
@@ -139,13 +158,28 @@ function App() {
           onNewJob={handleNewJob} 
           activeView={activeView}
           setActiveView={setActiveView}
+          isEditable={isEditable}
         />
+
+        {/* Show read-only notice if user doesn't have edit permissions */}
+        {!isEditable && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center text-amber-700">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                <span className="text-sm font-medium">
+                  You are in read-only mode. Contact an administrator to request edit access.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <main className="flex-1 overflow-hidden relative">
           {activeView === 'week' ? (
-            <WeekView />
+            <WeekView readOnly={!isEditable} />
           ) : (
-            <MonthView />
+            <MonthView readOnly={!isEditable} />
           )}
         </main>
 
@@ -153,6 +187,7 @@ function App() {
           <JobForm
             onClose={() => setIsJobFormOpen(false)}
             onSubmit={handleSubmitJob}
+            readOnly={!isEditable}
           />
         )}
 

@@ -15,6 +15,7 @@ interface CalendarGridProps {
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onNewWorker: () => void;
+  readOnly?: boolean;
 }
 
 const CalendarGrid: React.FC<CalendarGridProps> = ({
@@ -24,7 +25,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   onJobDrop,
   onJobClick,
   onJobResize,
-  onNewWorker
+  onNewWorker,
+  readOnly = false
 }) => {
   const [isManageWorkersOpen, setIsManageWorkersOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
@@ -65,17 +67,27 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setIsManageWorkersOpen(true)}
-              className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
-              title="Manage Workers"
+              className={`p-1.5 rounded-full transition-colors ${
+                readOnly 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : 'hover:bg-gray-200 text-gray-600'
+              }`}
+              title={readOnly ? 'Read-only mode' : 'Manage Workers'}
+              disabled={readOnly}
             >
-              <Minus className="h-5 w-5 text-gray-600" />
+              <Minus className="h-5 w-5" />
             </button>
             <button
               onClick={onNewWorker}
-              className="p-1.5 rounded-full hover:bg-gray-200 transition-colors"
-              title="Add New Worker"
+              className={`p-1.5 rounded-full transition-colors ${
+                readOnly 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : 'hover:bg-gray-200 text-gray-600'
+              }`}
+              title={readOnly ? 'Read-only mode' : 'Add New Worker'}
+              disabled={readOnly}
             >
-              <Plus className="h-5 w-5 text-gray-600" />
+              <Plus className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -119,6 +131,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
               onJobClick={onJobClick}
               onJobResize={onJobResize}
               onShowMore={(date) => setSelectedDay({ date, workerId: null })}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -140,6 +153,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onJobClick={onJobClick}
                 onJobResize={onJobResize}
                 onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -151,6 +165,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         <WorkerManageModal
           onClose={() => setIsManageWorkersOpen(false)}
           workers={workers}
+          readOnly={readOnly}
         />
       )}
 
@@ -179,6 +194,7 @@ interface CalendarCellProps {
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
+  readOnly?: boolean;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -189,7 +205,8 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobDrop,
   onJobClick,
   onJobResize,
-  onShowMore
+  onShowMore,
+  readOnly = false
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -198,7 +215,8 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     },
     collect: monitor => ({
       isOver: !!monitor.isOver()
-    })
+    }),
+    canDrop: () => !readOnly
   });
 
   // Current day index in the week
@@ -266,7 +284,8 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-        ${isOver ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
+        ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
+        ${readOnly ? 'cursor-default' : ''}
       `}
       style={{ height: `${cellHeight}px` }}
     >
@@ -288,6 +307,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               showText={showText}
               dayIndex={dayIndex}
               days={days}
+              readOnly={readOnly}
             />
           </div>
         )}

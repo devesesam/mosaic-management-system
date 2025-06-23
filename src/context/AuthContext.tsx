@@ -17,9 +17,15 @@ interface AuthContextProps {
   setError: (error: string | null) => void;
   isAdmin: boolean;
   authError: string | null;
+  isEditable: boolean;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+
+// List of email addresses that have edit permissions
+const ADMIN_EMAILS = [
+  'damsevese@gmail.com'
+];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -28,6 +34,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isEditable, setIsEditable] = useState(false);
+
+  // Update isEditable when currentWorker changes
+  useEffect(() => {
+    if (currentWorker?.email) {
+      const hasEditPermission = ADMIN_EMAILS.includes(currentWorker.email.toLowerCase());
+      setIsEditable(hasEditPermission);
+      console.log('AuthProvider: Edit permission check:', {
+        email: currentWorker.email,
+        hasEditPermission,
+        adminEmails: ADMIN_EMAILS
+      });
+    } else {
+      setIsEditable(false);
+    }
+  }, [currentWorker]);
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
@@ -37,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentWorker(null);
       setError(null);
       setAuthError(null);
+      setIsEditable(false);
       localStorage.removeItem('supabase.auth.token');
       await supabase.auth.signOut();
     } catch (err) {
@@ -196,7 +219,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     setError,
     isAdmin,
-    authError
+    authError,
+    isEditable
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

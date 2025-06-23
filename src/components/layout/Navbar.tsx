@@ -6,9 +6,10 @@ interface NavbarProps {
   onNewJob: () => void;
   activeView: 'week' | 'month';
   setActiveView: (view: 'week' | 'month') => void;
+  isEditable: boolean;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) => {
+const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView, isEditable }) => {
   const { signOut, currentWorker } = useAuth();
 
   return (
@@ -24,6 +25,11 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) 
                 <span className="text-white/70 text-sm mr-2">
                   {currentWorker.name}
                 </span>
+                {!isEditable && (
+                  <span className="bg-amber-600 text-white px-2 py-1 rounded text-xs font-medium">
+                    Read Only
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -54,7 +60,13 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView }) 
             
             <button
               onClick={onNewJob}
-              className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              disabled={!isEditable}
+              className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                isEditable
+                  ? 'text-white bg-indigo-600 hover:bg-indigo-700'
+                  : 'text-gray-400 bg-gray-600 cursor-not-allowed'
+              }`}
+              title={isEditable ? 'Create new job' : 'Read-only mode - cannot create jobs'}
             >
               <Plus className="h-4 w-4 mr-1" />
               New Job
