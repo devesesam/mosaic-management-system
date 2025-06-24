@@ -165,48 +165,17 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     return allDayJobs;
   }, [jobs, readOnly, currentWorker]);
   
-  // Helper function to check if a date is within a range (inclusive)
-  const isWithinRange = (date: Date, start: Date, end: Date) => {
-    return (
-      (date > start && date < end) ||
-      isSameDay(date, start) ||
-      isSameDay(date, end)
-    );
-  };
-  
-  // Helper function to check if a row is already occupied at specific columns
-  const isRowOccupied = (assignments: number[], rowIdx: number, startCol: number, endCol: number) => {
-    for (let col = startCol; col <= endCol; col++) {
-      if (assignments[col] && assignments[col].includes(rowIdx)) {
-        return true;
-      }
-    }
-    return false;
-  };
-  
-  // Calculate multi-day job positions for the entire month view
-  const getMultiDayJobs = useCallback(() => {
-    // For multiple weeks, we need to calculate row positions for multi-day jobs
-    const multiDayJobs: {job: Job, startCol: number, endCol: number, weekIdx: number, rowIdx: number, isSecondary: boolean}[] = [];
-    const rowAssignments: Record<string, number[][]> = {}; // Track row assignments by week
-    
-    // Get all multi-day jobs - filter for read-only mode
-    let jobsWithDates = jobs.filter(job => {
-      if (!job.start_date || !job.end_date) return false;
+  // Get jobs that should be displayed on their start date only
+  const getStartDateJobs = useCallback((day: Date) => {
+    const startDateJobs = jobs.filter(job => {
+      // If job has no start date, it can't be displayed
+      if (!job.start_date) return false;
       
       try {
-        const startDate = parseISO(job.start_date);
-        const endDate = parseISO(job.end_date);
+        const jobStart = parseISO(job.start_date);
         
-        // Check if this is a multi-day job that's visible in current month
-        const isMultiDay = !isSameDay(startDate, endDate);
-        const isVisible = (
-          isWithinRange(startDate, calendarStart, calendarEnd) ||
-          isWithinRange(endDate, calendarStart, calendarEnd) ||
-          (startDate < calendarStart && endDate > calendarEnd)
-        );
-        
-        return isMultiDay && isVisible;
+        // Only show jobs on their actual start date
+        return isSameDay(jobStart, day);
       } catch (error) {
         console.error('Error parsing job dates:', error, job);
         return false;
@@ -215,148 +184,14 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
 
     // Filter for read-only mode: only show jobs where current worker is primary or secondary
     if (readOnly && currentWorker) {
-      jobsWithDates = jobsWithDates.filter(job => 
+      return startDateJobs.filter(job => 
         job.worker_id === currentWorker.id || 
         (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
       );
     }
-
-    // Sort jobs: primary assignments first, then secondary assignments, then by date and duration
-    jobsWithDates.sort((a, b) => {
-      try {
-        // In read-only mode, prioritize primary assignments over secondary
-        if (readOnly && currentWorker) {
-          const aIsPrimary = a.worker_id === currentWorker.id;
-          const bIsPrimary = b.worker_id === currentWorker.id;
-          
-          if (aIsPrimary && !bIsPrimary) return -1;
-          if (!aIsPrimary && bIsPrimary) return 1;
-        }
-        
-        // Sort primarily by start date (earlier first)
-        const startA = parseISO(a.start_date!);
-        const startB = parseISO(b.start_date!);
-        const startCompare = startA.getTime() - startB.getTime();
-        if (startCompare !== 0) return startCompare;
-        
-        // If start dates are the same, sort by duration (longer jobs first)
-        const endA = parseISO(a.end_date!);
-        const endB = parseISO(b.end_date!);
-        return differenceInDays(endB, startB) - differenceInDays(endA, startA);
-      } catch (error) {
-        console.error('Error sorting jobs:', error, { a, b });
-        return 0;
-      }
-    });
     
-    // Initialize row assignments for each week
-    weeks.forEach((_, weekIdx) => {
-      rowAssignments[weekIdx] = Array(7).fill(null).map(() => []);
-    });
-    
-    // Process each multi-day job
-    jobsWithDates.forEach(job => {
-      try {
-        const startDate = parseISO(job.start_date!);
-        const endDate = parseISO(job.end_date!);
-        
-        // Check if this is a secondary assignment
-        const isSecondary = readOnly && currentWorker && 
-                           job.worker_id !== currentWorker.id &&
-                           job.secondary_worker_ids?.includes(currentWorker.id);
-        
-        // For each week, check if the job spans days within that week
-        weeks.forEach((week, weekIdx) => {
-          const weekStart = week[0];
-          const weekEnd = week[6];
-          
-          // Skip if job is completely outside this week
-          if (endDate < weekStart || startDate > weekEnd) {
-            return;
-          }
-          
-          // Find start and end column within this week
-          let startCol = 0;
-          let endCol = 6;
-          
-          // Adjust start column if job starts during or after this week
-          if (startDate >= weekStart) {
-            for (let i = 0; i < 7; i++) {
-              if (isSameDay(week[i], startDate) || (i > 0 && week[i-1] < startDate && week[i] > startDate)) {
-                startCol = i;
-                break;
-              }
-            }
-          }
-          
-          // Adjust end column if job ends during this week
-          if (endDate <= weekEnd) {
-            for (let i = 6; i >= 0; i--) {
-              if (isSameDay(week[i], endDate) || (i < 6 && week[i+1] > endDate && week[i] < endDate)) {
-                endCol = i;
-                break;
-              }
-            }
-          }
-          
-          // Find an available row in this week
-          let rowIdx = 0;
-          while (isRowOccupied(rowAssignments[weekIdx], rowIdx, startCol, endCol)) {
-            rowIdx++;
-          }
-          
-          // Mark this row as occupied for these columns
-          for (let col = startCol; col <= endCol; col++) {
-            rowAssignments[weekIdx][col].push(rowIdx);
-          }
-          
-          // Add this segment to our list
-          multiDayJobs.push({
-            job,
-            startCol,
-            endCol,
-            weekIdx,
-            rowIdx,
-            isSecondary
-          });
-        });
-      } catch (error) {
-        console.error('Error processing multi-day job:', error, job);
-      }
-    });
-    
-    return multiDayJobs;
-  }, [jobs, weeks, calendarStart, calendarEnd, readOnly, currentWorker]);
-  
-  const multiDayJobs = useMemo(() => getMultiDayJobs(), [getMultiDayJobs]);
-
-  // Calculate max rows needed for each week (considering both single day and multi-day jobs)
-  const weekHeights = useMemo(() => {
-    return weeks.map((week, weekIndex) => {
-      // First, get max row index of multi-day jobs in this week
-      const multiDayRows = multiDayJobs
-        .filter(mj => mj.weekIdx === weekIndex)
-        .map(mj => mj.rowIdx);
-      
-      const maxMultiDayRow = multiDayRows.length > 0 ? Math.max(...multiDayRows) : -1;
-      
-      // Then, check single-day jobs in each day of the week
-      const maxSingleDayJobs = week.map(day => {
-        const dayJobs = getDayJobs(day).filter(job => 
-          !multiDayJobs.some(mj => mj.job.id === job.id)
-        );
-        return dayJobs.length;
-      });
-      
-      const maxSingleDayCount = Math.max(...maxSingleDayJobs);
-      
-      // Max rows needed is the greater of multi-day rows or single-day jobs count
-      const maxRows = Math.max(maxMultiDayRow + 1, maxSingleDayCount);
-      
-      // Calculate cell height: min 120px + 26px per row + 40px padding
-      return Math.max(120, (maxRows * 26) + 40);
-    });
-  }, [weeks, multiDayJobs, getDayJobs]);
+    return startDateJobs;
+  }, [jobs, readOnly, currentWorker]);
 
   const handleJobDrop = async (job: Job, date: Date) => {
     if (readOnly) {
@@ -578,6 +413,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
                       day={day}
                       currentDate={currentDate}
                       jobs={getDayJobs(day)}
+                      startDateJobs={getStartDateJobs(day)}
                       onJobDrop={handleJobDrop}
                       onJobClick={(job) => {
                         setSelectedJob(job);
@@ -585,10 +421,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
                       }}
                       onShowMore={() => setSelectedDay(day)}
                       isInCurrentMonth={isSameMonth(day, currentDate)}
-                      weekIdx={weekIndex}
-                      dayIdx={dayIndex}
-                      multiDayJobs={multiDayJobs}
-                      weekHeight={weekHeights[weekIndex]}
                       onJobResize={handleJobResize}
                       readOnly={readOnly}
                       currentWorker={currentWorker}
@@ -648,14 +480,11 @@ interface CalendarDayProps {
   day: Date;
   currentDate: Date;
   jobs: Job[];
+  startDateJobs: Job[];
   onJobDrop: (job: Job, date: Date) => void;
   onJobClick: (job: Job) => void;
   onShowMore: () => void;
   isInCurrentMonth: boolean;
-  weekIdx: number;
-  dayIdx: number;
-  multiDayJobs: {job: Job, startCol: number, endCol: number, rowIdx: number, weekIdx: number, isSecondary: boolean}[];
-  weekHeight: number;
   onJobResize: (job: Job, days: number) => void;
   readOnly?: boolean;
   currentWorker?: any;
@@ -665,14 +494,11 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   day, 
   currentDate, 
   jobs, 
+  startDateJobs,
   onJobDrop, 
   onJobClick, 
   onShowMore, 
   isInCurrentMonth,
-  weekIdx,
-  dayIdx,
-  multiDayJobs,
-  weekHeight,
   onJobResize,
   readOnly = false,
   currentWorker
@@ -688,16 +514,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     canDrop: () => !readOnly
   });
 
-  // This day's column position in the grid (0-6)
-  const colPosition = dayIdx;
-  
-  // Filter out jobs that are already included in multiDayJobs
-  const singleDayJobs = jobs.filter(job => 
-    !multiDayJobs.some(mj => mj.job.id === job.id)
-  );
-
-  // Sort single-day jobs: put primary assignments first, then secondary
-  const sortedSingleDayJobs = [...singleDayJobs].sort((a, b) => {
+  // Sort start date jobs: put primary assignments first, then secondary
+  const sortedStartDateJobs = [...startDateJobs].sort((a, b) => {
     if (currentWorker) {
       const aIsPrimary = a.worker_id === currentWorker.id;
       const bIsPrimary = b.worker_id === currentWorker.id;
@@ -707,18 +525,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     }
     
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  // Get the multi-day jobs that start on this day for this week
-  const multiDayJobsForThisDay = multiDayJobs.filter(mj => 
-    mj.startCol === colPosition && mj.weekIdx === weekIdx
-  );
-
-  // Sort multi-day jobs: primary assignments first
-  const sortedMultiDayJobs = [...multiDayJobsForThisDay].sort((a, b) => {
-    if (a.isSecondary && !b.isSecondary) return 1;
-    if (!a.isSecondary && b.isSecondary) return -1;
-    return a.rowIdx - b.rowIdx;
   });
 
   // Simplified logic: Show "See All Jobs" if there are any jobs on this day
@@ -741,25 +547,25 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         ${isOver && !readOnly ? 'bg-blue-100' : ''}
         ${readOnly ? 'cursor-default' : ''}
       `}
-      style={{ height: `${weekHeight}px`, minHeight: '120px' }}
+      style={{ height: '120px', minHeight: '120px' }}
     >
       <div className="text-right px-2 py-1 text-sm font-medium border-b border-gray-100 flex-shrink-0">
         {format(day, 'd')}
       </div>
       
-      {/* Container for both single-day and multi-day jobs */}
+      {/* Container for job tiles - only show jobs that start on this day */}
       <div 
         className="flex-1 p-1 overflow-hidden relative"
         style={{ minHeight: 'calc(100% - 28px)' }}
       >
-        {/* Single-day jobs - show first 2 rows */}
-        {sortedSingleDayJobs.slice(0, 2).map((job, index) => {
+        {/* Single-day and multi-day jobs starting on this date - show first 3 */}
+        {sortedStartDateJobs.slice(0, 3).map((job, index) => {
           const isSecondary = isSecondaryAssignment(job);
           const zIndex = isSecondary ? 5 : 10;
           
           return (
             <div 
-              key={`single-${job.id}`} 
+              key={`job-${job.id}`} 
               className={`mb-1 h-6 ${isSecondary ? 'opacity-80' : ''}`}
               style={{ 
                 marginTop: index * 26 + 'px',
@@ -772,6 +578,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
                 onClick={() => onJobClick(job)}
                 isScheduled={true}
                 isWeekView={false}
+                // Only allow resize if not read-only AND not a secondary assignment
+                onResize={!readOnly && !isSecondary ? onJobResize : undefined}
                 readOnly={readOnly || isSecondary}
               />
             </div>
@@ -789,35 +597,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
           </button>
         )}
       </div>
-
-      {/* Multi-day job segments */}
-      {sortedMultiDayJobs.map(({ job, startCol, endCol, rowIdx, isSecondary }) => {
-        const spanDays = endCol - startCol + 1;
-        const zIndex = isSecondary ? 5 : 10;
-        
-        return (
-          <div 
-            key={`multiday-${job.id}`}
-            className={`absolute left-0 ${isSecondary ? 'opacity-80' : ''}`}
-            style={{
-              width: `calc(${spanDays} * 100%)`,
-              top: `${30 + rowIdx * 26}px`, // Position based on row index
-              height: '24px',
-              zIndex: zIndex
-            }}
-          >
-            <DraggableJob
-              job={job}
-              onClick={() => onJobClick(job)}
-              isScheduled={true}
-              isWeekView={false}
-              // Only allow resize if not read-only AND not a secondary assignment
-              onResize={!readOnly && !isSecondary ? onJobResize : undefined}
-              readOnly={readOnly || isSecondary}
-            />
-          </div>
-        );
-      })}
     </div>
   );
 };
