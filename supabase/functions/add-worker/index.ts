@@ -43,10 +43,10 @@ Deno.serve(async (req: Request) => {
       role: 'admin'
     };
 
-    // Insert the worker record
+    // Use upsert to handle potential email conflicts
     const { data: newWorker, error } = await supabase
       .from('workers')
-      .insert([workerWithRole])
+      .upsert(workerWithRole, { onConflict: 'email' })
       .select()
       .single();
 
@@ -65,14 +65,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Edge Function: add-worker - Worker created successfully:', newWorker.id);
+    console.log('Edge Function: add-worker - Worker created/updated successfully:', newWorker.id);
 
     // Return successful response
     const response = {
       success: true,
       timestamp: new Date().toISOString(),
       data: newWorker,
-      message: `Worker created successfully`
+      message: `Worker created/updated successfully`
     };
 
     return new Response(
