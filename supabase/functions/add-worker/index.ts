@@ -37,25 +37,70 @@ Deno.serve(async (req: Request) => {
     const workerData = await req.json();
     console.log('Edge Function: add-worker - Received data:', workerData);
 
+    // Validate required fields
+    if (!workerData.name || !workerData.name.trim()) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Worker name is required",
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        }
+      );
+    }
+
+    if (!workerData.email || !workerData.email.trim()) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Email address is required",
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        }
+      );
+    }
+
     // Ensure role is set to admin (application requirement)
     const workerWithRole = {
       ...workerData,
+      email: workerData.email.trim(),
+      name: workerData.name.trim(),
       role: 'admin'
     };
 
-    // Use upsert to handle potential email conflicts
+    // Insert the worker record (not upsert - we want to catch duplicates)
     const { data: newWorker, error } = await supabase
       .from('workers')
-      .upsert(workerWithRole, { onConflict: 'email' })
+      .insert([workerWithRole])
       .select()
       .single();
 
     if (error) {
       console.error('Edge Function: add-worker - Worker creation error:', error);
+      
+      // Handle specific database errors
+      if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `A worker with email "${workerData.email}" already exists. Please use a different email address.`,
+            code: 'DUPLICATE_EMAIL'
+          }),
+          {
+            status: 409, // Conflict
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: error.message,
+          error: error.message || 'Failed to create worker',
           details: error
         }),
         {
@@ -65,14 +110,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Edge Function: add-worker - Worker created/updated successfully:', newWorker.id);
+    console.log('Edge Function: add-worker - Worker created successfully:', newWorker.id);
 
     // Return successful response
     const response = {
       success: true,
       timestamp: new Date().toISOString(),
       data: newWorker,
-      message: `Worker created/updated successfully`
+      message: `Worker created successfully`
     };
 
     return new Response(

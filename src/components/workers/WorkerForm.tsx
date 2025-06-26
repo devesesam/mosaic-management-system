@@ -30,6 +30,18 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
       return;
     }
 
+    if (!worker.email.trim()) {
+      setError("Email address is required");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(worker.email.trim())) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -39,7 +51,18 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
       onClose();
     } catch (error) {
       console.error('Error submitting worker:', error);
-      setError(error instanceof Error ? error.message : "Failed to add worker. Please try again.");
+      
+      // Handle specific error messages from the server
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+        if (message.includes('duplicate') || message.includes('already exists') || message.includes('unique constraint')) {
+          setError(`A worker with email "${worker.email}" already exists. Please use a different email address.`);
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setError("Failed to add worker. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -50,6 +73,11 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
     
     const { name, value } = e.target;
     setWorker(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error when user starts typing
+    if (error) {
+      setError(null);
+    }
   };
 
   const modalTitle = readOnly 
@@ -90,7 +118,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
           )}
           
           {error && (
-            <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md">
+            <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
               {error}
             </div>
           )}
@@ -114,11 +142,12 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
           
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Email
+              Email*
             </label>
             <input
               type="email"
               name="email"
+              required
               value={worker.email || ''}
               onChange={handleChange}
               disabled={isSubmitting || readOnly}
@@ -156,7 +185,7 @@ const WorkerForm: React.FC<WorkerFormProps> = ({ onClose, onSubmit, onDelete, in
             {!readOnly && (
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !worker.name.trim() || !worker.email.trim()}
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
                 {isSubmitting ? (
