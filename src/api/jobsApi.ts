@@ -147,31 +147,45 @@ export const createJob = async (jobData: Omit<Job, 'id' | 'created_at'>): Promis
 };
 
 /**
- * Get jobs for a specific worker
+ * Get jobs for a specific worker using Edge Function
  */
 export const getJobsForWorker = async (workerId: string): Promise<Job[]> => {
   try {
-    console.log('JobsAPI: Fetching jobs for worker:', workerId);
+    console.log('JobsAPI: Fetching jobs for worker via Edge Function:', workerId);
     
-    await ensureConnection();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const apiUrl = `${supabaseUrl}/functions/v1/get-jobs-by-worker/${workerId}`;
     
-    console.log('JobsAPI: CRITICAL - About to query jobs for worker');
-    const { data, error, status } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('worker_id', workerId);
+    console.log('JobsAPI: CRITICAL - About to call Edge Function:', apiUrl);
     
-    console.log('JobsAPI: Worker jobs query completed with status:', status);
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (error) {
-      console.error('JobsAPI: Error fetching worker jobs:', error);
-      throw error;
+    console.log('JobsAPI: Edge Function response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    console.log(`JobsAPI: Found ${data?.length || 0} jobs for worker ${workerId}`);
-    return data || [];
+    const data = await response.json();
+    console.log('JobsAPI: Edge Function response:', data);
+    
+    if (data.success && data.data) {
+      const jobs = data.data;
+      console.log(`JobsAPI: Found ${jobs.length} jobs for worker ${workerId}`, {
+        breakdown: data.breakdown
+      });
+      return jobs;
+    } else {
+      throw new Error(data.error || 'Failed to fetch worker jobs');
+    }
   } catch (error) {
-    console.error('JobsAPI: Exception fetching worker jobs:', error);
+    console.error('JobsAPI: Exception fetching worker jobs via Edge Function:', error);
     throw handleSupabaseError(error);
   }
 };
