@@ -117,7 +117,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       {isUnassignedRow ? (
         // For unassigned row: show ALL jobs stacked vertically like MonthView
         <div className="flex flex-col p-1 space-y-1">
-          {sortedJobs.map((job) => (
+          {strictlyFilteredJobs.map((job) => (
             <DraggableJob
               key={job.id}
               job={job}
