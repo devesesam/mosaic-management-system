@@ -56,8 +56,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     return b.created_at.localeCompare(a.created_at);
   });
   
-  const mainJob = sortedJobs[0];
-  const hasMoreJobs = sortedJobs.length > 1;
 
   return (
     <div
@@ -70,56 +68,56 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       `}
       style={{ 
         height: isUnassignedRow ? 'auto' : '100px',
-        minHeight: isUnassignedRow ? '100px' : '100px'
+        minHeight: '100px'
       }}
     >
-      <div className={`${isUnassignedRow ? 'flex flex-col p-1' : 'h-full relative p-1'}`}>
-        {isUnassignedRow ? (
-          // For unassigned row, show all jobs vertically stacked
-          sortedJobs.map((job) => (
-            <div key={job.id} className="mb-1">
+      {isUnassignedRow ? (
+        // For unassigned row: show ALL jobs stacked vertically like MonthView
+        <div className="flex flex-col p-1 space-y-1">
+          {sortedJobs.map((job) => (
+            <DraggableJob
+              key={job.id}
+              job={job}
+              onClick={() => onJobClick(job)}
+              isScheduled={true}
+              isWeekView={true}
+              showText={true}
+              readOnly={readOnly}
+              days={days}
+              dayIndex={dayIndex}
+              isUnassignedWeekViewJob={true}
+            />
+          ))}
+        </div>
+      ) : (
+        // For worker rows: keep existing single job logic
+        <div className="h-full relative p-1">
+          {sortedJobs[0] && (
+            <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
               <DraggableJob
-                job={job}
-                onClick={() => onJobClick(job)}
+                job={sortedJobs[0]}
+                onClick={() => onJobClick(sortedJobs[0])}
                 isScheduled={true}
+                onResize={(days) => onJobResize(sortedJobs[0], days)}
                 isWeekView={true}
                 showText={true}
                 readOnly={readOnly}
                 days={days}
                 dayIndex={dayIndex}
-                isUnassignedWeekViewJob={true}
               />
             </div>
-          ))
-        ) : (
-          // For worker rows, keep existing logic with single main job
-          <>
-            {mainJob && (
-              <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
-                <DraggableJob
-                  job={mainJob}
-                  onClick={() => onJobClick(mainJob)}
-                  isScheduled={true}
-                  onResize={(days) => onJobResize(mainJob, days)}
-                  isWeekView={true}
-                  showText={true}
-                  readOnly={readOnly}
-                  days={days}
-                  dayIndex={dayIndex}
-                />
-              </div>
-            )}
-        
-            {hasMoreJobs && (
-              <button
-                onClick={() => onShowMore(day)}
-                className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-10"
-              >
-                +{sortedJobs.length - 1} more
-              </button>
-            )}
-          </>
-        )}
+          )}
+      
+          {sortedJobs.length > 1 && (
+            <button
+              onClick={() => onShowMore(day)}
+              className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-10"
+            >
+              +{sortedJobs.length - 1} more
+            </button>
+          )}
+        </div>
+      )}
       </div>
     </div>
   );
