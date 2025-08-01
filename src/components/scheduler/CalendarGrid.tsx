@@ -184,7 +184,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onShowMore={(date) => setSelectedDay({ date, workerId: null })}
                 readOnly={readOnly}
                 currentRowWorkerId={null}
-                isUnassignedRow={true}
               />
             ))}
           </div>
@@ -209,7 +208,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
                 readOnly={readOnly}
                 currentRowWorkerId={worker.id}
-                isUnassignedRow={false}
               />
             ))}
           </div>

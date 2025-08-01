@@ -8,7 +8,6 @@ interface JobTileProps {
   isScheduled?: boolean;
   isWeekView?: boolean;
   showText?: boolean;
-  isUnassignedWeekViewJob?: boolean;
 }
 
 const JobTile: React.FC<JobTileProps> = ({ 
@@ -17,50 +16,46 @@ const JobTile: React.FC<JobTileProps> = ({
   onClick,
   isScheduled = true,
   isWeekView = false,
-  showText = true,
-  isUnassignedWeekViewJob = false
+  showText = true
 }) => {
   // Get the display color based on status
   const getTileColor = () => {
     return job.status === JobStatus.Closed ? '#94a3b8' : (job.tile_color || '#3b82f6');
   };
   
-  // Determine effective styling - unassigned week view jobs should look like unscheduled jobs
-  const effectiveIsScheduled = isScheduled && !isUnassignedWeekViewJob;
-  
   return (
     <div 
       className={`
         ${isDragging ? 'opacity-50' : 'opacity-100'}
-        ${effectiveIsScheduled ? 'p-1' : 'p-3 mb-2'}
+        ${isScheduled ? 'p-1' : 'p-3 mb-2'}
         rounded-md shadow-sm
         hover:shadow-md transition-all duration-200
         overflow-hidden
         ${onClick ? 'cursor-pointer' : ''}
         flex flex-col justify-between
-        ${isWeekView && effectiveIsScheduled ? 'h-full' : effectiveIsScheduled ? 'h-[22px]' : 'min-h-[80px]'}
+        ${isWeekView && isScheduled ? 'h-full' : isScheduled ? 'h-[22px]' : 'min-h-[80px]'}
       `}
       style={{
-        backgroundColor: effectiveIsScheduled ? getTileColor() : 'white',
-        borderLeft: effectiveIsScheduled ? 'none' : `4px solid ${getTileColor()}`
+        backgroundColor: isScheduled ? getTileColor() : 'white',
+        borderLeft: isScheduled ? 'none' : `4px solid ${getTileColor()}`
       }}
       onClick={onClick}
     >
       {showText ? (
-        <div className={`${effectiveIsScheduled ? 'text-white' : 'text-gray-800'} ${!isWeekView && effectiveIsScheduled ? 'text-xs' : ''}`}>
+        <div className={`${isScheduled ? 'text-white' : 'text-gray-800'} ${!isWeekView && isScheduled ? 'text-xs' : ''}`}>
           <div className="font-medium truncate">{job.address}</div>
-          {isWeekView && effectiveIsScheduled && job.customer_name && (
+          {isWeekView && isScheduled && job.customer_name && (
             <div className="text-xs truncate opacity-90 mt-1">
               {job.customer_name}
             </div>
           )}
-          {!effectiveIsScheduled && job.customer_name && (
+          {!isScheduled && job.customer_name && (
             <div className="text-sm truncate opacity-90">
               {job.customer_name}
             </div>
           )}
-          {!effectiveIsScheduled && (
-            <div className={`text-sm truncate ${effectiveIsScheduled ? 'opacity-90' : 'text-gray-600'}`}>
+          {!isScheduled && (
+            <div className={`text-sm truncate ${isScheduled ? 'opacity-90' : 'text-gray-600'}`}>
               {job.status}
             </div>
           )}

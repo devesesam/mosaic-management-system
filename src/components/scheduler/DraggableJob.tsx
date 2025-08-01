@@ -14,7 +14,6 @@ interface DraggableJobProps {
   dayIndex?: number;
   span?: number;
   readOnly?: boolean;
-  isUnassignedWeekViewJob?: boolean;
 }
 
 const DraggableJob: React.FC<DraggableJobProps> = ({ 
@@ -27,8 +26,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
   days,
   dayIndex,
   span,
-  readOnly = false,
-  isUnassignedWeekViewJob = false
+  readOnly = false
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
@@ -165,7 +163,7 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
       style={{
         position: 'relative',
         width: isScheduled ? '100%' : 'auto',
-        height: isUnassignedWeekViewJob ? 'auto' : (isWeekView && isScheduled ? '100%' : isScheduled ? '22px' : 'auto'),
+        height: isWeekView && isScheduled ? '100%' : isScheduled ? '22px' : 'auto',
         cursor: isResizing ? 'ew-resize' : readOnly ? 'pointer' : isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         WebkitUserSelect: 'none'
@@ -178,11 +176,10 @@ const DraggableJob: React.FC<DraggableJobProps> = ({
         isScheduled={isScheduled}
         isWeekView={isWeekView}
         showText={showText}
-        isUnassignedWeekViewJob={isUnassignedWeekViewJob}
       />
       
       {/* Resize handle - only show if not read-only and resizing is available */}
-      {isScheduled && onResize && !readOnly && !isUnassignedWeekViewJob && (
+      {isScheduled && onResize && !readOnly && (
         <div
           className="absolute right-0 top-0 h-full w-3 cursor-ew-resize hover:bg-white hover:bg-opacity-30 z-20 flex items-center justify-end pr-1"
           onMouseDown={handleResizeStart}

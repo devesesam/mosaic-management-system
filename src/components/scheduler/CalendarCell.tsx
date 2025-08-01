@@ -14,8 +14,6 @@ interface CalendarCellProps {
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
   readOnly?: boolean;
-  currentRowWorkerId: string | null;
-  isUnassignedRow?: boolean;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -27,9 +25,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobClick,
   onJobResize,
   onShowMore,
-  readOnly = false,
-  currentRowWorkerId,
-  isUnassignedRow = false
+  readOnly = false
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -45,13 +41,21 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
-  // Use jobs prop directly - it should already be filtered by parent component
-  console.log(`CalendarCell [${format(day, 'MMM dd')} - ${isUnassignedRow ? 'Unassigned' : `Worker: ${currentRowWorkerId}`}]:`, {
-    isUnassignedRow,
-    jobCount: jobs.length,
-    jobIds: jobs.map(j => j.id),
-    dayIndex
+  // Sort jobs so most important shows on top
+  const sortedJobs = [...jobs].sort((a, b) => {
+    // Prioritize jobs with both start and end dates
+    const aHasBothDates = !!(a.start_date && a.end_date);
+    const bHasBothDates = !!(b.start_date && b.end_date);
+    
+    if (aHasBothDates && !bHasBothDates) return -1;
+    if (!aHasBothDates && bHasBothDates) return 1;
+    
+    // If both have dates or both don't, sort by created date (newest first)
+    return b.created_at.localeCompare(a.created_at);
   });
+  
+  const mainJob = sortedJobs[0];
+  const hasMoreJobs = sortedJobs.length > 1;
 
   return (
     <div
@@ -59,61 +63,37 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-        ${isOver && !readOnly ? 'bg-blue-50' : 'bg-white'}
+        ${isOver ? 'bg-blue-50' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
-      style={{ 
-        height: isUnassignedRow ? 'auto' : '100px',
-        minHeight: '100px'
-      }}
+      style={{ height: '100px' }}
     >
-      {isUnassignedRow ? (
-        // For unassigned row: show ALL jobs stacked vertically
-        <div className="flex flex-col p-1 space-y-1">
-          {jobs.map((job) => (
+      <div className="h-full relative p-1">
+        {mainJob && (
+          <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
             <DraggableJob
-              key={job.id}
-              job={job}
-              onClick={() => onJobClick(job)}
+              job={mainJob}
+              onClick={() => onJobClick(mainJob)}
               isScheduled={true}
+              onResize={(days) => onJobResize(mainJob, days)}
               isWeekView={true}
               showText={true}
               readOnly={readOnly}
               days={days}
               dayIndex={dayIndex}
-              isUnassignedWeekViewJob={true}
             />
-          ))}
-        </div>
-      ) : (
-        // For worker rows: keep existing single job logic
-        <div className="h-full relative p-1">
-          {jobs[0] && (
-            <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
-              <DraggableJob
-                job={jobs[0]}
-                onClick={() => onJobClick(jobs[0])}
-                isScheduled={true}
-                onResize={onJobResize ? (days) => onJobResize(jobs[0], days) : undefined}
-                isWeekView={true}
-                showText={true}
-                readOnly={readOnly}
-                days={days}
-                dayIndex={dayIndex}
-              />
-            </div>
-          )}
-          
-          {jobs.length > 1 && (
-            <button
-              onClick={() => onShowMore(day)}
-              className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-10"
-            >
-              +{jobs.length - 1} more
-            </button>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+        
+        {hasMoreJobs && (
+          <button
+            onClick={() => onShowMore(day)}
+            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-10"
+          >
+            +{sortedJobs.length - 1} more
+          </button>
+        )}
+      </div>
     </div>
   );
 };
