@@ -42,7 +42,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
 
   // Check if this is the unassigned row
   const isUnassignedRow = currentRowWorkerId === null;
-
+  
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
@@ -59,41 +59,44 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
+  // UNASSIGNED ROW: Stack all jobs vertically
   if (isUnassignedRow) {
-    // Unassigned row: Stack all jobs vertically
     return (
       <div
         ref={drop}
         data-date={format(day, 'yyyy-MM-dd')}
         className={`
           w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-          h-auto
+          min-h-[100px]
           ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
           ${readOnly ? 'cursor-default' : ''}
         `}
       >
-        <div className="p-1 flex flex-col space-y-1">
+        <div className="p-2 space-y-2">
           {sortedJobs.map((job) => (
-            <div key={job.id} className="relative" style={{ height: '80px' }}>
+            <div key={job.id} className="h-20">
               <DraggableJob
                 job={job}
                 onClick={() => onJobClick(job)}
-                isScheduled={true}
-                onResize={undefined} // Disable resizing for unassigned jobs
-                isWeekView={false} // Use Month View styling (taller tiles)
+                isScheduled={false}
+                onResize={undefined}
+                isWeekView={false}
                 showText={true}
-                dayIndex={dayIndex}
-                days={days}
                 readOnly={readOnly}
               />
             </div>
           ))}
+          {sortedJobs.length === 0 && (
+            <div className="h-20 flex items-center justify-center text-gray-400 text-sm">
+              Drop jobs here
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  // Worker rows: Keep existing logic unchanged
+  // WORKER ROWS: Keep existing single job display logic
   const mainJob = sortedJobs[0];
   const hasMoreJobs = sortedJobs.length > 1;
   const cellHeight = 100;
@@ -110,7 +113,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       style={{ height: `${cellHeight}px` }}
     >
       <div className="h-full relative p-1">
-        {/* Render single job for worker rows (existing logic) */}
+        {/* Render single job for worker rows */}
         {mainJob && (
           <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
             <DraggableJob
@@ -127,7 +130,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </div>
         )}
         
-        {/* Show "See All Jobs" button only for worker rows with multiple jobs */}
+        {/* Show "See All Jobs" button for worker rows with multiple jobs */}
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
