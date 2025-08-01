@@ -1,18 +1,13 @@
-  const mainJob = isUnassignedRow ? null : sortedJobs[0];
-import React from 'react';
-  // SIMPLIFIED LOGIC: Show "See All Jobs" if there are any jobs on this day (only for worker rows)
-  const hasJobs = !isUnassignedRow && strictlyFilteredJobs.length > 0;
+  import React from 'react';
 import { Job } from '../../types';
 import DraggableJob from './DraggableJob';
 
 interface CalendarCellProps {
-    mainJobId: mainJob?.id || 'none',
-    isUnassignedRow,
-    renderingMode: isUnassignedRow ? 'stacked' : 'single-with-more'
+  workerId: string | null;
   day: Date;
   days: Date[];
   jobs: Job[];
-  const cellHeight = isUnassignedRow ? 'auto' : 100;
+  onJobDrop: (job: Job, workerId: string | null, day: Date) => void;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
@@ -21,8 +16,7 @@ interface CalendarCellProps {
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
   workerId,
-  // Only do spanning logic for worker rows (not unassigned row)
-  if (!isUnassignedRow && mainJob && mainJob.start_date && mainJob.end_date) {
+  day,
   days,
   jobs,
   onJobDrop,
@@ -43,7 +37,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   });
 
   // Check if this is the unassigned row
-  const isUnassignedRow = currentRowWorkerId === null;
+  const isUnassignedRow = workerId === null;
 
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
@@ -61,14 +55,21 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     return b.created_at.localeCompare(a.created_at);
   });
   
-  const mainJob = sortedJobs[0];
+  const mainJob = isUnassignedRow ? null : sortedJobs[0];
+  // SIMPLIFIED LOGIC: Show "See All Jobs" if there are any jobs on this day (only for worker rows)
+  const hasJobs = !isUnassignedRow && jobs.length > 0;
   const hasMoreJobs = sortedJobs.length > 1;
+  const cellHeight = isUnassignedRow ? 'auto' : 100;
+
+  // Only do spanning logic for worker rows (not unassigned row)
+  if (!isUnassignedRow && mainJob && mainJob.start_date && mainJob.end_date) {
+    // existing spanning logic
+  }
 
   return (
     <div
       ref={drop}
       data-date={format(day, 'yyyy-MM-dd')}
-    isUnassignedRow
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative ${
           isUnassignedRow ? 'h-auto' : ''
@@ -122,7 +123,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </button>
         )}
       </div>
-        {!isUnassignedRow && strictlyFilteredJobs.length === 0 && (
+    </div>
   );
   // For worker rows, use the existing mainJob logic
 };
