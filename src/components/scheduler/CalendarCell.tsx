@@ -29,6 +29,15 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   readOnly = false,
   currentRowWorkerId
 }) => {
+  // DEBUG: Add console logs to see what's happening
+  console.log('CalendarCell DEBUG:', {
+    day: format(day, 'yyyy-MM-dd'),
+    currentRowWorkerId,
+    workerId,
+    jobsCount: jobs.length,
+    isUnassignedRow: currentRowWorkerId === null
+  });
+
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
     drop: (item: { job: Job }) => {
