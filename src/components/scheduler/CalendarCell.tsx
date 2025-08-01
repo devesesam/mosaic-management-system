@@ -1,15 +1,18 @@
+  const mainJob = isUnassignedRow ? null : sortedJobs[0];
 import React from 'react';
-import { format, isSameDay, parseISO } from 'date-fns';
-import { useDrop } from 'react-dnd';
+  // SIMPLIFIED LOGIC: Show "See All Jobs" if there are any jobs on this day (only for worker rows)
+  const hasJobs = !isUnassignedRow && strictlyFilteredJobs.length > 0;
 import { Job } from '../../types';
 import DraggableJob from './DraggableJob';
 
 interface CalendarCellProps {
-  workerId: string | null;
+    mainJobId: mainJob?.id || 'none',
+    isUnassignedRow,
+    renderingMode: isUnassignedRow ? 'stacked' : 'single-with-more'
   day: Date;
   days: Date[];
   jobs: Job[];
-  onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
+  const cellHeight = isUnassignedRow ? 'auto' : 100;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
@@ -18,7 +21,8 @@ interface CalendarCellProps {
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
   workerId,
-  day,
+  // Only do spanning logic for worker rows (not unassigned row)
+  if (!isUnassignedRow && mainJob && mainJob.start_date && mainJob.end_date) {
   days,
   jobs,
   onJobDrop,
@@ -37,6 +41,9 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     }),
     canDrop: () => !readOnly
   });
+
+  // Check if this is the unassigned row
+  const isUnassignedRow = currentRowWorkerId === null;
 
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
@@ -61,14 +68,35 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     <div
       ref={drop}
       data-date={format(day, 'yyyy-MM-dd')}
+    isUnassignedRow
       className={`
-        w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
+        w-[calc((100%-12rem)/7)] border-r border-gray-200 relative ${
+          isUnassignedRow ? 'h-auto' : ''
+        }
         ${isOver ? 'bg-blue-50' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
-      style={{ height: '100px' }}
+      style={isUnassignedRow ? {} : { height: `${cellHeight}px` }}
     >
-      <div className="h-full relative p-1">
+      <div className={isUnassignedRow ? "p-1 flex flex-col space-y-1" : "h-full relative p-1"}>
+        {/* Render jobs for unassigned row (stacked) */}
+        {isUnassignedRow && sortedJobs.map((job) => (
+          <div key={job.id} className="relative" style={{ height: '80px' }}>
+            <DraggableJob
+              job={job}
+              onClick={() => onJobClick(job)}
+              isScheduled={true}
+              onResize={undefined} // Disable resizing for unassigned jobs
+              isWeekView={false} // Use Month View styling
+              showText={true}
+              dayIndex={dayIndex}
+              days={days}
+              readOnly={readOnly}
+            />
+          </div>
+        ))}
+        
+        {/* Render single job for worker rows (existing logic) */}
         {mainJob && (
           <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
             <DraggableJob
@@ -84,7 +112,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             />
           </div>
         )}
-        
+        {/* Show "See All Jobs" button only for worker rows */}
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
@@ -94,8 +122,9 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </button>
         )}
       </div>
-    </div>
+        {!isUnassignedRow && strictlyFilteredJobs.length === 0 && (
   );
+  // For worker rows, use the existing mainJob logic
 };
-
+  // For unassigned row, we'll render all jobs
 export default React.memo(CalendarCell);
