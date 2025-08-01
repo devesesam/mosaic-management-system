@@ -74,28 +74,28 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         data-date={format(day, 'yyyy-MM-dd')}
         className={`
           w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-          min-h-[100px]
+          min-h-[100px] flex flex-col
           ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
           ${readOnly ? 'cursor-default' : ''}
         `}
       >
-        <div className="p-2 space-y-2">
+        <div className="p-1 flex flex-col space-y-1 flex-1">
           {sortedJobs.map((job) => (
-            <div key={job.id} className="h-20">
+            <div key={job.id} className="relative" style={{ height: '22px' }}>
               <DraggableJob
                 job={job}
                 onClick={() => onJobClick(job)}
-                isScheduled={false}
+                isScheduled={true}
                 onResize={undefined}
-                isWeekView={false}
+                isWeekView={true}
                 showText={true}
                 readOnly={readOnly}
               />
             </div>
           ))}
           {sortedJobs.length === 0 && (
-            <div className="h-20 flex items-center justify-center text-gray-400 text-sm">
-              Drop jobs here
+            <div className="h-[22px] w-full flex items-center justify-center">
+              <div className="w-full h-full" />
             </div>
           )}
         </div>
