@@ -547,7 +547,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         ${isOver && !readOnly ? 'bg-blue-100' : ''}
         ${readOnly ? 'cursor-default' : ''}
       `}
-      style={{ height: '120px', minHeight: '120px' }}
     >
       <div className="text-right px-2 py-1 text-sm font-medium border-b border-gray-100 flex-shrink-0">
         {format(day, 'd')}
@@ -555,23 +554,18 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       
       {/* Container for job tiles - only show jobs that start on this day */}
       <div 
-        className="flex-1 p-1 overflow-hidden relative"
-        style={{ minHeight: 'calc(100% - 28px)' }}
+        className="flex-1 p-1 flex flex-col"
       >
         {/* Single-day and multi-day jobs starting on this date - show first 3 */}
-        {sortedStartDateJobs.slice(0, 3).map((job, index) => {
+        {sortedStartDateJobs.map((job, index) => {
           const isSecondary = isSecondaryAssignment(job);
           const zIndex = isSecondary ? 5 : 10;
           
           return (
             <div 
               key={`job-${job.id}`} 
-              className={`mb-1 h-6 ${isSecondary ? 'opacity-80' : ''}`}
-              style={{ 
-                marginTop: index * 26 + 'px',
-                zIndex: zIndex,
-                position: 'relative'
-              }}
+              className={`mb-1 ${isSecondary ? 'opacity-80' : ''}`}
+              style={{ zIndex: zIndex }}
             >
               <DraggableJob
                 job={job}
@@ -586,16 +580,6 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
           );
         })}
         
-        {/* See All Jobs button - show if there are any jobs on this day */}
-        {hasJobs && (
-          <button
-            onClick={onShowMore}
-            className="text-xs text-black absolute bottom-1 left-1 hover:text-gray-700 hover:underline"
-            style={{ zIndex: 20 }}
-          >
-            See All Jobs
-          </button>
-        )}
       </div>
     </div>
   );
