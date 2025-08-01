@@ -42,15 +42,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     accept: 'JOB',
     drop: (item: { job: Job }) => {
       onJobDrop(item.job, workerId, day);
-    },
-    collect: monitor => ({
-      isOver: !!monitor.isOver()
-    }),
-    canDrop: () => !readOnly
-  });
-
-  // Check if this is the unassigned row
-  const isUnassignedRow = currentRowWorkerId === null;
   
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
