@@ -14,8 +14,8 @@ interface CalendarCellProps {
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
   readOnly?: boolean;
-}
   isUnassignedRow?: boolean;
+}
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
   workerId,
@@ -26,9 +26,9 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobClick,
   onJobResize,
   onShowMore,
-  readOnly = false
-}) => {
+  readOnly = false,
   isUnassignedRow = false
+}) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
     drop: (item: { job: Job }) => {
@@ -76,7 +76,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       <div className={`${isUnassignedRow ? 'flex flex-col p-1' : 'h-full relative p-1'}`}>
         {isUnassignedRow ? (
           // For unassigned row, show all jobs vertically stacked
-          strictlyFilteredJobs.map((job) => (
+          sortedJobs.map((job) => (
             <div key={job.id} className="mb-1">
               <DraggableJob
                 job={job}
@@ -110,10 +110,16 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               </div>
             )}
         
-            {hasJobs && (
+            {hasMoreJobs && (
               <button
                 onClick={() => onShowMore(day)}
                 className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-10"
+              >
+                +{sortedJobs.length - 1} more
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
