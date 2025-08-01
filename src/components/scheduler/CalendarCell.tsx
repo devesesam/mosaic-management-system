@@ -1,6 +1,6 @@
 import React from 'react';
+import { format, isSameDay, parseISO } from 'date-fns';
 import { useDrop } from 'react-dnd';
-import { format, isSameDay, isToday } from 'date-fns';
 import { Job } from '../../types';
 import DraggableJob from './DraggableJob';
 
@@ -9,12 +9,11 @@ interface CalendarCellProps {
   day: Date;
   days: Date[];
   jobs: Job[];
-  onJobDrop: (job: Job, workerId: string | null, day: Date) => void;
+  onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
   readOnly?: boolean;
-  currentRowWorkerId: string | null;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
@@ -26,30 +25,19 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobClick,
   onJobResize,
   onShowMore,
-  readOnly = false,
-  currentRowWorkerId
+  readOnly = false
 }) => {
-  // DEBUG: Add console logs to see what's happening
-  console.log('CalendarCell DEBUG:', {
-    day: format(day, 'yyyy-MM-dd'),
-    currentRowWorkerId,
-    workerId,
-    jobsCount: jobs.length,
-    isUnassignedRow: currentRowWorkerId === null
-  });
-
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
     drop: (item: { job: Job }) => {
       onJobDrop(item.job, workerId, day);
     },
-    collect: (monitor) => ({
-      isOver: monitor.isOver()
-    })
+    collect: monitor => ({
+      isOver: !!monitor.isOver()
+    }),
+    canDrop: () => !readOnly
   });
 
-  const isUnassignedRow = currentRowWorkerId === null;
-  
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
   
@@ -63,50 +51,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     if (!aHasBothDates && bHasBothDates) return 1;
     
     // If both have dates or both don't, sort by created date (newest first)
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return b.created_at.localeCompare(a.created_at);
   });
-
-  // UNASSIGNED ROW: Stack all jobs vertically
-  if (isUnassignedRow) {
-    return (
-      <div
-        ref={drop}
-        data-date={format(day, 'yyyy-MM-dd')}
-        className={`
-          w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-          min-h-[100px] flex flex-col
-          ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
-          ${readOnly ? 'cursor-default' : ''}
-        `}
-      >
-        <div className="p-1 flex flex-col space-y-1 flex-1">
-          {sortedJobs.map((job) => (
-            <div key={job.id} className="relative" style={{ height: '22px' }}>
-              <DraggableJob
-                job={job}
-                onClick={() => onJobClick(job)}
-                isScheduled={true}
-                onResize={undefined}
-                isWeekView={true}
-                showText={true}
-                readOnly={readOnly}
-              />
-            </div>
-          ))}
-          {sortedJobs.length === 0 && (
-            <div className="h-[22px] w-full flex items-center justify-center">
-              <div className="w-full h-full" />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // WORKER ROWS: Keep existing single job display logic
+  
   const mainJob = sortedJobs[0];
   const hasMoreJobs = sortedJobs.length > 1;
-  const cellHeight = 100;
 
   return (
     <div
@@ -114,13 +63,12 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-        ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
+        ${isOver ? 'bg-blue-50' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
-      style={{ height: `${cellHeight}px` }}
+      style={{ height: '100px' }}
     >
       <div className="h-full relative p-1">
-        {/* Render single job for worker rows */}
         {mainJob && (
           <div className="absolute left-0 right-0 top-0 mx-1 mt-1 h-[calc(100%-6px)]">
             <DraggableJob
@@ -137,7 +85,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           </div>
         )}
         
-        {/* Show "See All Jobs" button for worker rows with multiple jobs */}
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
