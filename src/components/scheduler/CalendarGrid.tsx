@@ -327,18 +327,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   
   const mainJob = sortedJobs[0];
   
-  // SIMPLIFIED LOGIC: Show "See All Jobs" if there are any jobs on this day
-  const hasJobs = strictlyFilteredJobs.length > 0;
-  
   console.log(`CalendarCell SIMPLIFIED LOGIC [${format(day, 'MMM dd')} - Worker: ${currentRowWorkerId || 'Unassigned'}]:`, {
     totalJobsForWorker: strictlyFilteredJobs.length,
-    hasJobs,
-    mainJobId: mainJob?.id || 'none'
+    mainJobId: mainJob?.id || 'none',
+    allJobIds: strictlyFilteredJobs.map(j => j.id)
   });
-  
-  // Fixed cell height
-  const cellHeight = 100;
-  
   // Determine if this cell should render the job and how it should span
   let shouldRenderJob = false;
   let jobSpan = 1;
@@ -399,49 +392,49 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
-      style={{ height: `${cellHeight}px` }}
     >
-      <div className="h-full relative p-1">
-        {mainJob && shouldRenderJob && (
-          <div 
-            className={`absolute left-0 right-0 top-0 mx-1 mt-1 ${isSecondaryAssignment ? 'opacity-80' : ''}`}
-            style={{ 
-              width: `calc(${jobSpan * 100}% - 0.5rem)`,
-              height: "calc(100% - 6px)",
-              zIndex: zIndex
-            }}
-          >
-            <DraggableJob
-              job={mainJob}
-              onClick={() => onJobClick(mainJob)}
-              isScheduled={true}
-              // Only allow resize on last day AND if it's not a secondary assignment
-              onResize={isLastDay && !isSecondaryAssignment ? onJobResize : undefined}
-              isWeekView={true}
-              showText={showText}
-              dayIndex={dayIndex}
-              days={days}
-              // Make read-only if global read-only OR if it's a secondary assignment
-              readOnly={readOnly || isSecondaryAssignment}
-            />
-          </div>
-        )}
+      <div className="p-1 flex flex-col min-h-[100px]">
+        {/* Show all jobs for this day */}
+        {strictlyFilteredJobs.map((job, index) => {
+          // Check if this is a secondary assignment
+          const isJobSecondaryAssignment = currentRowWorkerId !== null && 
+                           job.worker_id !== currentRowWorkerId &&
+                           job.secondary_worker_ids?.includes(currentRowWorkerId);
+          
+          return (
+            <div
+              key={job.id}
+              className={`mb-1 ${isJobSecondaryAssignment ? 'opacity-80' : ''}`}
+              style={{ zIndex: isJobSecondaryAssignment ? 5 : 10 }}
+            >
+              <DraggableJob
+                job={job}
+                onClick={() => onJobClick(job)}
+                isScheduled={true}
+                // Only allow resize if not read-only AND not a secondary assignment AND it's a multi-day job
+                onResize={!readOnly && !isJobSecondaryAssignment && job.end_date ? onJobResize : undefined}
+                isWeekView={true}
+                showText={true}
+                dayIndex={dayIndex}
+                days={days}
+                readOnly={readOnly || isJobSecondaryAssignment}
+              />
+            </div>
+          );
+        })}
         
-        {/* SIMPLIFIED: Show "See All Jobs" if there are any jobs on this day - reduced z-index to stay below header */}
-        {hasJobs && (
-          <button
-            onClick={() => onShowMore(day)}
-            className="absolute bottom-1 right-2 text-xs text-black hover:text-gray-700 hover:underline z-10"
-          >
-            See All Jobs
-          </button>
-        )}
-        
+        {/* Empty state for no jobs */}
         {strictlyFilteredJobs.length === 0 && (
-          <div className="h-full w-full flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center min-h-[80px]">
             <div className="w-full h-full" />
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+export default CalendarGrid;
       </div>
     </div>
   );
