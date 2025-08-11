@@ -396,7 +396,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
     return Math.max(4, maxDepth); // Minimum 4 for decent height
   }, [renderingData]);
 
-  const rowHeight = Math.max(100, maxStackDepth * 28 + 20); // 28px per job + padding
+  const rowHeight = Math.max(120, maxStackDepth * 54 + 20); // 54px per job + padding
 
   return (
     <div className="flex border-b border-gray-200" style={{ minHeight: `${rowHeight}px` }}>
@@ -485,7 +485,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
           
           const cellWidth = 100 / 7; // Each cell is 1/7th of the container
           const spanWidth = cellWidth * span;
-          const jobHeight = 24;
+          const jobHeight = 48;
           
           return (
             <div
@@ -493,7 +493,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
               className={`absolute ${isSecondaryAssignment ? 'opacity-80' : ''}`}
               style={{
                 left: '4px',
-                top: `${4 + stackIndex * (jobHeight + 4)}px`,
+                top: `${4 + stackIndex * (jobHeight + 6)}px`,
                 width: span > 1 ? `calc(${spanWidth}% * 7 - 8px)` : 'calc(100% - 8px)',
                 height: `${jobHeight}px`,
                 zIndex: isSecondaryAssignment ? 5 : 10,
