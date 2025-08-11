@@ -5,7 +5,8 @@ export enum JobStatus {
   HeldUp = 'Held Up',
   Complete = 'Complete',
   Invoiced = 'Invoiced',
-  Closed = 'Closed'
+  Closed = 'Closed',
+  Urgent = 'Urgent'
 }
 
 // All users are admins

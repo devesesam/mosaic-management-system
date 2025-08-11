@@ -34,6 +34,7 @@ const JobTile: React.FC<JobTileProps> = ({
         ${onClick ? 'cursor-pointer' : ''}
         flex flex-col justify-between
         ${isWeekView && isScheduled ? 'h-full' : isScheduled ? 'h-[22px]' : 'min-h-[80px]'}
+        ${job.status === JobStatus.Urgent ? 'border-4 border-black' : ''}
       `}
       style={{
         backgroundColor: isScheduled ? getTileColor() : 'white',
@@ -52,6 +53,12 @@ const JobTile: React.FC<JobTileProps> = ({
           {!isScheduled && job.customer_name && (
             <div className="text-sm truncate opacity-90">
               {job.customer_name}
+            </div>
+          )}
+          {/* Show "INVOICED" text for invoiced jobs */}
+          {job.status === JobStatus.Invoiced && isScheduled && (
+            <div className="text-xs font-bold text-black bg-white bg-opacity-90 px-1 rounded mt-1 inline-block">
+              INVOICED
             </div>
           )}
           {!isScheduled && (
