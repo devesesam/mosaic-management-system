@@ -38,7 +38,7 @@ const JobTile: React.FC<JobTileProps> = ({
       `}
       style={{
         backgroundColor: isScheduled ? getTileColor() : 'white',
-        borderLeft: isScheduled ? 'none' : `4px solid ${getTileColor()}`
+        borderLeft: isScheduled ? (job.status !== JobStatus.Urgent ? 'none' : undefined) : `4px solid ${getTileColor()}`
       }}
       onClick={onClick}
     >
