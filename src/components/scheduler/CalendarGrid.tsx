@@ -396,7 +396,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
     return Math.max(4, maxDepth); // Minimum 4 for decent height
   }, [renderingData]);
 
-  const rowHeight = Math.max(120, maxStackDepth * 54 + 20); // 54px per job + padding
+  const rowHeight = Math.max(70, maxStackDepth * 54 + 20); // 54px per job + padding
 
   return (
     <div className="flex border-b border-gray-200" style={{ minHeight: `${rowHeight}px` }}>
