@@ -270,9 +270,22 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
       stackIndex: number;
     }> = [];
     
-    const stackCounters: { [key: string]: number } = {};
+    // First, sort jobs by start date to ensure consistent stacking order
+    const sortedJobs = [...allWorkerJobs].sort((a, b) => {
+      if (!a.start_date && !b.start_date) return 0;
+      if (!a.start_date) return 1;
+      if (!b.start_date) return -1;
+      return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+    });
     
-    allWorkerJobs.forEach(job => {
+    // Track which jobs occupy which stack positions for each day
+    const dayStacks: { [key: string]: Array<{
+      job: Job;
+      span: number;
+      stackIndex: number;
+    }> } = {};
+    
+    sortedJobs.forEach(job => {
       if (!job.start_date) return;
       
       try {
@@ -310,11 +323,51 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
             span = 1;
           }
           
-          // Calculate stack position for this day
+          // Find the lowest available stack position that doesn't conflict with existing jobs
           const dayKey = format(renderDay, 'yyyy-MM-dd');
-          if (!stackCounters[dayKey]) stackCounters[dayKey] = 0;
-          const stackIndex = stackCounters[dayKey];
-          stackCounters[dayKey]++;
+          if (!dayStacks[dayKey]) dayStacks[dayKey] = [];
+          
+          // Find available stack position by checking for conflicts across the span
+          let stackIndex = 0;
+          let foundSlot = false;
+          
+          while (!foundSlot) {
+            foundSlot = true;
+            
+            // Check if this stack position conflicts with any existing job across the span
+            for (let dayOffset = 0; dayOffset < span; dayOffset++) {
+              const checkDayIndex = renderDayIndex + dayOffset;
+              if (checkDayIndex >= days.length) break;
+              
+              const checkDayKey = format(days[checkDayIndex], 'yyyy-MM-dd');
+              if (!dayStacks[checkDayKey]) dayStacks[checkDayKey] = [];
+              
+              const conflictingJob = dayStacks[checkDayKey].find(existingJob => 
+                existingJob.stackIndex === stackIndex
+              );
+              
+              if (conflictingJob) {
+                foundSlot = false;
+                stackIndex++;
+                break;
+              }
+            }
+          }
+          
+          // Reserve this stack position across all days in the span
+          for (let dayOffset = 0; dayOffset < span; dayOffset++) {
+            const reserveDayIndex = renderDayIndex + dayOffset;
+            if (reserveDayIndex >= days.length) break;
+            
+            const reserveDayKey = format(days[reserveDayIndex], 'yyyy-MM-dd');
+            if (!dayStacks[reserveDayKey]) dayStacks[reserveDayKey] = [];
+            
+            dayStacks[reserveDayKey].push({
+              job,
+              span,
+              stackIndex
+            });
+          }
           
           data.push({
             job,
@@ -334,14 +387,13 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
 
   // Calculate row height based on maximum stack depth
   const maxStackDepth = React.useMemo(() => {
-    const stackDepths: { [key: string]: number } = {};
-    
-    renderingData.forEach(({ renderDay, stackIndex }) => {
-      const dayKey = format(renderDay, 'yyyy-MM-dd');
-      stackDepths[dayKey] = Math.max(stackDepths[dayKey] || 0, stackIndex + 1);
+    let maxDepth = 0;
+    days.forEach(day => {
+      const dayJobs = renderingData.filter(data => isSameDay(data.renderDay, day));
+      const dayMaxStack = Math.max(...dayJobs.map(data => data.stackIndex), -1) + 1;
+      maxDepth = Math.max(maxDepth, dayMaxStack);
     });
-    
-    return Math.max(4, Math.max(...Object.values(stackDepths), 0)); // Minimum 4 for decent height
+    return Math.max(4, maxDepth); // Minimum 4 for decent height
   }, [renderingData]);
 
   const rowHeight = Math.max(100, maxStackDepth * 28 + 20); // 28px per job + padding
