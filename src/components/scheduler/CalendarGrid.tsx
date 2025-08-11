@@ -167,50 +167,33 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       <div className="flex flex-col">
         {/* Unassigned row - only show for users with edit permissions */}
         {showUnassignedRow && (
-          <div className="flex border-b border-gray-200">
-            <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
-              Unassigned
-            </div>
-            {days.map(day => (
-              <CalendarCell
-                key={`unassigned-${day.toString()}`}
-                workerId={null}
-                day={day}
-                days={days}
-                jobs={getWorkerDayJobs(null, day)}
-                onJobDrop={onJobDrop}
-                onJobClick={onJobClick}
-                onJobResize={onJobResize}
-                onShowMore={(date) => setSelectedDay({ date, workerId: null })}
-                readOnly={readOnly}
-                currentRowWorkerId={null}
-              />
-            ))}
-          </div>
+          <WorkerRow
+            workerId={null}
+            workerName="Unassigned"
+            days={days}
+            getWorkerDayJobs={getWorkerDayJobs}
+            onJobDrop={onJobDrop}
+            onJobClick={onJobClick}
+            onJobResize={onJobResize}
+            onShowMore={(date) => setSelectedDay({ date, workerId: null })}
+            readOnly={readOnly}
+          />
         )}
 
         {/* Worker rows */}
         {displayedWorkers.map(worker => (
-          <div key={worker.id} className="flex border-b border-gray-200">
-            <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
-              {worker.name}
-            </div>
-            {days.map(day => (
-              <CalendarCell
-                key={`${worker.id}-${day.toString()}`}
-                workerId={worker.id}
-                day={day}
-                days={days}
-                jobs={getWorkerDayJobs(worker.id, day)}
-                onJobDrop={onJobDrop}
-                onJobClick={onJobClick}
-                onJobResize={onJobResize}
-                onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
-                readOnly={readOnly}
-                currentRowWorkerId={worker.id}
-              />
-            ))}
-          </div>
+          <WorkerRow
+            key={worker.id}
+            workerId={worker.id}
+            workerName={worker.name}
+            days={days}
+            getWorkerDayJobs={getWorkerDayJobs}
+            onJobDrop={onJobDrop}
+            onJobClick={onJobClick}
+            onJobResize={onJobResize}
+            onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
+            readOnly={readOnly}
+          />
         ))}
       </div>
 
@@ -239,30 +222,184 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   );
 };
 
-interface CalendarCellProps {
+interface WorkerRowProps {
   workerId: string | null;
-  day: Date;
+  workerName: string;
   days: Date[];
-  jobs: Job[];
+  getWorkerDayJobs: (workerId: string | null, day: Date) => Job[];
   onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
   onJobClick: (job: Job) => void;
   onJobResize: (job: Job, days: number) => void;
   onShowMore: (date: Date) => void;
   readOnly?: boolean;
-  currentRowWorkerId: string | null;
+}
+
+const WorkerRow: React.FC<WorkerRowProps> = ({
+  workerId,
+  workerName,
+  days,
+  getWorkerDayJobs,
+  onJobDrop,
+  onJobClick,
+  onJobResize,
+  onShowMore,
+  readOnly = false
+}) => {
+  // Get all jobs for this worker across all days
+  const allWorkerJobs = React.useMemo(() => {
+    const jobsMap = new Map<string, Job>();
+    
+    // Collect unique jobs across all days
+    days.forEach(day => {
+      const dayJobs = getWorkerDayJobs(workerId, day);
+      dayJobs.forEach(job => {
+        jobsMap.set(job.id, job);
+      });
+    });
+    
+    return Array.from(jobsMap.values());
+  }, [workerId, days, getWorkerDayJobs]);
+
+  // Calculate which jobs should render on which days
+  const renderingData = React.useMemo(() => {
+    const data: Array<{
+      job: Job;
+      renderDay: Date;
+      dayIndex: number;
+      span: number;
+      stackIndex: number;
+    }> = [];
+    
+    const stackCounters: { [key: string]: number } = {};
+    
+    allWorkerJobs.forEach(job => {
+      if (!job.start_date) return;
+      
+      try {
+        const jobStartDate = parseISO(job.start_date);
+        const jobEndDate = job.end_date ? parseISO(job.end_date) : jobStartDate;
+        
+        // Find which day this job should render on
+        let renderDay: Date | null = null;
+        let renderDayIndex = -1;
+        
+        // Check if job starts within this week
+        const startDayIndex = days.findIndex(day => isSameDay(day, jobStartDate));
+        if (startDayIndex >= 0) {
+          renderDay = days[startDayIndex];
+          renderDayIndex = startDayIndex;
+        } else if (jobStartDate < days[0] && jobEndDate >= days[0]) {
+          // Job started before this week but extends into it - render on first day
+          renderDay = days[0];
+          renderDayIndex = 0;
+        }
+        
+        if (renderDay && renderDayIndex >= 0) {
+          // Calculate span
+          const endDayIndex = days.findIndex(day => isSameDay(day, jobEndDate));
+          let span: number;
+          
+          if (endDayIndex >= 0) {
+            // Job ends within this week
+            span = endDayIndex - renderDayIndex + 1;
+          } else if (jobEndDate > days[days.length - 1]) {
+            // Job extends beyond this week
+            span = days.length - renderDayIndex;
+          } else {
+            // Single day job
+            span = 1;
+          }
+          
+          // Calculate stack position for this day
+          const dayKey = format(renderDay, 'yyyy-MM-dd');
+          if (!stackCounters[dayKey]) stackCounters[dayKey] = 0;
+          const stackIndex = stackCounters[dayKey];
+          stackCounters[dayKey]++;
+          
+          data.push({
+            job,
+            renderDay,
+            dayIndex: renderDayIndex,
+            span: Math.max(1, span),
+            stackIndex
+          });
+        }
+      } catch (error) {
+        console.error('Error processing job dates:', error, job);
+      }
+    });
+    
+    return data;
+  }, [allWorkerJobs, days]);
+
+  // Calculate row height based on maximum stack depth
+  const maxStackDepth = React.useMemo(() => {
+    const stackDepths: { [key: string]: number } = {};
+    
+    renderingData.forEach(({ renderDay, stackIndex }) => {
+      const dayKey = format(renderDay, 'yyyy-MM-dd');
+      stackDepths[dayKey] = Math.max(stackDepths[dayKey] || 0, stackIndex + 1);
+    });
+    
+    return Math.max(4, Math.max(...Object.values(stackDepths), 0)); // Minimum 4 for decent height
+  }, [renderingData]);
+
+  const rowHeight = Math.max(100, maxStackDepth * 28 + 20); // 28px per job + padding
+
+  return (
+    <div className="flex border-b border-gray-200" style={{ minHeight: `${rowHeight}px` }}>
+      <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
+        {workerName}
+      </div>
+      {days.map((day, dayIndex) => (
+        <CalendarCell
+          key={`${workerId}-${day.toString()}`}
+          workerId={workerId}
+          day={day}
+          dayIndex={dayIndex}
+          days={days}
+          renderingData={renderingData.filter(data => data.dayIndex === dayIndex)}
+          onJobDrop={onJobDrop}
+          onJobClick={onJobClick}
+          onJobResize={onJobResize}
+          readOnly={readOnly}
+          rowHeight={rowHeight}
+        />
+      ))}
+    </div>
+  );
+};
+
+interface CalendarCellProps {
+  workerId: string | null;
+  day: Date;
+  dayIndex: number;
+  days: Date[];
+  renderingData: Array<{
+    job: Job;
+    renderDay: Date;
+    dayIndex: number;
+    span: number;
+    stackIndex: number;
+  }>;
+  onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
+  onJobClick: (job: Job) => void;
+  onJobResize: (job: Job, days: number) => void;
+  readOnly?: boolean;
+  rowHeight: number;
 }
 
 const CalendarCell: React.FC<CalendarCellProps> = ({
   workerId,
   day,
+  dayIndex,
   days,
-  jobs,
+  renderingData,
   onJobDrop,
   onJobClick,
   onJobResize,
-  onShowMore,
   readOnly = false,
-  currentRowWorkerId
+  rowHeight
 }) => {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
@@ -275,114 +412,6 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
     canDrop: () => !readOnly
   });
 
-  // Current day index in the week
-  const dayIndex = days.findIndex(d => isSameDay(d, day));
-  
-  // CRITICAL FIX: Ensure we ONLY work with jobs for the current worker
-  // This should be redundant since getWorkerDayJobs should already filter,
-  // but we'll be extra explicit to eliminate any edge cases
-  const strictlyFilteredJobs = jobs.filter(job => {
-    if (currentRowWorkerId === null) {
-      // For unassigned row: only truly unassigned jobs
-      return !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0);
-    } else {
-      // For worker rows: only jobs where this worker is primary or secondary
-      return job.worker_id === currentRowWorkerId || 
-             (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentRowWorkerId));
-    }
-  });
-  
-  console.log(`CalendarCell DEBUG [${format(day, 'MMM dd')} - Worker: ${currentRowWorkerId || 'Unassigned'}]:`, {
-    originalJobsCount: jobs.length,
-    filteredJobsCount: strictlyFilteredJobs.length,
-    jobIds: strictlyFilteredJobs.map(j => j.id),
-    currentRowWorkerId,
-    dayIndex
-  });
-  
-  // Sort jobs by priority: put editable jobs first, then secondary assignments
-  const sortedJobs = [...strictlyFilteredJobs].sort((a, b) => {
-    // Check if jobs are secondary assignments for current worker
-    const aIsSecondary = currentRowWorkerId !== null && 
-                         a.worker_id !== currentRowWorkerId &&
-                         a.secondary_worker_ids?.includes(currentRowWorkerId);
-    const bIsSecondary = currentRowWorkerId !== null && 
-                         b.worker_id !== currentRowWorkerId &&
-                         b.secondary_worker_ids?.includes(currentRowWorkerId);
-    
-    // Primary jobs come before secondary jobs
-    if (!aIsSecondary && bIsSecondary) return -1;
-    if (aIsSecondary && !bIsSecondary) return 1;
-    
-    // Within same category, prioritize jobs with both dates
-    const aHasBothDates = !!(a.start_date && a.end_date);
-    const bHasBothDates = !!(b.start_date && b.end_date);
-    
-    if (aHasBothDates && !bHasBothDates) return -1;
-    if (!aHasBothDates && bHasBothDates) return 1;
-    
-    // Finally sort by creation date
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-  
-  const mainJob = sortedJobs[0];
-  
-  console.log(`CalendarCell SIMPLIFIED LOGIC [${format(day, 'MMM dd')} - Worker: ${currentRowWorkerId || 'Unassigned'}]:`, {
-    totalJobsForWorker: strictlyFilteredJobs.length,
-    mainJobId: mainJob?.id || 'none',
-    allJobIds: strictlyFilteredJobs.map(j => j.id)
-  });
-  // Determine if this cell should render the job and how it should span
-  let shouldRenderJob = false;
-  let jobSpan = 1;
-  let showText = false;
-  let isLastDay = false;
-  let isSecondaryAssignment = false;
-  
-  if (mainJob && mainJob.start_date && mainJob.end_date) {
-    const startDate = parseISO(mainJob.start_date);
-    const endDate = parseISO(mainJob.end_date);
-    
-    // Check if this is a secondary assignment (job's primary worker is not the current row's worker)
-    isSecondaryAssignment = currentRowWorkerId !== null && 
-                           mainJob.worker_id !== currentRowWorkerId &&
-                           mainJob.secondary_worker_ids?.includes(currentRowWorkerId);
-    
-    // For secondary assignments, we need to ensure proper spanning across all days of the job
-    // Only render on the start day (or first day of week if job started before)
-    const isStartDay = isSameDay(day, startDate);
-    const isFirstDayOfWeek = dayIndex === 0;
-    const jobStartsBeforeWeek = isBefore(startDate, days[0]);
-    
-    shouldRenderJob = isStartDay || (isFirstDayOfWeek && jobStartsBeforeWeek);
-    
-    if (shouldRenderJob) {
-      // Calculate how many days this job should span from this day
-      const remainingDaysInWeek = days.length - dayIndex;
-      let jobDaysFromThisDay: number;
-      
-      if (isStartDay) {
-        // Job starts on this day - calculate full duration
-        jobDaysFromThisDay = differenceInDays(endDate, startDate) + 1;
-      } else {
-        // Job started before this week - calculate remaining days from today
-        jobDaysFromThisDay = differenceInDays(endDate, day) + 1;
-      }
-      
-      // Ensure we don't span beyond the current week
-      jobSpan = Math.min(Math.max(1, jobDaysFromThisDay), remainingDaysInWeek);
-      showText = true;
-      
-      // Check if this is the last day of the job (for resize handle)
-      const actualEndDayIndex = days.findIndex(d => isSameDay(d, endDate));
-      isLastDay = actualEndDayIndex === dayIndex + jobSpan - 1 || 
-                  (actualEndDayIndex === -1 && dayIndex + jobSpan - 1 === days.length - 1);
-    }
-  }
-  
-  // Determine z-index: secondary assignments should be behind primary assignments
-  const zIndex = isSecondaryAssignment ? 5 : 10;
-  
   return (
     <div
       ref={drop}
@@ -392,43 +421,46 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
+      style={{ height: `${rowHeight}px` }}
     >
-      <div className="p-1 flex flex-col min-h-[100px]">
-        {/* Show all jobs for this day */}
-        {strictlyFilteredJobs.map((job, index) => {
+      <div className="absolute inset-0 p-1">
+        {/* Render jobs that should appear on this day */}
+        {renderingData.map(({ job, span, stackIndex }) => {
           // Check if this is a secondary assignment
-          const isJobSecondaryAssignment = currentRowWorkerId !== null && 
-                           job.worker_id !== currentRowWorkerId &&
-                           job.secondary_worker_ids?.includes(currentRowWorkerId);
+          const isSecondaryAssignment = workerId !== null && 
+                         job.worker_id !== workerId &&
+                         job.secondary_worker_ids?.includes(workerId);
+          
+          const cellWidth = 100 / 7; // Each cell is 1/7th of the container
+          const spanWidth = cellWidth * span;
+          const jobHeight = 24;
           
           return (
             <div
               key={job.id}
-              className={`mb-1 ${isJobSecondaryAssignment ? 'opacity-80' : ''}`}
-              style={{ zIndex: isJobSecondaryAssignment ? 5 : 10 }}
+              className={`absolute ${isSecondaryAssignment ? 'opacity-80' : ''}`}
+              style={{
+                left: '4px',
+                top: `${4 + stackIndex * (jobHeight + 4)}px`,
+                width: span > 1 ? `calc(${spanWidth}% * 7 - 8px)` : 'calc(100% - 8px)',
+                height: `${jobHeight}px`,
+                zIndex: isSecondaryAssignment ? 5 : 10,
+              }}
             >
               <DraggableJob
                 job={job}
                 onClick={() => onJobClick(job)}
                 isScheduled={true}
-                // Only allow resize if not read-only AND not a secondary assignment AND it's a multi-day job
-                onResize={!readOnly && !isJobSecondaryAssignment && job.end_date ? onJobResize : undefined}
+                onResize={!readOnly && !isSecondaryAssignment && job.end_date ? onJobResize : undefined}
                 isWeekView={true}
                 showText={true}
                 dayIndex={dayIndex}
                 days={days}
-                readOnly={readOnly || isJobSecondaryAssignment}
+                readOnly={readOnly || isSecondaryAssignment}
               />
             </div>
           );
         })}
-        
-        {/* Empty state for no jobs */}
-        {strictlyFilteredJobs.length === 0 && (
-          <div className="flex-1 flex items-center justify-center min-h-[80px]">
-            <div className="w-full h-full" />
-          </div>
-        )}
       </div>
     </div>
   );
