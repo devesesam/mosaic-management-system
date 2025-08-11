@@ -435,9 +435,3 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
 };
 
 export default CalendarGrid;
-      </div>
-    </div>
-  );
-};
-
-export default CalendarGrid;
