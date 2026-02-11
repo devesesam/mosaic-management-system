@@ -85,8 +85,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     <div className="min-w-fit">
       {/* Header row with days - Increased z-index to stay above all content */}
       <div className="flex sticky top-0 z-30 bg-white">
-        {/* Worker column header */}
-        <div className="w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-gray-100 flex items-center justify-between px-3">
+        {/* Worker column header - responsive width */}
+        <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-gray-100 flex items-center justify-between px-2 md:px-3">
           <div className="flex items-center space-x-2 flex-1">
             {isEditable ? (
               <select
@@ -135,16 +135,16 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           </div>
         </div>
         
-        {/* Day headers */}
+        {/* Day headers - responsive width calculation */}
         {days.map(day => (
           <div
             key={day.toString()}
-            className={`w-[calc((100%-12rem)/7)] h-14 flex flex-col justify-center border-r border-b border-gray-200 ${
+            className={`flex-1 min-w-0 h-14 flex flex-col justify-center border-r border-b border-gray-200 ${
               isToday(day) ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-800'
             }`}
           >
-            <div className="text-sm text-center">{format(day, 'EEEE')}</div>
-            <div className="text-lg text-center font-medium">{format(day, 'd')}</div>
+            <div className="text-xs sm:text-sm text-center truncate px-1">{format(day, 'EEE')}</div>
+            <div className="text-sm sm:text-lg text-center font-medium">{format(day, 'd')}</div>
           </div>
         ))}
       </div>
@@ -400,7 +400,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
 
   return (
     <div className="flex border-b border-gray-200" style={{ minHeight: `${rowHeight}px` }}>
-      <div className="w-48 flex-shrink-0 p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700">
+      <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 p-2 md:p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700 text-xs sm:text-sm md:text-base truncate">
         {workerName}
       </div>
       {days.map((day, dayIndex) => (
@@ -469,7 +469,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       ref={drop}
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
-        w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
+        flex-1 min-w-0 border-r border-gray-200 relative
         ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}

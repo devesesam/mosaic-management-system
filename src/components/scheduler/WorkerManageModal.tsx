@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Worker } from '../../types';
-import { X, Trash2, AlertTriangle, Lock } from 'lucide-react';
+import { X, Trash2, AlertTriangle, Lock, Pencil, Check } from 'lucide-react';
 import { useWorkerStore } from '../../store/workersStore';
 import { getJobsForWorker } from '../../api/jobsApi';
 
@@ -15,7 +15,43 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [assignedJobsCount, setAssignedJobsCount] = useState(0);
-  const { deleteWorker } = useWorkerStore();
+  const [editingWorkerId, setEditingWorkerId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const { deleteWorker, updateWorker } = useWorkerStore();
+
+  const startEditing = (worker: Worker) => {
+    if (readOnly) return;
+    setEditingWorkerId(worker.id);
+    setEditName(worker.name);
+    setEditEmail(worker.email || '');
+  };
+
+  const cancelEditing = () => {
+    setEditingWorkerId(null);
+    setEditName('');
+    setEditEmail('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingWorkerId || readOnly) return;
+    if (!editName.trim()) return;
+
+    setIsLoading(true);
+    try {
+      await updateWorker(editingWorkerId, {
+        name: editName.trim(),
+        email: editEmail.trim() || null
+      });
+      setEditingWorkerId(null);
+      setEditName('');
+      setEditEmail('');
+    } catch (error) {
+      console.error('Error updating worker:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const checkWorkerJobs = async (worker: Worker) => {
     if (readOnly) return;
@@ -47,8 +83,9 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        <div className="flex justify-between items-center p-4 border-b">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
+        {/* Fixed header */}
+        <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
           <div className="flex items-center space-x-2">
             <h2 className="text-xl font-semibold text-gray-800">
               Manage Workers
@@ -60,15 +97,16 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
               </div>
             )}
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-gray-100 rounded"
           >
             <X size={20} />
           </button>
         </div>
-        
-        <div className="p-4">
+
+        {/* Scrollable content */}
+        <div className="p-4 overflow-y-auto flex-1">
           {readOnly && (
             <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-amber-700 text-sm">
@@ -76,7 +114,7 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
               </p>
             </div>
           )}
-          
+
           {workers.length === 0 ? (
             <p className="text-gray-500 text-center py-4">No workers available</p>
           ) : (
@@ -86,24 +124,85 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
                   key={worker.id}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
-                  <div>
-                    <div className="font-medium text-gray-900">{worker.name}</div>
-                    {worker.email && (
-                      <div className="text-sm text-gray-500">{worker.email}</div>
+                  {editingWorkerId === worker.id ? (
+                    // Edit mode
+                    <div className="flex-1 mr-2 space-y-2">
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Worker name"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        autoFocus
+                      />
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        placeholder="Email (optional)"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+                  ) : (
+                    // Display mode
+                    <div>
+                      <div className="font-medium text-gray-900">{worker.name}</div>
+                      {worker.email && (
+                        <div className="text-sm text-gray-500">{worker.email}</div>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-1">
+                    {editingWorkerId === worker.id ? (
+                      // Save/Cancel buttons
+                      <>
+                        <button
+                          onClick={saveEdit}
+                          disabled={isLoading || !editName.trim()}
+                          className="p-2 text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                          title="Save changes"
+                        >
+                          <Check size={18} />
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          disabled={isLoading}
+                          className="p-2 text-gray-600 hover:text-gray-700 transition-colors"
+                          title="Cancel"
+                        >
+                          <X size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      // Edit/Delete buttons
+                      <>
+                        <button
+                          onClick={() => startEditing(worker)}
+                          disabled={isLoading || readOnly}
+                          className={`p-2 transition-colors ${
+                            readOnly
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-indigo-600 hover:text-indigo-700'
+                          } disabled:opacity-50`}
+                          title={readOnly ? 'Read-only mode' : 'Edit Worker'}
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button
+                          onClick={() => checkWorkerJobs(worker)}
+                          disabled={isLoading || readOnly}
+                          className={`p-2 transition-colors ${
+                            readOnly
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-red-600 hover:text-red-700'
+                          } disabled:opacity-50`}
+                          title={readOnly ? 'Read-only mode' : 'Delete Worker'}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
                     )}
                   </div>
-                  <button
-                    onClick={() => checkWorkerJobs(worker)}
-                    disabled={isLoading || readOnly}
-                    className={`p-2 transition-colors ${
-                      readOnly 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-red-600 hover:text-red-700'
-                    } disabled:opacity-50`}
-                    title={readOnly ? 'Read-only mode' : 'Delete Worker'}
-                  >
-                    <Trash2 size={18} />
-                  </button>
                 </div>
               ))}
             </div>

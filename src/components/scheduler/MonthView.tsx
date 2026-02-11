@@ -17,8 +17,9 @@ import {
   isWithinInterval
 } from 'date-fns';
 import { useDrop } from 'react-dnd';
-import { Job } from '../../types';
+import { Job, Worker } from '../../types';
 import UnscheduledPanel from './UnscheduledPanel';
+import GlobalJobSearch from './GlobalJobSearch';
 import { useJobsStore } from '../../store/jobsStore';
 import { useAuth } from '../../context/AuthContext';
 import JobForm from '../jobs/JobForm';
@@ -37,6 +38,16 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isJobsPaneCollapsed, setIsJobsPaneCollapsed] = useState(() => {
+    return localStorage.getItem('jobsPaneCollapsed') === 'true';
+  });
+
+  // Toggle jobs pane and persist to localStorage
+  const toggleJobsPane = () => {
+    const newValue = !isJobsPaneCollapsed;
+    setIsJobsPaneCollapsed(newValue);
+    localStorage.setItem('jobsPaneCollapsed', String(newValue));
+  };
   
   // Use store for data access
   const { 
@@ -321,7 +332,8 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Month navigation header */}
         <div className="flex items-center justify-between p-2 bg-white border-b border-gray-200">
-          <div className="flex items-center space-x-2">
+          {/* Left: Navigation */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
             <button
               onClick={prevMonth}
               className="p-1 rounded-full hover:bg-gray-100 transition-colors"
@@ -329,7 +341,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             >
               <ChevronLeft className="h-5 w-5 text-gray-600" />
             </button>
-            <h2 className="text-xl font-semibold text-gray-800">
+            <h2 className="text-xl font-semibold text-gray-800 whitespace-nowrap">
               {format(currentDate, 'MMMM yyyy')}
             </h2>
             <button
@@ -340,13 +352,27 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
               <ChevronRight className="h-5 w-5 text-gray-600" />
             </button>
           </div>
-          
-          <button
-            onClick={goToToday}
-            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            Today
-          </button>
+
+          {/* Center: Search bar */}
+          <div className="flex-1 flex justify-center px-4">
+            <GlobalJobSearch
+              jobs={jobs}
+              onJobSelect={(job) => {
+                setSelectedJob(job);
+                setIsJobFormOpen(true);
+              }}
+            />
+          </div>
+
+          {/* Right: Today button */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={goToToday}
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap"
+            >
+              Today
+            </button>
+          </div>
         </div>
         
         {/* Error messages - keep these but make them less prominent */}
@@ -441,6 +467,8 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
                 setIsJobFormOpen(true);
               }}
               readOnly={readOnly}
+              isCollapsed={isJobsPaneCollapsed}
+              onToggleCollapse={toggleJobsPane}
             />
           )}
         </div>
@@ -487,7 +515,7 @@ interface CalendarDayProps {
   isInCurrentMonth: boolean;
   onJobResize: (job: Job, days: number) => void;
   readOnly?: boolean;
-  currentWorker?: any;
+  currentWorker?: Worker | null;
 }
 
 const CalendarDay: React.FC<CalendarDayProps> = ({ 

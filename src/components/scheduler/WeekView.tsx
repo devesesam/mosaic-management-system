@@ -15,6 +15,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Job, Worker } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
+import GlobalJobSearch from './GlobalJobSearch';
 import { useJobsStore } from '../../store/jobsStore';
 import { useWorkerStore } from '../../store/workersStore';
 import { useAuth } from '../../context/AuthContext';
@@ -32,6 +33,16 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isJobsPaneCollapsed, setIsJobsPaneCollapsed] = useState(() => {
+    return localStorage.getItem('jobsPaneCollapsed') === 'true';
+  });
+
+  // Toggle jobs pane and persist to localStorage
+  const toggleJobsPane = () => {
+    const newValue = !isJobsPaneCollapsed;
+    setIsJobsPaneCollapsed(newValue);
+    localStorage.setItem('jobsPaneCollapsed', String(newValue));
+  };
   
   // Use stores for data access
   const { 
@@ -375,14 +386,15 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     <div className="flex h-full flex-col">
       {/* Week navigation header */}
       <div className="flex items-center justify-between p-2 bg-white border-b border-gray-200">
-        <div className="flex items-center space-x-2">
+        {/* Left: Navigation */}
+        <div className="flex items-center space-x-2 flex-shrink-0">
           <button
             onClick={prevWeek}
             className="p-1 rounded-full hover:bg-gray-200 transition-colors"
           >
             <ChevronLeft className="h-5 w-5 text-gray-600" />
           </button>
-          <h2 className="text-lg font-semibold text-gray-800">
+          <h2 className="text-lg font-semibold text-gray-800 whitespace-nowrap">
             {format(weekStart, 'MMMM d')} - {format(weekEnd, 'MMMM d, yyyy')}
           </h2>
           <button
@@ -392,13 +404,27 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
             <ChevronRight className="h-5 w-5 text-gray-600" />
           </button>
         </div>
-        
-        <button
-          onClick={goToToday}
-          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-        >
-          Today
-        </button>
+
+        {/* Center: Search bar */}
+        <div className="flex-1 flex justify-center px-4">
+          <GlobalJobSearch
+            jobs={jobs}
+            onJobSelect={(job) => {
+              setSelectedJob(job);
+              setIsJobFormOpen(true);
+            }}
+          />
+        </div>
+
+        {/* Right: Today button */}
+        <div className="flex-shrink-0">
+          <button
+            onClick={goToToday}
+            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap"
+          >
+            Today
+          </button>
+        </div>
       </div>
       
       {/* Error messages - keep these but make them less prominent */}
@@ -488,7 +514,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         
         {/* Fixed-width unscheduled jobs panel - only show for edit mode */}
         {!readOnly && (
-          <UnscheduledPanel 
+          <UnscheduledPanel
             jobs={unscheduledJobs}
             onJobDrop={handleJobDrop}
             onJobClick={(job) => {
@@ -496,6 +522,8 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
               setIsJobFormOpen(true);
             }}
             readOnly={readOnly}
+            isCollapsed={isJobsPaneCollapsed}
+            onToggleCollapse={toggleJobsPane}
           />
         )}
       </div>

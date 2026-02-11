@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Job } from '../types';
 import toast from 'react-hot-toast';
+import { logger } from '../utils/logger';
 
 interface JobsState {
   jobs: Job[];
@@ -25,13 +26,13 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   
   fetchJobs: async () => {
     set({ loading: true, error: null, isLoading: true });
-    console.log('jobsStore: Fetching jobs - using edge function');
+    logger.debug('jobsStore: Fetching jobs - using edge function');
     
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/get-jobs`;
       
-      console.log('jobsStore: Fetching jobs from edge function:', apiUrl);
+      logger.debug('jobsStore: Fetching jobs from edge function:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -41,24 +42,24 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         },
       });
 
-      console.log('jobsStore: Jobs response status:', response.status);
+      logger.debug('jobsStore: Jobs response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('jobsStore: Jobs response:', data);
+      logger.debug('jobsStore: Jobs response:', data);
       
       if (data.success && data.data) {
         const jobs = data.data;
-        console.log('jobsStore: Fetched', jobs.length, 'jobs');
+        logger.debug('jobsStore: Fetched', jobs.length, 'jobs');
         set({ jobs, loading: false, error: null, isLoading: false });
       } else {
         throw new Error(data.error || 'Failed to fetch jobs');
       }
     } catch (error) {
-      console.error('jobsStore: Error fetching jobs:', error);
+      logger.error('jobsStore: Error fetching jobs:', error);
       
       // Create a user-friendly error message
       const errorMessage = error instanceof Error 
@@ -72,13 +73,13 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   
   addJob: async (jobData) => {
     set({ loading: true, error: null, isLoading: true });
-    console.log('jobsStore: Adding job:', jobData);
+    logger.debug('jobsStore: Adding job:', jobData);
     
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/add-job`;
       
-      console.log('jobsStore: Adding job via edge function:', apiUrl);
+      logger.debug('jobsStore: Adding job via edge function:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -89,18 +90,18 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         body: JSON.stringify(jobData)
       });
 
-      console.log('jobsStore: Add job response status:', response.status);
+      logger.debug('jobsStore: Add job response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('jobsStore: Add job response:', data);
+      logger.debug('jobsStore: Add job response:', data);
       
       if (data.success && data.data) {
         const newJob = data.data;
-        console.log('jobsStore: Job created successfully:', newJob.id);
+        logger.debug('jobsStore: Job created successfully:', newJob.id);
         
         // Update local state immediately
         set((state) => ({ 
@@ -111,16 +112,14 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         }));
         
         toast.success('Job created successfully');
-        
-        // Then refresh all jobs to ensure consistency
-        get().fetchJobs();
-        
+
+        // Optimistic update - trust local state, no refetch needed
         return newJob;
       } else {
         throw new Error(data.error || 'Failed to create job');
       }
     } catch (error) {
-      console.error('jobsStore: Error adding job:', error);
+      logger.error('jobsStore: Error adding job:', error);
       
       // Create a user-friendly error message
       let errorMessage = 'Failed to add job - please try again';
@@ -143,13 +142,13 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   
   updateJob: async (id, updates) => {
     set({ loading: true, error: null, isLoading: true });
-    console.log('jobsStore: Updating job:', id, updates);
+    logger.debug('jobsStore: Updating job:', id, updates);
     
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/update-job`;
       
-      console.log('jobsStore: Updating job via edge function:', apiUrl);
+      logger.debug('jobsStore: Updating job via edge function:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'PUT',
@@ -160,18 +159,18 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         body: JSON.stringify({ id, updates })
       });
 
-      console.log('jobsStore: Update job response status:', response.status);
+      logger.debug('jobsStore: Update job response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('jobsStore: Update job response:', data);
+      logger.debug('jobsStore: Update job response:', data);
       
       if (data.success && data.data) {
         const updatedJob = data.data;
-        console.log('jobsStore: Job updated successfully:', id);
+        logger.debug('jobsStore: Job updated successfully:', id);
         
         // Update local state immediately
         set((state) => ({
@@ -182,16 +181,14 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         }));
         
         toast.success('Job updated successfully');
-        
-        // Then refresh all jobs to ensure consistency
-        get().fetchJobs();
-        
+
+        // Optimistic update - trust local state, no refetch needed
         return updatedJob;
       } else {
         throw new Error(data.error || 'Failed to update job');
       }
     } catch (error) {
-      console.error('jobsStore: Error updating job:', error);
+      logger.error('jobsStore: Error updating job:', error);
       
       // Create a user-friendly error message
       let errorMessage = 'Failed to update job - please try again';
@@ -214,13 +211,13 @@ export const useJobsStore = create<JobsState>((set, get) => ({
 
   deleteJob: async (id) => {
     set({ loading: true, error: null, isLoading: true });
-    console.log('jobsStore: Deleting job:', id);
+    logger.debug('jobsStore: Deleting job:', id);
     
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const apiUrl = `${supabaseUrl}/functions/v1/delete-job/${id}`;
       
-      console.log('jobsStore: Deleting job via edge function:', apiUrl);
+      logger.debug('jobsStore: Deleting job via edge function:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'DELETE',
@@ -230,17 +227,17 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         },
       });
 
-      console.log('jobsStore: Delete job response status:', response.status);
+      logger.debug('jobsStore: Delete job response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('jobsStore: Delete job response:', data);
+      logger.debug('jobsStore: Delete job response:', data);
       
       if (data.success) {
-        console.log('jobsStore: Job deleted successfully:', id);
+        logger.debug('jobsStore: Job deleted successfully:', id);
         
         // Update local state
         set((state) => ({
@@ -251,14 +248,13 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         }));
         
         toast.success('Job deleted successfully');
-        
-        // Then refresh all jobs to ensure consistency
-        get().fetchJobs();
+
+        // Optimistic update - trust local state, no refetch needed
       } else {
         throw new Error(data.error || 'Failed to delete job');
       }
     } catch (error) {
-      console.error('jobsStore: Error deleting job:', error);
+      logger.error('jobsStore: Error deleting job:', error);
       
       // Create a user-friendly error message
       let errorMessage = 'Failed to delete job - please try again';
@@ -287,7 +283,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
     const state = get();
     const jobsToUpdate = state.jobs.filter(job => job.worker_id === workerId);
     
-    console.log('jobsStore: Unassigning', jobsToUpdate.length, 'jobs from worker', workerId);
+    logger.debug('jobsStore: Unassigning', jobsToUpdate.length, 'jobs from worker', workerId);
     
     // Update each job to unassign the worker
     for (const job of jobsToUpdate) {
@@ -298,7 +294,7 @@ export const useJobsStore = create<JobsState>((set, get) => ({
           end_date: null
         });
       } catch (error) {
-        console.error(`Failed to unassign job ${job.id}:`, error);
+        logger.error(`Failed to unassign job ${job.id}:`, error);
       }
     }
     

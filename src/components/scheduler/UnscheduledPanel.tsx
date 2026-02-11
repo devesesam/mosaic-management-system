@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useDrop } from 'react-dnd';
 import { Job } from '../../types';
 import DraggableJob from './DraggableJob';
-import { Search, X } from 'lucide-react';
+import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface UnscheduledPanelProps {
@@ -10,13 +10,17 @@ interface UnscheduledPanelProps {
   onJobDrop: (job: Job, workerId: string | null, date: Date | null) => void;
   onJobClick: (job: Job) => void;
   readOnly?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
   jobs,
   onJobDrop,
   onJobClick,
-  readOnly = false
+  readOnly = false,
+  isCollapsed = false,
+  onToggleCollapse
 }) => {
   const { currentWorker } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,10 +86,37 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
     finalFiltered: filteredJobs.length
   });
   
+  // Collapsed state - show just a toggle button
+  if (isCollapsed) {
+    return (
+      <div className="hidden md:flex border-l border-gray-200 bg-gray-50 flex-col items-center py-2">
+        <button
+          onClick={onToggleCollapse}
+          className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+          title="Show Jobs to Schedule"
+        >
+          <ChevronLeft className="h-5 w-5 text-gray-600" />
+        </button>
+        <div className="mt-2 writing-mode-vertical text-xs text-gray-500 font-medium" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+          Jobs ({filteredJobs.length})
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-[200px] min-w-[200px] border-l border-gray-200 bg-gray-50 flex flex-col">
-      <div className="p-3 font-semibold text-gray-800 border-b border-gray-200 bg-gray-100">
-        Jobs to Schedule ({filteredJobs.length})
+    <div className="hidden md:flex w-[200px] min-w-[200px] border-l border-gray-200 bg-gray-50 flex-col">
+      <div className="p-3 font-semibold text-gray-800 border-b border-gray-200 bg-gray-100 flex items-center justify-between">
+        <span>Jobs to Schedule ({filteredJobs.length})</span>
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 rounded hover:bg-gray-200 transition-colors"
+            title="Hide Jobs to Schedule"
+          >
+            <ChevronRight className="h-4 w-4 text-gray-600" />
+          </button>
+        )}
       </div>
 
       {/* Search and filters */}

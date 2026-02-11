@@ -11,6 +11,8 @@ import { useJobsStore } from './store/jobsStore';
 import { useWorkerStore } from './store/workersStore';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
+import { Job } from './types';
+import { logger } from './utils/logger';
 
 function App() {
   const { user, authError, currentWorker, signOut, isEditable } = useAuth();
@@ -35,7 +37,7 @@ function App() {
 
   // Load data when component mounts - no auth dependency
   useEffect(() => {
-    console.log('App: Initial data load');
+    logger.debug('App: Initial data load');
     fetchJobs();
     fetchWorkers();
   }, [fetchJobs, fetchWorkers]);
@@ -43,12 +45,12 @@ function App() {
   // Set up periodic refresh without auth dependency
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('App: Periodic data refresh');
+      logger.debug('App: Periodic data refresh');
       try {
         fetchJobs();
         fetchWorkers();
       } catch (error) {
-        console.error('Error during periodic refresh:', error);
+        logger.error('Error during periodic refresh:', error);
       }
     }, 60000); // Refresh every minute
     
@@ -58,7 +60,7 @@ function App() {
   // Log edit permission status
   useEffect(() => {
     if (currentWorker) {
-      console.log('App: User edit permissions:', {
+      logger.debug('App: User edit permissions:', {
         email: currentWorker.email,
         isEditable,
         mode: isEditable ? 'EDIT' : 'READ-ONLY'
@@ -69,36 +71,36 @@ function App() {
   // Force week view for read-only users
   useEffect(() => {
     if (!isEditable && activeView !== 'week') {
-      console.log('App: Forcing week view for read-only user');
+      logger.debug('App: Forcing week view for read-only user');
       setActiveView('week');
     }
   }, [isEditable, activeView]);
 
   const handleNewJob = () => {
     if (!isEditable) {
-      console.log('App: New job creation blocked - read-only mode');
+      logger.debug('App: New job creation blocked - read-only mode');
       return;
     }
     setIsJobFormOpen(true);
   };
 
-  const handleSubmitJob = async (jobData: any) => {
+  const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
     if (!isEditable) {
-      console.log('App: Job submission blocked - read-only mode');
+      logger.debug('App: Job submission blocked - read-only mode');
       return;
     }
     try {
       await addJob(jobData);
       setIsJobFormOpen(false);
     } catch (error) {
-      console.error('Error creating job:', error);
+      logger.error('Error creating job:', error);
     }
   };
 
   const handleSetActiveView = (view: 'week' | 'month') => {
     // Only allow view changes for users with edit permissions
     if (!isEditable) {
-      console.log('App: View change blocked - read-only mode forces week view');
+      logger.debug('App: View change blocked - read-only mode forces week view');
       return;
     }
     setActiveView(view);

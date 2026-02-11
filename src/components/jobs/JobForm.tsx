@@ -4,6 +4,8 @@ import { useWorkerStore } from '../../store/workersStore';
 import { X, Trash2, AlertTriangle, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { logger } from '../../utils/logger';
+import { validators } from '../../utils/validation';
 
 interface JobFormProps {
   onClose: () => void;
@@ -41,7 +43,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   // Initialize form with initial job data
   useEffect(() => {
     if (initialJob) {
-      console.log('JobForm: Initializing with job:', initialJob);
+      logger.debug('JobForm: Initializing with job:', initialJob);
       setFormData({
         ...initialJob,
         secondary_worker_ids: initialJob.secondary_worker_ids || []
@@ -51,7 +53,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
 
   // Fetch workers when form opens
   useEffect(() => {
-    console.log('JobForm: Fetching workers...');
+    logger.debug('JobForm: Fetching workers...');
     fetchWorkers();
   }, [fetchWorkers]);
 
@@ -63,7 +65,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
   // Show read-only warning if needed
   useEffect(() => {
     if (readOnly && initialJob) {
-      console.log('JobForm: Opening in read-only mode');
+      logger.debug('JobForm: Opening in read-only mode');
     }
   }, [readOnly, initialJob]);
 
@@ -75,7 +77,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     // CRITICAL: If worker_id is being set to null/empty, also clear secondary workers
     if (name === 'worker_id') {
       if (!value || value === '') {
-        console.log('JobForm: Primary worker cleared - clearing secondary workers');
+        logger.debug('JobForm: Primary worker cleared - clearing secondary workers');
         setFormData(prev => ({ 
           ...prev, 
           [name]: null,
@@ -132,18 +134,25 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     e.preventDefault();
     if (isSubmitting || readOnly) return;
     
-    console.log('JobForm: Submitting job data:', formData);
+    logger.debug('JobForm: Submitting job data:', formData);
     
     // Validate required fields
     if (!formData.address?.trim()) {
       toast.error('Job address is required');
       return;
     }
+
+    // Validate date range
+    const dateError = validators.dateRange(formData.start_date || null, formData.end_date || null);
+    if (dateError) {
+      toast.error(dateError);
+      return;
+    }
     
     // CRITICAL: Ensure secondary workers are cleared if no primary worker
     let finalFormData = { ...formData };
     if (!finalFormData.worker_id) {
-      console.log('JobForm: No primary worker - ensuring secondary workers are cleared');
+      logger.debug('JobForm: No primary worker - ensuring secondary workers are cleared');
       finalFormData.secondary_worker_ids = [];
     }
     
@@ -162,7 +171,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
       
       onClose();
     } catch (error) {
-      console.error('Error submitting job:', error);
+      logger.error('Error submitting job:', error);
       
       // More specific error messages
       if (error instanceof Error) {
@@ -188,7 +197,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
       await onDelete(initialJob.id);
       onClose();
     } catch (error) {
-      console.error('Error deleting job:', error);
+      logger.error('Error deleting job:', error);
     } finally {
       setIsSubmitting(false);
     }

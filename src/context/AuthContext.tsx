@@ -4,6 +4,7 @@ import { supabase, handleSupabaseError } from '../api/supabaseClient';
 import { getWorkerByEmail, createOrUpdateWorkerProfile } from '../api/workersApi';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
+import { logger } from '../utils/logger';
 
 interface AuthContextProps {
   session: Session | null;
@@ -22,12 +23,11 @@ interface AuthContextProps {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-// List of email addresses that have edit permissions
-const ADMIN_EMAILS = [
-  'damsevese@gmail.com',
-  'nick@roofingtasman.co.nz',
-  'henry@roofingtasman.co.nz'
-];
+// List of email addresses that have edit permissions (loaded from environment)
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userEmail = user.email.toLowerCase();
       const hasEditPermission = ADMIN_EMAILS.includes(userEmail);
       setIsEditable(hasEditPermission);
-      console.log('AuthProvider: Edit permission check:', {
+      logger.debug('AuthProvider: Edit permission check:', {
         email: userEmail,
         hasEditPermission,
         adminEmails: ADMIN_EMAILS,
@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('supabase.auth.token');
       await supabase.auth.signOut();
     } catch (err) {
-      console.error('Error signing out:', err);
+      logger.error('Error signing out:', err);
     }
   };
 
@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Skip worker profile creation for admin emails
     if (ADMIN_EMAILS.includes(normalizedEmail)) {
-      console.log('AuthProvider: Skipping worker profile creation for admin email:', normalizedEmail);
+      logger.debug('AuthProvider: Skipping worker profile creation for admin email:', normalizedEmail);
       return;
     }
 
@@ -86,15 +86,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const worker = await getWorkerByEmail(userEmail);
       
       if (worker) {
-        console.log('AuthProvider: Found existing worker profile');
+        logger.debug('AuthProvider: Found existing worker profile');
         setCurrentWorker(worker);
       } else {
-        console.log('AuthProvider: No worker profile found, creating one');
+        logger.debug('AuthProvider: No worker profile found, creating one');
         const newWorker = await createOrUpdateWorkerProfile(userEmail);
         setCurrentWorker(newWorker);
       }
     } catch (err) {
-      console.error('AuthProvider: Error getting/creating worker profile:', err);
+      logger.error('AuthProvider: Error getting/creating worker profile:', err);
       // Don't throw here - allow auth to continue even if worker profile fails
     }
   };
@@ -103,12 +103,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        console.log('AuthProvider: Initializing auth...');
+        logger.debug('AuthProvider: Initializing auth...');
         setLoading(true);
         
         // Get current session if any
         const { data } = await supabase.auth.getSession();
-        console.log('Initial session check:', data.session ? 'Session exists' : 'No session');
+        logger.debug('Initial session check:', data.session ? 'Session exists' : 'No session');
         
         if (data.session) {
           setSession(data.session);
@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch (err) {
-        console.error('AuthProvider: Error getting session:', err);
+        logger.error('AuthProvider: Error getting session:', err);
         setAuthError('Authentication service unavailable. Please try again later.');
       } finally {
         setLoading(false);
@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('AuthProvider: Auth state changed:', event);
+      logger.debug('AuthProvider: Auth state changed:', event);
 
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         await handleSignOut();
@@ -163,9 +163,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (signInError) {
         // Use less alarming console method for invalid credentials since it's expected user behavior
         if (signInError.message === 'Invalid login credentials' || signInError.message?.includes('invalid_credentials')) {
-          console.log('AuthProvider: Invalid credentials provided');
+          logger.debug('AuthProvider: Invalid credentials provided');
         } else {
-          console.error('AuthProvider: Sign in error:', signInError);
+          logger.error('AuthProvider: Sign in error:', signInError);
         }
         setError('Invalid login credentials');
         setLoading(false);
@@ -175,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       return true;
     } catch (err) {
-      console.error('AuthProvider: Error signing in:', err);
+      logger.error('AuthProvider: Error signing in:', err);
       setError('Failed to sign in. Please try again.');
       setLoading(false);
       return false;
@@ -196,14 +196,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (signUpError) {
-        console.error('AuthProvider: Sign up error:', signUpError);
+        logger.error('AuthProvider: Sign up error:', signUpError);
         setError(signUpError.message);
       } else {
-        console.log('AuthProvider: Sign up successful');
+        logger.debug('AuthProvider: Sign up successful');
         setError('Account created. Please sign in.');
       }
     } catch (err) {
-      console.error('AuthProvider: Error signing up:', err);
+      logger.error('AuthProvider: Error signing up:', err);
       setError('Failed to sign up');
     } finally {
       setLoading(false);

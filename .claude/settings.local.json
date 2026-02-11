@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(cd:*)",
+      "Bash(wc:*)",
+      "Bash(del \"c:\\\\Users\\\\damse\\\\OneDrive\\\\Documents\\\\AntiGravity Workspaces\\\\TasmanRoofing\\\\RoofingScheduler\\\\src\\\\components\\\\HelloModal.tsx\")",
+      "Bash(npm install:*)"
+    ]
+  }
+}
