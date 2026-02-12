@@ -287,10 +287,27 @@ import { Job, Worker } from './types';
 - Don't create parallel implementations (React Query hooks AND Zustand stores)
 
 ### When to Delete Files
-A file is dead code when:
+
+⚠️ **CRITICAL WARNING:** A previous agent (2026-02-12) incorrectly identified files as dead code by only checking some directories. This would have broken the app.
+
+**Required Verification Process:**
+```bash
+# Run BOTH of these searches - check ALL results
+grep -r "from.*fileName" src/
+grep -r "import.*FileName" src/
+```
+
+A file is dead code ONLY when:
 1. It exports functions/components
-2. `grep -r "import.*FileName" src/` returns nothing
+2. **BOTH grep commands above return ZERO matches**
 3. It's not the entry point (`main.tsx`, `index.html`)
+
+**Common Mistake:** Checking only `src/store/` and assuming that's representative. In this codebase:
+- Stores use Edge Functions
+- BUT `src/context/AuthContext.tsx` uses the direct API layer
+- BUT `src/components/scheduler/WorkerManageModal.tsx` uses the direct API layer
+
+**Always check ALL directories:** `src/store/`, `src/api/`, `src/context/`, `src/components/`, `src/hooks/`
 
 ### Debug Code Cleanup
 Debug utilities (test modals, console inspectors) should:
@@ -308,21 +325,49 @@ If build succeeds, the deletion was safe.
 
 ## Data Fetching Pattern
 
-### Current Pattern: Zustand + Edge Functions
-This project uses **Zustand stores** calling **Supabase Edge Functions**.
+### Current State: Mixed Patterns (Architecture Debt)
 
+⚠️ **IMPORTANT:** This codebase has TWO data fetching patterns due to its history. Be aware of both.
+
+**Pattern 1: Zustand Stores + Edge Functions (Primary)**
 ```
 Component → useJobsStore() → fetch('/functions/v1/get-jobs') → Edge Function → Database
 ```
+Used by: `App.tsx`, `WeekView`, `MonthView`, most components
 
+**Pattern 2: Direct Supabase Client (Legacy, Still Active)**
+```
+Component → jobsApi/workersApi → supabase.from('table') → Database
+```
+Used by: `AuthContext.tsx`, `WorkerManageModal.tsx`
+
+### Why Two Patterns Exist
+1. bolt.new originally generated direct Supabase client code
+2. RLS policies blocked direct access
+3. Edge Functions were added as a workaround (bypasses RLS with service key)
+4. Some files still use the old pattern and CANNOT be deleted without refactoring
+
+### Files That Use Each Pattern
+
+| File | Pattern | Notes |
+|------|---------|-------|
+| `jobsStore.ts` | Edge Functions | Primary data store |
+| `workersStore.ts` | Edge Functions | Primary data store |
+| `AuthContext.tsx` | Direct API | Uses `workersApi.ts` for profile lookup |
+| `WorkerManageModal.tsx` | Direct API | Uses `jobsApi.ts` for job count check |
+
+### Rules for New Code
 **Do NOT create:**
-- React Query hooks that duplicate store functionality
-- Direct Supabase client calls in components
-- Multiple competing data fetching patterns
+- React Query hooks (we use Zustand)
+- Additional parallel patterns
+- New direct Supabase calls in components (use stores)
 
-### Why Single Pattern Matters
-Multiple patterns (React Query + Zustand + direct API) cause:
-- Confusion about which to use
-- Dead code accumulation
-- Inconsistent caching behavior
-- Maintenance burden
+**For new features:** Use the Zustand stores pattern (Edge Functions)
+
+### Future Cleanup (Not Urgent)
+To fully consolidate:
+1. Refactor `AuthContext.tsx` to use Edge Functions
+2. Refactor `WorkerManageModal.tsx` to use stores
+3. Then delete `jobsApi.ts`, `workersApi.ts`, `supabaseClient.ts`
+
+See `troubleshooting.md` → "Mixed Data Fetching Patterns" for full details.

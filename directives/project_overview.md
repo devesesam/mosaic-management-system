@@ -96,27 +96,25 @@ RoofingScheduler/
 | `admin_users` | Email-based admin role management |
 
 ### Current Status
-- **Version**: 0.1.3
-- **Last Updated**: 2026-02-11
+- **Version**: 0.1.4
+- **Last Updated**: 2026-02-12
 - **Recent Improvements**:
-  - Dead code cleanup (~871 lines removed)
-  - Removed bolt.new artifacts (83 discarded migrations)
-  - Removed unused `dotenv` dependency
-  - Global job search bar
-  - Edit worker name functionality
-  - Collapsible Jobs to Schedule pane
-  - Mobile-responsive calendar layout
-- **Pending Deployments**:
-  - `supabase functions deploy update-worker`
-  - `npx supabase db push` (RLS migration)
-- **Next Steps**: Apply pending deployments, add comprehensive testing
+  - Full deployment to Netlify via GitHub
+  - Security hardening (RLS + Admin Table)
+  - Fixed Admin permission checks
+- **Next Steps**: Monitor stability, begin feature development via branches
 
 ### Codebase Health
 After cleanup, the codebase now has:
-- **No dead code** - All files are actively imported
 - **No bolt.new artifacts** - `.bolt/` directory removed
 - **Clean dependencies** - Only used packages remain
-- **Single data pattern** - Zustand stores are the primary data layer (not competing with React Query)
+- **Debug modals removed** - HelloModal, RawDataModal, WorkersDebugModal deleted
+
+⚠️ **Architecture Debt (Mixed Data Patterns):**
+- **Primary pattern:** Zustand stores → Edge Functions (used by most components)
+- **Legacy pattern:** Direct Supabase API (still used by `AuthContext.tsx`, `WorkerManageModal.tsx`)
+- **DO NOT** delete `jobsApi.ts` or `workersApi.ts` without refactoring dependents first
+- See [Code Standards](./code_standards.md) → "Data Fetching Pattern" for details
 
 ### Related Directives
 - [Code Standards](./code_standards.md) - Coding conventions and patterns

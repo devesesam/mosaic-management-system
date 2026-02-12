@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from '../api/supabaseClient';
-import { getWorkerByEmail, createOrUpdateWorkerProfile } from '../api/workersApi';
+import { useWorkerStore } from '../store/workersStore';
 import { Worker } from '../types';
 import toast from 'react-hot-toast';
 import { logger } from '../utils/logger';
@@ -96,33 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Helper function to handle worker profile logic
-  const handleWorkerProfile = async (userEmail: string) => {
-    const normalizedEmail = userEmail.toLowerCase();
 
-    // Skip worker profile creation for admin emails
-    if (ADMIN_EMAILS.includes(normalizedEmail)) {
-      logger.debug('AuthProvider: Skipping worker profile creation for admin email:', normalizedEmail);
-      return;
-    }
-
-    // For non-admin emails, try to get or create worker profile
-    try {
-      const worker = await getWorkerByEmail(userEmail);
-
-      if (worker) {
-        logger.debug('AuthProvider: Found existing worker profile');
-        setCurrentWorker(worker);
-      } else {
-        logger.debug('AuthProvider: No worker profile found, creating one');
-        const newWorker = await createOrUpdateWorkerProfile(userEmail);
-        setCurrentWorker(newWorker);
-      }
-    } catch (err) {
-      logger.error('AuthProvider: Error getting/creating worker profile:', err);
-      // Don't throw here - allow auth to continue even if worker profile fails
-    }
-  };
 
   // Initialize auth and set up listener
   useEffect(() => {
@@ -139,9 +113,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(data.session);
           setUser(data.session.user);
 
-          // Handle worker profile for non-admin users
+          // Helper to link worker profile
           if (data.session.user.email) {
-            await handleWorkerProfile(data.session.user.email);
+            const email = data.session.user.email.toLowerCase();
+
+            // Skip for admins (they don't need a worker profile to function)
+            if (ADMIN_EMAILS.includes(email)) {
+              logger.debug('AuthProvider: Admin login, skipping worker profile check');
+            } else {
+              // For workers: Try to find their existing profile via Store (Edge Function)
+              try {
+                // Note: We use the store's fetch logic which runs via Edge Function (system role)
+                // This allows us to find the profile even if RLS blocks direct read
+                await useWorkerStore.getState().fetchWorkers();
+                const workers = useWorkerStore.getState().workers;
+                const worker = workers.find(w => w.email?.toLowerCase() === email);
+
+                if (worker) {
+                  logger.debug('AuthProvider: Linked to worker profile:', worker.id);
+                  setCurrentWorker(worker);
+                } else {
+                  logger.warn('AuthProvider: No worker profile found for user:', email);
+                  setAuthError('Account not linked to a worker profile. Please contact an admin.');
+                }
+              } catch (err) {
+                logger.error('AuthProvider: Failed to link worker profile:', err);
+              }
+            }
           }
         }
       } catch (err) {
@@ -164,8 +162,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
 
         // Handle worker profile for non-admin users
-        if (session.user.email) {
-          await handleWorkerProfile(session.user.email);
+        const email = session.user.email?.toLowerCase();
+        if (email) {
+          if (!ADMIN_EMAILS.includes(email)) {
+            // For workers: Try to find their existing profile via Store
+            try {
+              await useWorkerStore.getState().fetchWorkers();
+              const workers = useWorkerStore.getState().workers;
+              const worker = workers.find(w => w.email?.toLowerCase() === email);
+
+              if (worker) {
+                logger.debug('AuthState: Linked to worker profile:', worker.id);
+                setCurrentWorker(worker);
+              } else {
+                logger.warn('AuthState: No worker profile found for user:', email);
+                setAuthError('Account not linked to a worker profile. Please contact an admin.');
+              }
+            } catch (err) {
+              logger.error('AuthState: Failed to link worker profile:', err);
+            }
+          }
         }
       }
     });

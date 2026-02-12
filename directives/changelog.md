@@ -4,17 +4,29 @@ All notable changes to the Tasman Roofing Scheduler project are documented in th
 
 ---
 
-## [Unreleased]
+## [0.1.4] - 2026-02-12 - Security & Deployment
 
-### Security Migration Pending
-- RLS migration created at `supabase/migrations/20260211_tighten_rls.sql`
-- **Action Required**: Run `npx supabase db push` to apply
-- Creates `admin_users` table for dynamic role management
-- Tightens RLS policies (authenticated read, admin-only write)
+### Added
+- **`admin_users` table** - Database source of truth for admin permissions
+- **Deployment Documentation** - New `directives/deployment.md` guide
 
-### Edge Function Deployment Pending
-- **`update-worker`** edge function created at `supabase/functions/update-worker/index.ts`
-- **Action Required**: Run `supabase functions deploy update-worker` to deploy
+### Changed
+- **AuthContext.tsx** - Now uses `workersStore` (Edge Functions) to verify worker profiles, enforcing Admin-provisioned accounts.
+- **WorkerManageModal.tsx** - Refactored to use `jobsStore` for job checks instead of legacy API.
+- **Project Structure** - Removed legacy "Direct Supabase API" layer:
+  - Deleted `src/api/jobsApi.ts`
+  - Deleted `src/api/workersApi.ts`
+  - Deleted `src/hooks/useWorkersData.ts`
+- **Hosting** - Linked Netlify to GitHub `master` branch for continuous deployment
+
+### Security
+- **Strict RLS** - Applied `20260211_tighten_rls.sql` migration
+  - Anonymous users: No access
+  - Authenticated users: Read-only access to jobs/workers
+  - Admin users: Full create/edit/delete access
+
+### Fixed
+- **Read-Only Mode Bug** - Fixed issue where valid admins were seen as read-only users because Netlify environment variables were missing. Frontend now correctly queries the database properties.
 
 ---
 
@@ -70,15 +82,19 @@ A file is "dead" when:
 These files have multiple imports and are essential:
 - `src/store/jobsStore.ts` → Used by App.tsx, MonthView, WeekView
 - `src/store/workersStore.ts` → Used by App.tsx, JobForm, DayJobsModal, WorkerManageModal, WeekView
-- `src/api/jobsApi.ts` → Used by hooks (future use) and stores
-- `src/api/workersApi.ts` → Used by stores
+- `src/api/jobsApi.ts` → Used by WorkerManageModal.tsx (getJobsForWorker)
+- `src/api/workersApi.ts` → Used by AuthContext.tsx (getWorkerByEmail, createOrUpdateWorkerProfile)
+- `src/hooks/useWorkersData.ts` → Uses workersApi.ts
 - All components in `src/components/scheduler/` → Actively imported and rendered
 
 ### Lessons Learned
 1. **bolt.new leaves artifacts** - Always check for `.bolt/` directory and discarded migrations
 2. **Debug modals accumulate** - Development utilities should be removed before production
 3. **Parallel patterns compete** - Project had React Query hooks AND Zustand stores doing same thing
-4. **Import search is definitive** - If `grep -r "import.*FileName"` returns nothing, file is dead
+4. **Import search must be comprehensive** - Run `grep -r "from.*fileName" src/` and check ALL results, not just likely files
+
+### Correction (2026-02-12)
+An agent initially incorrectly stated that `jobsApi.ts` and `workersApi.ts` were only used by stores (which use Edge Functions instead). A second analysis revealed they ARE actively imported by `AuthContext.tsx` and `WorkerManageModal.tsx`. The lesson: always run the full grep search, don't make assumptions based on checking only some files.
 
 ---
 

@@ -74,14 +74,19 @@ VITE_LOG_LEVEL=debug
 **Cause:** User's email not in admin list
 
 **Solutions:**
-1. Add email to `VITE_ADMIN_EMAILS` in `.env`:
-   ```bash
-   VITE_ADMIN_EMAILS=existing@email.com,new@email.com
+1. **Check Database (Primary):**
+   - Run SQL in Supabase Dashboard to check/add admin:
+   ```sql
+   SELECT * FROM admin_users;
+   -- If missing, insert your email:
+   INSERT INTO admin_users (email) VALUES ('your@email.com');
    ```
-2. Restart the server
-3. User must log out and log back in
+2. **Check Environment Variable (Fallback):**
+   - Ensure `VITE_ADMIN_EMAILS` includes your email (less reliable).
+3. **Restart/Refresh:** 
+   - Hard refresh the page to clear any cached state.
 
-**Debug:** Check `VITE_LOG_LEVEL=debug` to see permission check logs
+**Debug:** Check `VITE_LOG_LEVEL=debug` logs for "Auth: Admin status check".
 
 ---
 
@@ -386,14 +391,19 @@ VITE_LOG_LEVEL=error # Only errors
 
 **Symptom:** Files exist but don't seem to be used
 
-**How to Verify:**
-```bash
-# Check if a file is imported anywhere
-grep -r "import.*FileName" src/
-grep -r "from.*fileName" src/
+**CRITICAL - How to Verify Properly:**
 
-# If no matches found = file is dead code (safe to delete)
+⚠️ **WARNING:** A previous agent made a mistake here by only checking some files. You MUST run a comprehensive search across ALL files.
+
+```bash
+# CORRECT: Search for ALL imports of a file across entire src/
+grep -r "from.*jobsApi" src/
+grep -r "from.*workersApi" src/
+
+# WRONG: Only checking a few "likely" files and assuming the rest
 ```
+
+**The Trap:** In this codebase, the Zustand stores use Edge Functions, but other files (AuthContext, WorkerManageModal) still use the direct API layer. Checking only the stores will give you a false "this is dead code" result.
 
 **Common Dead Code Patterns:**
 1. **Debug modals** - Created during development, never wired to UI
@@ -402,11 +412,52 @@ grep -r "from.*fileName" src/
 4. **Unused API layers** - API files that nothing imports
 
 **Safe Deletion Process:**
-1. Search for all imports of the file
-2. If 0 imports → file never runs
-3. Delete the file
-4. Run `npm run build` to verify no breakage
-5. Document in changelog
+1. **Run comprehensive grep** for ALL imports (not just likely files)
+2. Check `src/context/`, `src/components/`, `src/hooks/` - not just `src/store/`
+3. If truly 0 imports → file never runs
+4. Delete the file
+5. Run `npm run build` to verify no breakage
+6. Document in changelog
+
+**Lesson Learned (2026-02-12):** An agent incorrectly identified `jobsApi.ts` and `workersApi.ts` as dead code because the stores don't use them. But `AuthContext.tsx` and `WorkerManageModal.tsx` DO import from these files. Deleting them would have broken login. Always run the full grep.
+
+---
+
+### Issue: Mixed Data Fetching Patterns (Architecture Debt)
+
+**Symptom:** Confusion about which data fetching approach to use
+
+**Background:** This codebase has TWO competing data fetching patterns due to its bolt.new origins and RLS debugging history:
+
+| Pattern | Files | How It Works | Used By |
+|---------|-------|--------------|---------|
+| **Edge Functions** | `jobsStore.ts`, `workersStore.ts` | `fetch('/functions/v1/...')` | App.tsx, calendar views |
+| **Direct Supabase** | `jobsApi.ts`, `workersApi.ts` | `supabase.from('table')` | AuthContext, WorkerManageModal |
+
+**Why This Happened:**
+1. bolt.new originally generated direct Supabase client code
+2. RLS policies blocked direct access (permission errors)
+3. Edge Functions were added as a workaround (they use service role key)
+4. Both patterns now coexist, creating confusion
+
+**Current State (as of 2026-02-12):**
+- **Stores** → Use Edge Functions (the "new" pattern)
+- **AuthContext** → Still uses direct API (`workersApi.ts`) for worker profile lookup
+- **WorkerManageModal** → Still uses direct API (`jobsApi.ts`) for checking worker's jobs
+
+**What NOT to Do:**
+- ❌ Don't delete `jobsApi.ts` or `workersApi.ts` without refactoring their dependents first
+- ❌ Don't assume "stores use Edge Functions, so everything does"
+- ❌ Don't add MORE patterns (React Query hooks, etc.)
+
+**Future Cleanup (Optional):**
+To fully consolidate to Edge Functions:
+1. Refactor `AuthContext.tsx` to use Edge Functions or stores
+2. Refactor `WorkerManageModal.tsx` to use stores
+3. Then delete the API layer files
+4. Delete `supabaseClient.ts` if no longer needed
+
+**For Now:** The mixed pattern works. Just be aware of it when making changes.
 
 ---
 

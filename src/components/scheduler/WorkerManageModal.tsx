@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Worker } from '../../types';
 import { X, Trash2, AlertTriangle, Lock, Pencil, Check } from 'lucide-react';
 import { useWorkerStore } from '../../store/workersStore';
-import { getJobsForWorker } from '../../api/jobsApi';
+import { useJobsStore } from '../../store/jobsStore';
 
 interface WorkerManageModalProps {
   onClose: () => void;
@@ -19,6 +19,7 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const { deleteWorker, updateWorker } = useWorkerStore();
+  const { jobs } = useJobsStore();
 
   const startEditing = (worker: Worker) => {
     if (readOnly) return;
@@ -55,11 +56,12 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
 
   const checkWorkerJobs = async (worker: Worker) => {
     if (readOnly) return;
-    
+
     setIsLoading(true);
     try {
-      const jobs = await getJobsForWorker(worker.id);
-      setAssignedJobsCount(jobs.length);
+      // Use local jobs store instead of API call
+      const workerJobs = jobs.filter(job => job.worker_id === worker.id);
+      setAssignedJobsCount(workerJobs.length);
       setSelectedWorker(worker);
       setShowDeleteConfirm(true);
     } catch (error) {
@@ -179,11 +181,10 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
                         <button
                           onClick={() => startEditing(worker)}
                           disabled={isLoading || readOnly}
-                          className={`p-2 transition-colors ${
-                            readOnly
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-indigo-600 hover:text-indigo-700'
-                          } disabled:opacity-50`}
+                          className={`p-2 transition-colors ${readOnly
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-indigo-600 hover:text-indigo-700'
+                            } disabled:opacity-50`}
                           title={readOnly ? 'Read-only mode' : 'Edit Worker'}
                         >
                           <Pencil size={18} />
@@ -191,11 +192,10 @@ const WorkerManageModal: React.FC<WorkerManageModalProps> = ({ onClose, workers,
                         <button
                           onClick={() => checkWorkerJobs(worker)}
                           disabled={isLoading || readOnly}
-                          className={`p-2 transition-colors ${
-                            readOnly
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-red-600 hover:text-red-700'
-                          } disabled:opacity-50`}
+                          className={`p-2 transition-colors ${readOnly
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-red-600 hover:text-red-700'
+                            } disabled:opacity-50`}
                           title={readOnly ? 'Read-only mode' : 'Delete Worker'}
                         >
                           <Trash2 size={18} />
