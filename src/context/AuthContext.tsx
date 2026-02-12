@@ -38,22 +38,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
   const [isEditable, setIsEditable] = useState(false);
 
-  // Update isEditable when user or currentWorker changes
+  // Check if user is an admin by querying the database
+  const checkAdminStatus = async (email: string) => {
+    try {
+      // First check environment variable as fallback/override
+      if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+        logger.debug('Auth: User is admin (via env var)');
+        setIsEditable(true);
+        return;
+      }
+
+      // Then check database
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (error) {
+        logger.error('Auth: Error checking admin status:', error);
+        setIsEditable(false);
+        return;
+      }
+
+      const isAdmin = !!data;
+      setIsEditable(isAdmin);
+      logger.debug('Auth: Admin status check:', { email, isAdmin });
+
+    } catch (err) {
+      logger.error('Auth: Unexpected error checking admin status:', err);
+      setIsEditable(false);
+    }
+  };
+
+  // Update isEditable when user changes
   useEffect(() => {
     if (user?.email) {
-      const userEmail = user.email.toLowerCase();
-      const hasEditPermission = ADMIN_EMAILS.includes(userEmail);
-      setIsEditable(hasEditPermission);
-      logger.debug('AuthProvider: Edit permission check:', {
-        email: userEmail,
-        hasEditPermission,
-        adminEmails: ADMIN_EMAILS,
-        isAdminEmail: ADMIN_EMAILS.includes(userEmail)
-      });
+      checkAdminStatus(user.email);
     } else {
       setIsEditable(false);
     }
-  }, [user, currentWorker]);
+  }, [user]);
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
@@ -74,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Helper function to handle worker profile logic
   const handleWorkerProfile = async (userEmail: string) => {
     const normalizedEmail = userEmail.toLowerCase();
-    
+
     // Skip worker profile creation for admin emails
     if (ADMIN_EMAILS.includes(normalizedEmail)) {
       logger.debug('AuthProvider: Skipping worker profile creation for admin email:', normalizedEmail);
@@ -84,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // For non-admin emails, try to get or create worker profile
     try {
       const worker = await getWorkerByEmail(userEmail);
-      
+
       if (worker) {
         logger.debug('AuthProvider: Found existing worker profile');
         setCurrentWorker(worker);
@@ -105,15 +130,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         logger.debug('AuthProvider: Initializing auth...');
         setLoading(true);
-        
+
         // Get current session if any
         const { data } = await supabase.auth.getSession();
         logger.debug('Initial session check:', data.session ? 'Session exists' : 'No session');
-        
+
         if (data.session) {
           setSession(data.session);
           setUser(data.session.user);
-          
+
           // Handle worker profile for non-admin users
           if (data.session.user.email) {
             await handleWorkerProfile(data.session.user.email);
@@ -126,9 +151,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     };
-    
+
     initializeAuth();
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       logger.debug('AuthProvider: Auth state changed:', event);
 
@@ -137,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user);
         setSession(session);
-        
+
         // Handle worker profile for non-admin users
         if (session.user.email) {
           await handleWorkerProfile(session.user.email);
@@ -153,13 +178,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string): Promise<boolean> => {
     setError(null);
     setLoading(true);
-    
+
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
-      
+
       if (signInError) {
         // Use less alarming console method for invalid credentials since it's expected user behavior
         if (signInError.message === 'Invalid login credentials' || signInError.message?.includes('invalid_credentials')) {
@@ -171,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         return false;
       }
-      
+
       setLoading(false);
       return true;
     } catch (err) {
@@ -185,16 +210,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string) => {
     setError(null);
     setLoading(true);
-    
+
     try {
-      const { error: signUpError } = await supabase.auth.signUp({ 
-        email, 
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
         password,
         options: {
           emailRedirectTo: window.location.origin
         }
       });
-      
+
       if (signUpError) {
         logger.error('AuthProvider: Sign up error:', signUpError);
         setError(signUpError.message);
@@ -236,10 +261,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
+
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  
+
   return context;
 };

@@ -22,7 +22,7 @@ The Tasman Roofing Scheduler is a web-based application designed to manage sched
     - `execution/`: Deterministic Python scripts
     - `src/utils/`: TypeScript utilities (logger, validation, errors, debounce)
     - `.tmp/`: Temporary files
-- **Hosting**: Netlify (Frontend)
+- **Hosting**: Netlify (Frontend) - [Project Link](https://app.netlify.com/projects/teal-eclair-7a0089/overview)
 - **Version Control**: GitHub (`devesesam/scheduler_test`)
 
 ### Key Directories
