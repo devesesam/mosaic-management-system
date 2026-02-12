@@ -325,49 +325,24 @@ If build succeeds, the deletion was safe.
 
 ## Data Fetching Pattern
 
-### Current State: Mixed Patterns (Architecture Debt)
+### Standard: Zustand Stores + Edge Functions
+All data access must go through the Zustand stores, which use Edge Functions to interact with the database.
 
-⚠️ **IMPORTANT:** This codebase has TWO data fetching patterns due to its history. Be aware of both.
-
-**Pattern 1: Zustand Stores + Edge Functions (Primary)**
+**Pattern:**
 ```
-Component → useJobsStore() → fetch('/functions/v1/get-jobs') → Edge Function → Database
+Component → useStore() → fetch('/functions/v1/...') → Edge Function → Database
 ```
-Used by: `App.tsx`, `WeekView`, `MonthView`, most components
 
-**Pattern 2: Direct Supabase Client (Legacy, Still Active)**
-```
-Component → jobsApi/workersApi → supabase.from('table') → Database
-```
-Used by: `AuthContext.tsx`, `WorkerManageModal.tsx`
+### Why This Pattern?
+1.  **Security**: Edge Functions run with Service Role permissions, bypassing RLS limitations for workers.
+2.  **Consistency**: A single way to fetch/update data across the app.
+3.  **State Management**: Zustand handles local state updates optimistically.
 
-### Why Two Patterns Exist
-1. bolt.new originally generated direct Supabase client code
-2. RLS policies blocked direct access
-3. Edge Functions were added as a workaround (bypasses RLS with service key)
-4. Some files still use the old pattern and CANNOT be deleted without refactoring
-
-### Files That Use Each Pattern
-
-| File | Pattern | Notes |
-|------|---------|-------|
-| `jobsStore.ts` | Edge Functions | Primary data store |
-| `workersStore.ts` | Edge Functions | Primary data store |
-| `AuthContext.tsx` | Direct API | Uses `workersApi.ts` for profile lookup |
-| `WorkerManageModal.tsx` | Direct API | Uses `jobsApi.ts` for job count check |
+### Legacy Code Removed
+The old "Direct Supabase Client" pattern (`src/api/jobsApi.ts`, etc.) has been removed. 
+**Do NOT re-introduce direct `supabase.from('table')` calls in components.**
 
 ### Rules for New Code
-**Do NOT create:**
-- React Query hooks (we use Zustand)
-- Additional parallel patterns
-- New direct Supabase calls in components (use stores)
-
-**For new features:** Use the Zustand stores pattern (Edge Functions)
-
-### Future Cleanup (Not Urgent)
-To fully consolidate:
-1. Refactor `AuthContext.tsx` to use Edge Functions
-2. Refactor `WorkerManageModal.tsx` to use stores
-3. Then delete `jobsApi.ts`, `workersApi.ts`, `supabaseClient.ts`
-
-See `troubleshooting.md` → "Mixed Data Fetching Patterns" for full details.
+- **Always** use `useJobsStore` or `useWorkerStore`.
+- **Never** make direct API calls in components.
+- **Never** add React Query hooks (we use Zustand).

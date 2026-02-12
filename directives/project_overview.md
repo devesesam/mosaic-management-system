@@ -102,19 +102,29 @@ RoofingScheduler/
   - Full deployment to Netlify via GitHub
   - Security hardening (RLS + Admin Table)
   - Fixed Admin permission checks
-- **Next Steps**: Monitor stability, begin feature development via branches
+  ### Security & Permissions
+- **Authentication**: Email/Password via Supabase Auth
+- **Authorization**:
+  - **Admin**: Full access (via `admin_users` table)
+  - **Worker**: Read-only access to their own schedule (via `workers` table link)
+  - **Public**: No access
+- **New User Flow**: 
+  - Admin creates worker profile first
+  - Worker signs up with same email
+  - System automatically links profile
+  - Unauthorized signups are blocked (no profile = no access)
 
 ### Codebase Health
 After cleanup, the codebase now has:
+- **No dead code** - All files are actively imported
 - **No bolt.new artifacts** - `.bolt/` directory removed
 - **Clean dependencies** - Only used packages remain
+- **Single data pattern** - Zustand stores + Edge Functions for all data access
 - **Debug modals removed** - HelloModal, RawDataModal, WorkersDebugModal deleted
 
-⚠️ **Architecture Debt (Mixed Data Patterns):**
-- **Primary pattern:** Zustand stores → Edge Functions (used by most components)
-- **Legacy pattern:** Direct Supabase API (still used by `AuthContext.tsx`, `WorkerManageModal.tsx`)
-- **DO NOT** delete `jobsApi.ts` or `workersApi.ts` without refactoring dependents first
-- See [Code Standards](./code_standards.md) → "Data Fetching Pattern" for details
+⚠️ **Architecture Note:**
+- The "Mixed Data Pattern" has been resolved. All components now use Stores/Edge Functions.
+- `src/api/` folder is now minimal (only used for Supabase client initialization).
 
 ### Related Directives
 - [Code Standards](./code_standards.md) - Coding conventions and patterns

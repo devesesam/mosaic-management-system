@@ -1,5 +1,6 @@
 import React from 'react';
-import { Book as Roof, LogOut, Plus } from 'lucide-react';
+import { LogOut, Plus } from 'lucide-react';
+import tasmanLogo from '../../assets/TasmanRoofingLogo.png';
 import { useAuth } from '../../context/AuthContext';
 
 interface NavbarProps {
@@ -17,8 +18,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNewJob, activeView, setActiveView, is
       <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Roof className="h-8 w-8 text-white" />
-            <span className="ml-2 text-white font-semibold text-lg">Tasman Roofing</span>
+            <img src={tasmanLogo} alt="Tasman Roofing" className="h-10 w-auto" />
             
             {currentWorker && (
               <div className="ml-4 flex items-center space-x-2">

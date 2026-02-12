@@ -423,41 +423,22 @@ grep -r "from.*workersApi" src/
 
 ---
 
-### Issue: Mixed Data Fetching Patterns (Architecture Debt)
+### Issue: Edge Function Authorization
+**Symptom:** 401/403 errors when fetching data
 
-**Symptom:** Confusion about which data fetching approach to use
+**Cause:**
+Edge Functions use a Service Role key to bypass RLS. If this key is missing or invalid in the Supabase dashboard secrets, the function will fail.
 
-**Background:** This codebase has TWO competing data fetching patterns due to its bolt.new origins and RLS debugging history:
+**Solutions:**
+1. Check Supabase Dashboard > Edge Functions > Secrets
+2. Ensure `SUPABASE_SERVICE_ROLE_KEY` is set
+3. Check function logs for permission errors
 
-| Pattern | Files | How It Works | Used By |
-|---------|-------|--------------|---------|
-| **Edge Functions** | `jobsStore.ts`, `workersStore.ts` | `fetch('/functions/v1/...')` | App.tsx, calendar views |
-| **Direct Supabase** | `jobsApi.ts`, `workersApi.ts` | `supabase.from('table')` | AuthContext, WorkerManageModal |
-
-**Why This Happened:**
-1. bolt.new originally generated direct Supabase client code
-2. RLS policies blocked direct access (permission errors)
-3. Edge Functions were added as a workaround (they use service role key)
-4. Both patterns now coexist, creating confusion
-
-**Current State (as of 2026-02-12):**
-- **Stores** → Use Edge Functions (the "new" pattern)
-- **AuthContext** → Still uses direct API (`workersApi.ts`) for worker profile lookup
-- **WorkerManageModal** → Still uses direct API (`jobsApi.ts`) for checking worker's jobs
-
-**What NOT to Do:**
-- ❌ Don't delete `jobsApi.ts` or `workersApi.ts` without refactoring their dependents first
-- ❌ Don't assume "stores use Edge Functions, so everything does"
-- ❌ Don't add MORE patterns (React Query hooks, etc.)
-
-**Future Cleanup (Optional):**
-To fully consolidate to Edge Functions:
-1. Refactor `AuthContext.tsx` to use Edge Functions or stores
-2. Refactor `WorkerManageModal.tsx` to use stores
-3. Then delete the API layer files
-4. Delete `supabaseClient.ts` if no longer needed
-
-**For Now:** The mixed pattern works. Just be aware of it when making changes.
+### Legacy Architecture Note
+(Resolved 2026-02-12) The "Mixed Data Pattern" issue where some components used direct API calls has been fixed.
+- `jobsApi.ts` and `workersApi.ts` are deleted.
+- All data access now goes through Zustand Stores → Edge Functions.
+- If you see `supabase.from('table')` in component code, it is incorrect and should be refactored to use a Store.
 
 ---
 

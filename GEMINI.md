@@ -1,4 +1,20 @@
-# Agent Instructions
+# Project Context: Tasman Roofing Scheduler
+
+## Overview
+The **Tasman Roofing Scheduler** is a React + Supabase web application for managing roofing jobs, worker schedules, and customer details. It features a drag-and-drop calendar interface, role-based access control (Admin vs. Worker), and strict data security via RLS and Edge Functions.
+
+## 📚 Key Pointers for Agents
+All detailed project knowledge is stored in the `directives/` folder. Use these as your primary source of truth:
+
+- **Understand the App**: Read `directives/project_overview.md`
+- **Coding Rules**: Read `directives/code_standards.md`
+- **Fixing Bugs**: Read `directives/troubleshooting.md`
+- **Deploying**: Read `directives/deployment.md`
+- **UI/UX**: Read `directives/ui_features.md`
+
+---
+
+# Agent Instructions (Meta-Role)
 
 > This file is mirrored across CLAUDE.md, AGENTS.md, and GEMINI.md so the same instructions load in any AI environment.
 
