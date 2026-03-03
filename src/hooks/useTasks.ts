@@ -131,19 +131,17 @@ export function useTasksQuery(workerId?: string, isAdmin?: boolean) {
 }
 
 /**
- * Hook to add a new task with optimistic updates
+ * Hook to add a new task with cache invalidation
  */
 export function useAddTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: addTaskApi,
-    onSuccess: (newTask) => {
-      // Update cache with new task
-      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-        if (!old) return [newTask];
-        return [newTask, ...old];
-      });
+    onSuccess: () => {
+      // Invalidate all task queries to refetch with new data
+      // We invalidate instead of setQueryData because queries use variable keys
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
       toast.success('Task created successfully');
     },
     onError: (error) => {
@@ -155,7 +153,7 @@ export function useAddTask() {
 }
 
 /**
- * Hook to update an existing task with optimistic updates
+ * Hook to update an existing task with cache invalidation
  */
 export function useUpdateTask() {
   const queryClient = useQueryClient();
@@ -163,38 +161,12 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Task> }) =>
       updateTaskApi(id, updates),
-    onMutate: async ({ id, updates }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: taskKeys.all });
-
-      // Snapshot previous value
-      const previousTasks = queryClient.getQueryData<Task[]>(taskKeys.all);
-
-      // Optimistically update
-      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-        if (!old) return old;
-        return old.map((task) =>
-          task.id === id ? { ...task, ...updates } : task
-        );
-      });
-
-      return { previousTasks };
-    },
-    onSuccess: (updatedTask) => {
-      // Replace optimistic update with actual server data
-      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-        if (!old) return old;
-        return old.map((task) =>
-          task.id === updatedTask.id ? updatedTask : task
-        );
-      });
+    onSuccess: () => {
+      // Invalidate all task queries to refetch with updated data
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
       toast.success('Task updated successfully');
     },
-    onError: (error, _, context) => {
-      // Rollback on error
-      if (context?.previousTasks) {
-        queryClient.setQueryData(taskKeys.all, context.previousTasks);
-      }
+    onError: (error) => {
       const message = error instanceof Error ? error.message : 'Failed to update task';
       toast.error(message);
       logger.error('useTasks: Error updating task:', error);
@@ -203,36 +175,19 @@ export function useUpdateTask() {
 }
 
 /**
- * Hook to delete a task with optimistic updates
+ * Hook to delete a task with cache invalidation
  */
 export function useDeleteTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: deleteTaskApi,
-    onMutate: async (id) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: taskKeys.all });
-
-      // Snapshot previous value
-      const previousTasks = queryClient.getQueryData<Task[]>(taskKeys.all);
-
-      // Optimistically remove
-      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-        if (!old) return old;
-        return old.filter((task) => task.id !== id);
-      });
-
-      return { previousTasks };
-    },
     onSuccess: () => {
+      // Invalidate all task queries to refetch without deleted task
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
       toast.success('Task deleted successfully');
     },
-    onError: (error, _, context) => {
-      // Rollback on error
-      if (context?.previousTasks) {
-        queryClient.setQueryData(taskKeys.all, context.previousTasks);
-      }
+    onError: (error) => {
       const message = error instanceof Error ? error.message : 'Failed to delete task';
       toast.error(message);
       logger.error('useTasks: Error deleting task:', error);
@@ -268,32 +223,14 @@ export function useUnassignWorkerTasks() {
 }
 
 /**
- * Helper to manually update the tasks cache (used by real-time subscriptions)
+ * Helper to manually invalidate the tasks cache
+ * Note: Direct cache updates (setQueryData) don't work because queries use variable keys.
+ * Always use invalidate() to trigger a refetch.
  */
 export function useTasksCacheUpdater() {
   const queryClient = useQueryClient();
 
   return {
-    addTask: (task: Task) => {
-      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-        if (!old) return [task];
-        // Avoid duplicates
-        if (old.some((t) => t.id === task.id)) return old;
-        return [task, ...old];
-      });
-    },
-    updateTask: (task: Task) => {
-      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-        if (!old) return old;
-        return old.map((t) => (t.id === task.id ? task : t));
-      });
-    },
-    removeTask: (taskId: string) => {
-      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-        if (!old) return old;
-        return old.filter((t) => t.id !== taskId);
-      });
-    },
     invalidate: () => {
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
