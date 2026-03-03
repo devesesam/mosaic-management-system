@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  format, 
-  startOfWeek, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  addWeeks, 
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  addWeeks,
   subWeeks,
   parseISO,
   addDays,
@@ -12,14 +12,14 @@ import {
   isSameDay
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Job, TeamMember } from '../../types';
+import { Task, TeamMember } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
-import GlobalJobSearch from './GlobalJobSearch';
-import { useJobsStore } from '../../store/jobsStore';
+import GlobalTaskSearch from './GlobalTaskSearch';
+import { useTasksStore } from '../../store/tasksStore';
 import { useTeamStore } from '../../store/teamStore';
 import { useAuth } from '../../context/AuthContext';
-import JobForm from '../jobs/JobForm';
+import { TaskForm } from '../tasks';
 import TeamMemberForm from '../team/TeamMemberForm';
 import toast from 'react-hot-toast';
 
@@ -29,32 +29,32 @@ interface WeekViewProps {
 
 const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isJobFormOpen, setIsJobFormOpen] = useState(false);
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isTeamMemberFormOpen, setIsTeamMemberFormOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [isJobsPaneCollapsed, setIsJobsPaneCollapsed] = useState(() => {
-    return localStorage.getItem('jobsPaneCollapsed') === 'true';
+  const [isTasksPaneCollapsed, setIsTasksPaneCollapsed] = useState(() => {
+    return localStorage.getItem('tasksPaneCollapsed') === 'true';
   });
 
-  // Toggle jobs pane and persist to localStorage
-  const toggleJobsPane = () => {
-    const newValue = !isJobsPaneCollapsed;
-    setIsJobsPaneCollapsed(newValue);
-    localStorage.setItem('jobsPaneCollapsed', String(newValue));
+  // Toggle tasks pane and persist to localStorage
+  const toggleTasksPane = () => {
+    const newValue = !isTasksPaneCollapsed;
+    setIsTasksPaneCollapsed(newValue);
+    localStorage.setItem('tasksPaneCollapsed', String(newValue));
   };
-  
+
   // Use stores for data access
-  const { 
-    jobs, 
-    loading: jobsLoading, 
-    error: jobsError, 
-    fetchJobs,
-    addJob,
-    updateJob,
-    deleteJob
-  } = useJobsStore();
-  
+  const {
+    tasks,
+    loading: tasksLoading,
+    error: tasksError,
+    fetchTasks,
+    addTask,
+    updateTask,
+    deleteTask
+  } = useTasksStore();
+
   const {
     teamMembers,
     loading: teamLoading,
@@ -80,144 +80,144 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   // Fetch data when component mounts
   useEffect(() => {
     console.log('WeekView: Initial data load');
-    fetchJobs();
+    fetchTasks();
     fetchTeamMembers();
-  }, [fetchJobs, fetchTeamMembers]);
+  }, [fetchTasks, fetchTeamMembers]);
 
-  
-  // Debug log jobs data
+
+  // Debug log tasks data
   useEffect(() => {
-    if (jobs.length > 0) {
-      console.log('WeekView: Jobs loaded:', jobs.length);
+    if (tasks.length > 0) {
+      console.log('WeekView: Tasks loaded:', tasks.length);
     }
-  }, [jobs]);
-  
+  }, [tasks]);
+
   // Debug log the team members data
   useEffect(() => {
     if (teamMembers.length > 0) {
       console.log('WeekView: Team members loaded:', teamMembers.length);
     }
   }, [teamMembers]);
-  
-  // Get unscheduled jobs - filter for read-only mode
-  const unscheduledJobs = React.useMemo(() => {
-    const baseUnscheduled = jobs.filter(job => !job.worker_id || !job.start_date);
+
+  // Get unscheduled tasks - filter for read-only mode
+  const unscheduledTasks = React.useMemo(() => {
+    const baseUnscheduled = tasks.filter(task => !task.worker_id || !task.start_date);
 
     if (readOnly && currentWorker) {
-      // In read-only mode, show jobs that are either:
+      // In read-only mode, show tasks that are either:
       // 1. Completely unassigned (no worker, no date)
       // 2. Assigned to current worker (primary or secondary) but no date
-      return jobs.filter(job =>
-        (!job.start_date && !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0)) ||
-        (!job.start_date && (
-          job.worker_id === currentWorker.id ||
-          (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
+      return tasks.filter(task =>
+        (!task.start_date && !task.worker_id && (!task.secondary_worker_ids || task.secondary_worker_ids.length === 0)) ||
+        (!task.start_date && (
+          task.worker_id === currentWorker.id ||
+          (task.secondary_worker_ids && task.secondary_worker_ids.includes(currentWorker.id))
         ))
       );
     }
 
     return baseUnscheduled;
-  }, [jobs, readOnly, currentWorker]);
+  }, [tasks, readOnly, currentWorker]);
 
-  // PRE-COMPUTE worker-day job assignments for O(1) lookups
-  // This replaces the O(n) filter on every getWorkerDayJobs call
-  const workerDayJobsMap = React.useMemo(() => {
-    const map = new Map<string, Job[]>();
+  // PRE-COMPUTE worker-day task assignments for O(1) lookups
+  // This replaces the O(n) filter on every getWorkerDayTasks call
+  const workerDayTasksMap = React.useMemo(() => {
+    const map = new Map<string, Task[]>();
 
     // Pre-format day keys for the week
     const dayKeys = weekDays.map(d => format(d, 'yyyy-MM-dd'));
 
-    jobs.forEach(job => {
-      if (!job.start_date) return;
+    tasks.forEach(task => {
+      if (!task.start_date) return;
 
       try {
-        const jobStart = parseISO(job.start_date);
-        const jobEnd = job.end_date ? parseISO(job.end_date) : jobStart;
+        const taskStart = parseISO(task.start_date);
+        const taskEnd = task.end_date ? parseISO(task.end_date) : taskStart;
 
-        // For each day in the week, check if job spans that day
+        // For each day in the week, check if task spans that day
         weekDays.forEach((day, dayIdx) => {
           const dayKey = dayKeys[dayIdx];
 
-          // Check if job spans this day
-          const isOnDay = (day >= jobStart && day <= jobEnd) ||
-            format(jobStart, 'yyyy-MM-dd') === dayKey ||
-            format(jobEnd, 'yyyy-MM-dd') === dayKey;
+          // Check if task spans this day
+          const isOnDay = (day >= taskStart && day <= taskEnd) ||
+            format(taskStart, 'yyyy-MM-dd') === dayKey ||
+            format(taskEnd, 'yyyy-MM-dd') === dayKey;
 
           if (!isOnDay) return;
 
-          // Determine which worker rows this job appears on
+          // Determine which worker rows this task appears on
           const workerIds: (string | null)[] = [];
 
-          if (!job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0)) {
+          if (!task.worker_id && (!task.secondary_worker_ids || task.secondary_worker_ids.length === 0)) {
             workerIds.push(null); // Unassigned row
           } else {
-            if (job.worker_id) workerIds.push(job.worker_id);
-            if (job.secondary_worker_ids) {
-              workerIds.push(...job.secondary_worker_ids);
+            if (task.worker_id) workerIds.push(task.worker_id);
+            if (task.secondary_worker_ids) {
+              workerIds.push(...task.secondary_worker_ids);
             }
           }
 
           workerIds.forEach(workerId => {
             const key = `${workerId || 'null'}-${dayKey}`;
             if (!map.has(key)) map.set(key, []);
-            map.get(key)!.push(job);
+            map.get(key)!.push(task);
           });
         });
       } catch (error) {
-        console.error('Error processing job dates:', error, job);
+        console.error('Error processing task dates:', error, task);
       }
     });
 
     return map;
-  }, [jobs, weekDays]);
+  }, [tasks, weekDays]);
 
-  // Fast O(1) lookup for jobs on a specific worker-day combination
-  const getWorkerDayJobs = useCallback((workerId: string | null, day: Date): Job[] => {
+  // Fast O(1) lookup for tasks on a specific worker-day combination
+  const getWorkerDayTasks = useCallback((workerId: string | null, day: Date): Task[] => {
     const key = `${workerId || 'null'}-${format(day, 'yyyy-MM-dd')}`;
-    const result = workerDayJobsMap.get(key) || [];
+    const result = workerDayTasksMap.get(key) || [];
 
-    // In read-only mode, filter to only show jobs where current worker is involved
+    // In read-only mode, filter to only show tasks where current worker is involved
     if (readOnly && currentWorker) {
-      return result.filter(job =>
-        job.worker_id === currentWorker.id ||
-        (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
+      return result.filter(task =>
+        task.worker_id === currentWorker.id ||
+        (task.secondary_worker_ids && task.secondary_worker_ids.includes(currentWorker.id))
       );
     }
 
     return result;
-  }, [workerDayJobsMap, readOnly, currentWorker]);
+  }, [workerDayTasksMap, readOnly, currentWorker]);
   
-  const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
+  const handleSubmitTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
     if (readOnly) {
-      toast.error('Cannot modify jobs in read-only mode');
+      toast.error('Cannot modify tasks in read-only mode');
       return;
     }
-    
+
     try {
-      if (selectedJob) {
-        await updateJob(selectedJob.id, jobData);
+      if (selectedTask) {
+        await updateTask(selectedTask.id, taskData);
       } else {
-        await addJob(jobData);
+        await addTask(taskData);
       }
-      setIsJobFormOpen(false);
-      setSelectedJob(null);
+      setIsTaskFormOpen(false);
+      setSelectedTask(null);
     } catch (error) {
-      console.error('Error saving job:', error);
+      console.error('Error saving task:', error);
     }
   };
 
-  const handleDeleteJob = async (id: string) => {
+  const handleDeleteTask = async (id: string) => {
     if (readOnly) {
-      toast.error('Cannot delete jobs in read-only mode');
+      toast.error('Cannot delete tasks in read-only mode');
       return;
     }
-    
+
     try {
-      await deleteJob(id);
-      setIsJobFormOpen(false);
-      setSelectedJob(null);
+      await deleteTask(id);
+      setIsTaskFormOpen(false);
+      setSelectedTask(null);
     } catch (error) {
-      console.error('Error deleting job:', error);
+      console.error('Error deleting task:', error);
     }
   };
 
@@ -240,143 +240,143 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     }
   };
   
-  const handleJobDrop = async (job: Job, workerId: string | null, date: Date | null) => {
+  const handleTaskDrop = async (task: Task, workerId: string | null, date: Date | null) => {
     if (readOnly) {
-      toast.error('Cannot move jobs in read-only mode');
+      toast.error('Cannot move tasks in read-only mode');
       return;
     }
-    
+
     try {
-      let updates: Partial<Job> = {
+      let updates: Partial<Task> = {
         worker_id: workerId,
         start_date: date ? date.toISOString() : null
       };
 
-      // CRITICAL: If unassigning a job (workerId is null), also clear secondary workers
+      // CRITICAL: If unassigning a task (workerId is null), also clear secondary workers
       if (workerId === null) {
-        console.log('WeekView: Unassigning job - clearing secondary workers');
+        console.log('WeekView: Unassigning task - clearing secondary workers');
         updates.secondary_worker_ids = [];
       }
 
-      // Calculate end date to preserve the job's duration
-      if (date && job.start_date && job.end_date) {
+      // Calculate end date to preserve the task's duration
+      if (date && task.start_date && task.end_date) {
         try {
-          const originalStartDate = parseISO(job.start_date);
-          const originalEndDate = parseISO(job.end_date);
-          
+          const originalStartDate = parseISO(task.start_date);
+          const originalEndDate = parseISO(task.end_date);
+
           // Calculate the duration in days (inclusive)
           // For calendar purposes, if start and end are the same day, it's 1 day
           // If end is 1 day after start, it's 2 days, etc.
           let durationInDays: number;
-          
+
           if (isSameDay(originalStartDate, originalEndDate)) {
-            // Single day job
+            // Single day task
             durationInDays = 1;
           } else {
-            // Multi-day job - calculate the span
+            // Multi-day task - calculate the span
             durationInDays = differenceInDays(originalEndDate, originalStartDate) + 1;
           }
-          
+
           // Set the new end date to preserve the duration
           const newEndDate = addDays(date, durationInDays - 1);
           updates.end_date = newEndDate.toISOString();
-          
-          console.log('WeekView: Preserving job duration:', {
-            job_id: job.id,
-            original_start: job.start_date,
-            original_end: job.end_date,
+
+          console.log('WeekView: Preserving task duration:', {
+            task_id: task.id,
+            original_start: task.start_date,
+            original_end: task.end_date,
             original_duration_days: durationInDays,
             new_start: date.toISOString(),
             new_end: newEndDate.toISOString()
           });
         } catch (error) {
-          console.error('Error calculating job duration:', error);
-          // Fallback to single-day job
+          console.error('Error calculating task duration:', error);
+          // Fallback to single-day task
           updates.end_date = date.toISOString();
         }
       } else if (date) {
-        // New job or job without existing dates - make it a single-day job
+        // New task or task without existing dates - make it a single-day task
         updates.end_date = date.toISOString();
       } else {
-        // Unscheduling the job
+        // Unscheduling the task
         updates.end_date = null;
       }
-      
-      console.log('WeekView: Updating job with drop info:', {
-        job_id: job.id,
+
+      console.log('WeekView: Updating task with drop info:', {
+        task_id: task.id,
         updates
       });
-      
-      await updateJob(job.id, updates);
+
+      await updateTask(task.id, updates);
     } catch (error) {
-      console.error('Error updating job:', error);
-      toast.error('Failed to move job. Please try again.');
+      console.error('Error updating task:', error);
+      toast.error('Failed to move task. Please try again.');
     }
   };
 
-  const handleJobResize = async (job: Job, days: number) => {
+  const handleTaskResize = async (task: Task, days: number) => {
     if (readOnly) {
-      toast.error('Cannot resize jobs in read-only mode');
+      toast.error('Cannot resize tasks in read-only mode');
       return;
     }
-    
+
     try {
       console.log('WeekView: Resize started with:', {
-        job_id: job.id,
+        task_id: task.id,
         days,
         days_type: typeof days,
-        start_date: job.start_date
+        start_date: task.start_date
       });
 
       // Validate the days parameter
       if (typeof days !== 'number' || isNaN(days) || days < 1) {
-        console.error('Invalid days parameter for job resize:', days);
-        toast.error('Cannot resize job: invalid duration');
+        console.error('Invalid days parameter for task resize:', days);
+        toast.error('Cannot resize task: invalid duration');
         return;
       }
 
-      if (!job.start_date) {
-        console.error('Cannot resize job without start_date');
-        toast.error('Cannot resize job: no start date');
+      if (!task.start_date) {
+        console.error('Cannot resize task without start_date');
+        toast.error('Cannot resize task: no start date');
         return;
       }
-      
-      const startDate = parseISO(job.start_date);
-      
+
+      const startDate = parseISO(task.start_date);
+
       // Check if the parsed start date is valid
       if (isNaN(startDate.getTime())) {
-        console.error('Invalid start_date for job:', job.start_date);
-        toast.error('Cannot resize job: invalid start date');
+        console.error('Invalid start_date for task:', task.start_date);
+        toast.error('Cannot resize task: invalid start date');
         return;
       }
-      
+
       const newEndDate = addDays(startDate, days - 1);
-      
+
       // Check if the calculated end date is valid
       if (isNaN(newEndDate.getTime())) {
         console.error('Invalid calculated end date:', {
-          start_date: job.start_date,
+          start_date: task.start_date,
           days,
           calculation: `addDays(${startDate}, ${days - 1})`
         });
-        toast.error('Cannot resize job: invalid end date calculation');
+        toast.error('Cannot resize task: invalid end date calculation');
         return;
       }
-      
-      console.log('WeekView: Resizing job:', {
-        job_id: job.id,
+
+      console.log('WeekView: Resizing task:', {
+        task_id: task.id,
         days,
-        start_date: job.start_date,
+        start_date: task.start_date,
         parsed_start_date: startDate.toISOString(),
         new_end_date: newEndDate.toISOString()
       });
-      
-      await updateJob(job.id, {
+
+      await updateTask(task.id, {
         end_date: newEndDate.toISOString()
       });
     } catch (error) {
-      console.error('Error resizing job:', error);
-      toast.error('Failed to resize job. Please try again.');
+      console.error('Error resizing task:', error);
+      toast.error('Failed to resize task. Please try again.');
     }
   };
 
@@ -405,11 +405,11 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
 
         {/* Center: Search bar */}
         <div className="flex-1 flex justify-center px-4">
-          <GlobalJobSearch
-            jobs={jobs}
-            onJobSelect={(job) => {
-              setSelectedJob(job);
-              setIsJobFormOpen(true);
+          <GlobalTaskSearch
+            tasks={tasks}
+            onTaskSelect={(task) => {
+              setSelectedTask(task);
+              setIsTaskFormOpen(true);
             }}
           />
         </div>
@@ -452,14 +452,14 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         </div>
       )}
       
-      {jobsError && (
+      {tasksError && (
         <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-red-700">Error loading jobs: {jobsError}</span>
-            <button 
+            <span className="text-red-700">Error loading tasks: {tasksError}</span>
+            <button
               onClick={() => {
                 setIsRetrying(true);
-                fetchJobs();
+                fetchTasks();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
               className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex items-center"
@@ -477,17 +477,17 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           </div>
         </div>
       )}
-      
+
       {/* Info messages - keep these as they're informational */}
       {!teamLoading && !teamError && teamMembers.length === 0 && (
         <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-100 text-sm">
-          <span className="text-yellow-700">No team members found. Add a team member to start scheduling jobs.</span>
+          <span className="text-yellow-700">No team members found. Add a team member to start scheduling tasks.</span>
         </div>
       )}
-      
-      {!jobsLoading && !jobsError && jobs.length === 0 && (
+
+      {!tasksLoading && !tasksError && tasks.length === 0 && (
         <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-100 text-sm">
-          <span className="text-yellow-700">No jobs found. Add jobs to start scheduling.</span>
+          <span className="text-yellow-700">No tasks found. Add tasks to start scheduling.</span>
         </div>
       )}
       
@@ -498,45 +498,45 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           <CalendarGrid
             days={weekDays}
             teamMembers={teamMembers}
-            allJobs={jobs}
-            getWorkerDayJobs={getWorkerDayJobs}
-            onJobDrop={handleJobDrop}
-            onJobClick={(job) => {
-              setSelectedJob(job);
-              setIsJobFormOpen(true);
+            allTasks={tasks}
+            getWorkerDayTasks={getWorkerDayTasks}
+            onTaskDrop={handleTaskDrop}
+            onTaskClick={(task) => {
+              setSelectedTask(task);
+              setIsTaskFormOpen(true);
             }}
-            onJobResize={handleJobResize}
+            onTaskResize={handleTaskResize}
             onNewWorker={() => setIsTeamMemberFormOpen(true)}
             readOnly={readOnly}
           />
         </div>
-        
-        {/* Fixed-width unscheduled jobs panel - only show for edit mode */}
+
+        {/* Fixed-width unscheduled tasks panel - only show for edit mode */}
         {!readOnly && (
           <UnscheduledPanel
-            jobs={unscheduledJobs}
-            onJobDrop={handleJobDrop}
-            onJobClick={(job) => {
-              setSelectedJob(job);
-              setIsJobFormOpen(true);
+            tasks={unscheduledTasks}
+            onTaskDrop={handleTaskDrop}
+            onTaskClick={(task) => {
+              setSelectedTask(task);
+              setIsTaskFormOpen(true);
             }}
             readOnly={readOnly}
-            isCollapsed={isJobsPaneCollapsed}
-            onToggleCollapse={toggleJobsPane}
+            isCollapsed={isTasksPaneCollapsed}
+            onToggleCollapse={toggleTasksPane}
           />
         )}
       </div>
-      
-      {/* Job form modal */}
-      {isJobFormOpen && (
-        <JobForm
+
+      {/* Task form modal */}
+      {isTaskFormOpen && (
+        <TaskForm
           onClose={() => {
-            setIsJobFormOpen(false);
-            setSelectedJob(null);
+            setIsTaskFormOpen(false);
+            setSelectedTask(null);
           }}
-          onSubmit={handleSubmitJob}
-          onDelete={handleDeleteJob}
-          initialJob={selectedJob || undefined}
+          onSubmit={handleSubmitTask}
+          onDelete={handleDeleteTask}
+          initialTask={selectedTask || undefined}
           readOnly={readOnly}
         />
       )}

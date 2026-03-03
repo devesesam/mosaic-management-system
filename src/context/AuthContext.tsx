@@ -14,8 +14,9 @@ interface AuthContextProps {
   currentWorker: TeamMember | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<boolean>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshCurrentTeamMember: () => Promise<void>;
   error: string | null;
   setError: (error: string | null) => void;
   isAdmin: boolean;
@@ -164,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, name?: string) => {
     setError(null);
     setLoading(true);
 
@@ -173,7 +174,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin
+          emailRedirectTo: window.location.origin,
+          data: name ? { name } : undefined
         }
       });
 
@@ -192,6 +194,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshCurrentTeamMember = async () => {
+    if (!user?.email) return;
+
+    try {
+      await useTeamStore.getState().fetchTeamMembers();
+      const teamMembers = useTeamStore.getState().teamMembers;
+      const email = user.email.toLowerCase();
+      const member = teamMembers.find(m => m.email?.toLowerCase() === email);
+
+      if (member) {
+        logger.debug('AuthProvider: Refreshed team member profile:', member.id);
+        setCurrentTeamMember(member);
+      }
+    } catch (err) {
+      logger.error('AuthProvider: Failed to refresh team member profile:', err);
+    }
+  };
+
   const signOut = async () => {
     await handleSignOut();
   };
@@ -207,6 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signUp,
     signOut,
+    refreshCurrentTeamMember,
     error,
     setError,
     isAdmin,

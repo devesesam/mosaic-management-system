@@ -6,6 +6,7 @@ import mosaicLogo from '../../assets/MosaicLogo.png';
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { signIn, signUp, error, loading, setError, signOut } = useAuth();
@@ -37,8 +38,9 @@ const LoginForm: React.FC = () => {
 
     try {
       if (isSignUp) {
-        await signUp(email, password);
+        await signUp(email, password, name.trim() || undefined);
         setIsSignUp(false);
+        setName('');
         toast.success('Account created! Please sign in to continue.');
       } else {
         await signIn(email, password);
@@ -68,6 +70,24 @@ const LoginForm: React.FC = () => {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
+            {isSignUp && (
+              <div>
+                <label htmlFor="name" className="sr-only">
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-charcoal rounded-t-md focus:outline-none focus:ring-margaux focus:border-margaux focus:z-10 sm:text-sm"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
             <div>
               <label htmlFor="email-address" className="sr-only">
                 Email address
@@ -78,7 +98,7 @@ const LoginForm: React.FC = () => {
                 type="email"
                 autoComplete="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-charcoal rounded-t-md focus:outline-none focus:ring-margaux focus:border-margaux focus:z-10 sm:text-sm"
+                className={`appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-charcoal ${!isSignUp ? 'rounded-t-md' : ''} focus:outline-none focus:ring-margaux focus:border-margaux focus:z-10 sm:text-sm`}
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -133,7 +153,10 @@ const LoginForm: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setName('');
+              }}
               className="text-sm text-margaux hover:text-blueberry font-medium focus:outline-none"
               disabled={isSubmitting}
             >

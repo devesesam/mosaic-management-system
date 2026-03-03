@@ -1,23 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { useDrop } from 'react-dnd';
-import { Job } from '../../types';
-import DraggableJob from './DraggableJob';
+import { Task } from '../../types';
+import DraggableTask from './DraggableTask';
 import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface UnscheduledPanelProps {
-  jobs: Job[];
-  onJobDrop: (job: Job, workerId: string | null, date: Date | null) => void;
-  onJobClick: (job: Job) => void;
+  tasks: Task[];
+  onTaskDrop: (task: Task, workerId: string | null, date: Date | null) => void;
+  onTaskClick: (task: Task) => void;
   readOnly?: boolean;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
 const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
-  jobs,
-  onJobDrop,
-  onJobClick,
+  tasks,
+  onTaskDrop,
+  onTaskClick,
   readOnly = false,
   isCollapsed = false,
   onToggleCollapse
@@ -27,9 +27,9 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
 
   const [{ isOver }, drop] = useDrop({
-    accept: 'JOB',
-    drop: (item: { job: Job }) => {
-      onJobDrop(item.job, null, null);
+    accept: 'TASK',
+    drop: (item: { task: Task }) => {
+      onTaskDrop(item.task, null, null);
     },
     collect: monitor => ({
       isOver: !!monitor.isOver()
@@ -37,53 +37,52 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
     canDrop: () => !readOnly
   });
 
-  // First filter unscheduled jobs
-  const baseUnscheduledJobs = useMemo(() => {
-    return jobs.filter(job => !job.start_date && !job.worker_id);
-  }, [jobs]);
+  // First filter unscheduled tasks (tasks without a start date need scheduling)
+  const baseUnscheduledTasks = useMemo(() => {
+    return tasks.filter(task => !task.start_date);
+  }, [tasks]);
 
-  // Filter for read-only mode: only show jobs assigned to current worker or unassigned
-  const unscheduledJobs = useMemo(() => {
+  // Filter for read-only mode: only show tasks assigned to current worker or unassigned
+  const unscheduledTasks = useMemo(() => {
     if (readOnly && currentWorker) {
-      // In read-only mode, show jobs that are either:
-      // 1. Completely unassigned (no worker, no date)
-      // 2. Assigned to current worker but no date
-      return jobs.filter(job =>
-        (!job.start_date && !job.worker_id) ||
-        (!job.start_date && job.worker_id === currentWorker.id)
+      // In read-only mode, show unscheduled tasks that are either:
+      // 1. Unassigned (no worker)
+      // 2. Assigned to current worker
+      return tasks.filter(task =>
+        !task.start_date && (!task.worker_id || task.worker_id === currentWorker.id)
       );
     }
 
-    // For admin users, show all unscheduled jobs
-    return baseUnscheduledJobs;
-  }, [jobs, readOnly, currentWorker, baseUnscheduledJobs]);
+    // For admin users, show all unscheduled tasks
+    return baseUnscheduledTasks;
+  }, [tasks, readOnly, currentWorker, baseUnscheduledTasks]);
 
-  // Get unique tile colors from unscheduled jobs only
+  // Get unique tile colors from unscheduled tasks only
   const uniqueColors = useMemo(() => {
-    const colors = new Set(unscheduledJobs.map(job => job.tile_color).filter(Boolean));
+    const colors = new Set(unscheduledTasks.map(task => task.tile_color).filter(Boolean));
     return Array.from(colors) as string[];
-  }, [unscheduledJobs]);
+  }, [unscheduledTasks]);
 
-  // Filter jobs based on search term and selected color
-  const filteredJobs = useMemo(() => {
-    return unscheduledJobs.filter(job => {
+  // Filter tasks based on search term and selected color
+  const filteredTasks = useMemo(() => {
+    return unscheduledTasks.filter(task => {
       const matchesSearch = searchTerm === '' ||
-        job.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.address.toLowerCase().includes(searchTerm.toLowerCase());
+        task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.notes?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesColor = !selectedColor || job.tile_color === selectedColor;
+      const matchesColor = !selectedColor || task.tile_color === selectedColor;
 
       return matchesSearch && matchesColor;
     });
-  }, [unscheduledJobs, searchTerm, selectedColor]);
+  }, [unscheduledTasks, searchTerm, selectedColor]);
 
   console.log('UnscheduledPanel: Filter logic:', {
     readOnly,
     currentWorkerId: currentWorker?.id,
-    totalJobs: jobs.length,
-    baseUnscheduled: baseUnscheduledJobs.length,
-    filteredUnscheduled: unscheduledJobs.length,
-    finalFiltered: filteredJobs.length
+    totalTasks: tasks.length,
+    baseUnscheduled: baseUnscheduledTasks.length,
+    filteredUnscheduled: unscheduledTasks.length,
+    finalFiltered: filteredTasks.length
   });
 
   // Collapsed state - show just a toggle button
@@ -93,12 +92,12 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
         <button
           onClick={onToggleCollapse}
           className="p-2 rounded-full hover:bg-garlic transition-colors"
-          title="Show Jobs to Schedule"
+          title="Show Tasks to Schedule"
         >
           <ChevronLeft className="h-5 w-5 text-charcoal" />
         </button>
         <div className="mt-2 writing-mode-vertical text-xs text-gray-500 font-medium" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-          Jobs ({filteredJobs.length})
+          Tasks ({filteredTasks.length})
         </div>
       </div>
     );
@@ -107,12 +106,12 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
   return (
     <div className="hidden md:flex w-[200px] min-w-[200px] border-l border-gray-200 bg-vanilla flex-col">
       <div className="p-3 font-semibold text-charcoal border-b border-gray-200 bg-garlic flex items-center justify-between">
-        <span>Jobs to Schedule ({filteredJobs.length})</span>
+        <span>Tasks to Schedule ({filteredTasks.length})</span>
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
             className="p-1 rounded hover:bg-vanilla transition-colors"
-            title="Hide Jobs to Schedule"
+            title="Hide Tasks to Schedule"
           >
             <ChevronRight className="h-4 w-4 text-charcoal" />
           </button>
@@ -172,22 +171,22 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
         )}
       </div>
 
-      {/* Jobs list */}
+      {/* Tasks list */}
       <div
         ref={drop}
         className={`flex-1 p-2 overflow-y-auto ${isOver && !readOnly ? 'bg-sorbet/30' : ''}`}
       >
-        {filteredJobs.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <div className="p-3 text-sm text-gray-500 italic">
-            {unscheduledJobs.length === 0 ? 'No unscheduled jobs' : 'No jobs match the filters'}
+            {unscheduledTasks.length === 0 ? 'No unscheduled tasks' : 'No tasks match the filters'}
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredJobs.map(job => (
-              <DraggableJob
-                key={job.id}
-                job={job}
-                onClick={() => onJobClick(job)}
+            {filteredTasks.map(task => (
+              <DraggableTask
+                key={task.id}
+                task={task}
+                onClick={() => onTaskClick(task)}
                 isScheduled={false}
                 readOnly={readOnly}
               />

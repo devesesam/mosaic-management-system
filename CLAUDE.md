@@ -3,11 +3,21 @@
 ## Overview
 The **Mosaic Scheduler** is a React + Supabase web application for managing tasks, team member schedules, and customer details. It features a drag-and-drop calendar interface, role-based access control (Admin vs. Team Member), and strict data security via RLS and Edge Functions.
 
+**Current Version:** 0.2.0 (2026-03-03)
+
+## ⚠️ Important Terminology
+As of v0.2.0, use **"Task"** terminology throughout the codebase:
+- Use `Task`, `TaskStatus`, `useTasksStore`, `TaskForm`
+- NOT `Job`, `JobStatus`, `useJobsStore`, `JobForm` (legacy, aliased for backwards compat)
+- Database tables: `tasks`, `task_secondary_workers`
+- Edge functions: `get-tasks`, `add-task`, `update-task`, `delete-task`
+
 ## 📚 Key Pointers for Agents
 All detailed project knowledge is stored in the `directives/` folder. Use these as your primary source of truth:
 
 - **Understand the App**: Read `directives/project_overview.md`
 - **Coding Rules**: Read `directives/code_standards.md`
+- **Brand & Styling**: Read `directives/brand_guidelines.md`
 - **Fixing Bugs**: Read `directives/troubleshooting.md`
 - **Deploying**: Read `directives/deployment.md`
 - **UI/UX**: Read `directives/ui_features.md`

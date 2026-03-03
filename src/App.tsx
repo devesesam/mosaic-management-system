@@ -6,29 +6,29 @@ import LoginForm from './components/auth/LoginForm';
 import Navbar from './components/layout/Navbar';
 import WeekView from './components/scheduler/WeekView';
 import MonthView from './components/scheduler/MonthView';
-import JobForm from './components/jobs/JobForm';
-import { useJobsStore } from './store/jobsStore';
+import { TaskForm } from './components/tasks';
+import { useTasksStore } from './store/tasksStore';
 import { useTeamStore } from './store/teamStore';
-import { useRealtimeJobs } from './hooks/useRealtimeJobs';
+import { useRealtimeTasks } from './hooks/useRealtimeTasks';
 import { useRealtimeTeam } from './hooks/useRealtimeTeam';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
-import { Job } from './types';
+import { Task } from './types';
 import { logger } from './utils/logger';
 
 function App() {
   const { user, authError, currentWorker, signOut, isEditable } = useAuth();
-  const [isJobFormOpen, setIsJobFormOpen] = useState(false);
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
 
   const {
-    jobs,
-    addJob,
-    error: jobsError,
-    fetchJobs,
-    isLoading: jobsLoading
-  } = useJobsStore();
+    tasks,
+    addTask,
+    error: tasksError,
+    fetchTasks,
+    isLoading: tasksLoading
+  } = useTasksStore();
 
   const {
     teamMembers,
@@ -38,22 +38,22 @@ function App() {
   } = useTeamStore();
 
   // Subscribe to real-time updates (replaces polling)
-  useRealtimeJobs();
+  useRealtimeTasks();
   useRealtimeTeam();
 
   // Load data when component mounts
   useEffect(() => {
     logger.debug('App: Initial data load');
-    fetchJobs();
+    fetchTasks();
     fetchTeamMembers();
-  }, [fetchJobs, fetchTeamMembers]);
+  }, [fetchTasks, fetchTeamMembers]);
 
   // Refresh data when tab becomes visible (handles stale data after tab was inactive)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         logger.debug('App: Tab became visible, refreshing data');
-        fetchJobs();
+        fetchTasks();
         fetchTeamMembers();
       }
     };
@@ -63,7 +63,7 @@ function App() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchJobs, fetchTeamMembers]);
+  }, [fetchTasks, fetchTeamMembers]);
 
   // Log edit permission status
   useEffect(() => {
@@ -84,24 +84,24 @@ function App() {
     }
   }, [isEditable, activeView]);
 
-  const handleNewJob = () => {
+  const handleNewTask = () => {
     if (!isEditable) {
-      logger.debug('App: New job creation blocked - read-only mode');
+      logger.debug('App: New task creation blocked - read-only mode');
       return;
     }
-    setIsJobFormOpen(true);
+    setIsTaskFormOpen(true);
   };
 
-  const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
+  const handleSubmitTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
     if (!isEditable) {
-      logger.debug('App: Job submission blocked - read-only mode');
+      logger.debug('App: Task submission blocked - read-only mode');
       return;
     }
     try {
-      await addJob(jobData);
-      setIsJobFormOpen(false);
+      await addTask(taskData);
+      setIsTaskFormOpen(false);
     } catch (error) {
-      logger.error('Error creating job:', error);
+      logger.error('Error creating task:', error);
     }
   };
 
@@ -140,8 +140,8 @@ function App() {
     );
   }
 
-  // Show error if there's any problem with the jobs or team data
-  if (jobsError || teamError) {
+  // Show error if there's any problem with the tasks or team data
+  if (tasksError || teamError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-garlic">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
@@ -150,13 +150,13 @@ function App() {
           </div>
           <h2 className="text-2xl font-bogart font-medium text-charcoal text-center mb-4">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">
-            {jobsError?.message || teamError?.message || 'Failed to load data. Please try refreshing the page.'}
+            {tasksError?.message || teamError?.message || 'Failed to load data. Please try refreshing the page.'}
           </p>
           <div className="flex flex-col space-y-3">
             <button
               onClick={() => {
                 setIsRetrying(true);
-                fetchJobs();
+                fetchTasks();
                 fetchTeamMembers();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
@@ -182,7 +182,7 @@ function App() {
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-screen bg-vanilla">
         <Navbar
-          onNewJob={handleNewJob}
+          onNewTask={handleNewTask}
           activeView={activeView}
           setActiveView={handleSetActiveView}
           isEditable={isEditable}
@@ -210,10 +210,10 @@ function App() {
           )}
         </main>
 
-        {isJobFormOpen && (
-          <JobForm
-            onClose={() => setIsJobFormOpen(false)}
-            onSubmit={handleSubmitJob}
+        {isTaskFormOpen && (
+          <TaskForm
+            onClose={() => setIsTaskFormOpen(false)}
+            onSubmit={handleSubmitTask}
             readOnly={!isEditable}
           />
         )}

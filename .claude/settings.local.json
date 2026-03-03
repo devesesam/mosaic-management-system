@@ -11,7 +11,9 @@
       "Bash(python -c:*)",
       "Bash(pip show:*)",
       "Bash(where:*)",
-      "Bash(pdftotext:*)"
+      "Bash(pdftotext:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ]
   }
 }

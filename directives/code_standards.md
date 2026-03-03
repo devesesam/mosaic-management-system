@@ -5,6 +5,29 @@ This document defines coding conventions, patterns, and best practices for the M
 
 ---
 
+## Naming Conventions
+
+### Task Terminology (v0.2.0+)
+As of version 0.2.0, the codebase uses "task" terminology consistently:
+
+| Old Term | New Term | Notes |
+|----------|----------|-------|
+| Job | Task | All new code should use "Task" |
+| JobStatus | TaskStatus | Enum with simplified values |
+| jobsStore | tasksStore | Zustand store |
+| useRealtimeJobs | useRealtimeTasks | Realtime hook |
+| DraggableJob | DraggableTask | Calendar component |
+| JobForm | TaskForm | Form component |
+
+**Backwards Compatibility:** Legacy names are aliased for gradual migration:
+```typescript
+// These aliases exist but should not be used in new code
+export type Job = Task;
+export const useJobsStore = useTasksStore;
+```
+
+---
+
 ## TypeScript Standards
 
 ### Avoid `any` Type
@@ -17,20 +40,20 @@ const handleSubmit = async (data: any) => { ... }
 
 **Good:**
 ```typescript
-const handleSubmit = async (data: Omit<Job, 'id' | 'created_at'>) => { ... }
+const handleSubmit = async (data: Omit<Task, 'id' | 'created_at'>) => { ... }
 ```
 
 ### Use Type Imports
 Import types separately when possible for clarity.
 
 ```typescript
-import { Job, Worker } from '../types';
+import { Task, Worker, TaskStatus } from '../types';
 ```
 
 ### Define Interfaces for API Responses
 ```typescript
-interface WorkersResponse {
-  data: Worker[];
+interface TasksResponse {
+  data: Task[];
   count?: number;
   message?: string;
   success: boolean;
@@ -77,21 +100,21 @@ logger.error('Component: Error occurred', error);
 ## State Management (Zustand)
 
 ### Store Naming
-- Use plural for collection stores: `jobsStore.ts`, `workersStore.ts`
-- Export hook with `use` prefix: `useJobsStore`, `useWorkerStore`
+- Use plural for collection stores: `tasksStore.ts`, `teamStore.ts`
+- Export hook with `use` prefix: `useTasksStore`, `useTeamStore`
 
 ### Optimistic Updates
 Update local state immediately, don't refetch after mutations.
 
 **Bad:**
 ```typescript
-set((state) => ({ jobs: [...state.jobs, newJob] }));
-get().fetchJobs(); // Unnecessary refetch
+set((state) => ({ tasks: [...state.tasks, newTask] }));
+get().fetchTasks(); // Unnecessary refetch
 ```
 
 **Good:**
 ```typescript
-set((state) => ({ jobs: [...state.jobs, newJob] }));
+set((state) => ({ tasks: [...state.tasks, newTask] }));
 // Trust the local state, no refetch needed
 ```
 
@@ -112,6 +135,36 @@ try {
 
 ---
 
+## Task Status Values
+
+### Standard Status Enum
+```typescript
+export enum TaskStatus {
+  NotStarted = 'Not Started',
+  InProgress = 'In Progress',
+  OnHold = 'On Hold',
+  Completed = 'Completed'
+}
+```
+
+### Usage in Components
+```typescript
+import { TaskStatus } from '../types';
+
+// Setting status
+const newTask = {
+  ...taskData,
+  status: TaskStatus.NotStarted
+};
+
+// Checking status
+if (task.status === TaskStatus.Completed) {
+  // Task is done
+}
+```
+
+---
+
 ## Validation Standards
 
 ### Use the Validation Utility
@@ -121,8 +174,8 @@ All form validation should use `src/utils/validation.ts`.
 import { validators } from '../utils/validation';
 
 // In submit handler:
-if (!validators.required(formData.address)) {
-  toast.error('Job address is required');
+if (!validators.required(formData.name)) {
+  toast.error('Task name is required');
   return;
 }
 
@@ -197,6 +250,73 @@ Row Level Security should enforce:
 
 ---
 
+## Brand & Styling Standards
+
+### Use Brand Colors (Not Generic Tailwind Colors)
+
+All UI elements must use the Mosaic brand colors defined in `tailwind.config.js`. Never use generic Tailwind colors like `indigo-*`, `blue-*` for primary UI elements.
+
+**Bad:**
+```typescript
+<button className="bg-indigo-600 hover:bg-indigo-700">Submit</button>
+<div className="focus:ring-indigo-500">...</div>
+```
+
+**Good:**
+```typescript
+<button className="bg-blueberry hover:bg-blueberry/90">Submit</button>
+<div className="focus:ring-margaux">...</div>
+```
+
+### Brand Color Reference
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| `garlic` | `#F9F8F1` | Page backgrounds |
+| `aubergine` | `#3A4750` | Navbar, dark backgrounds |
+| `margaux` | `#477296` | Focus states, links |
+| `saffron` | `#B96129` | CTA buttons |
+| `blueberry` | `#345981` | Primary buttons, default tiles |
+| `vanilla` | `#F7F4E9` | Panel backgrounds |
+| `charcoal` | `#333333` | Body text |
+| `seafoam` | `#94B0B3` | Selection highlights |
+| `sorbet` | `#E2C1A4` | Drop zones |
+
+### Typography
+
+Always use brand fonts for consistency:
+
+```typescript
+// Headlines and titles
+<h2 className="font-bogart font-medium text-charcoal">Title</h2>
+
+// Body text (default, no class needed)
+<p className="text-charcoal">Body text</p>
+```
+
+### Common Patterns
+
+```typescript
+// Primary button
+className="bg-blueberry hover:bg-blueberry/90 text-white"
+
+// Focus state
+className="focus:ring-margaux focus:border-margaux"
+
+// Link styling
+className="text-margaux hover:text-blueberry"
+
+// Panel/card background
+className="bg-vanilla"
+
+// Page background
+className="bg-garlic"
+```
+
+See [Brand Guidelines](./brand_guidelines.md) for complete reference.
+
+---
+
 ## Component Patterns
 
 ### Form Components
@@ -257,9 +377,9 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 import { Navbar } from './components/layout/Navbar';
-import { useJobsStore } from './store/jobsStore';
+import { useTasksStore } from './store/tasksStore';
 import { logger } from './utils/logger';
-import { Job, Worker } from './types';
+import { Task, Worker } from './types';
 ```
 
 ### Component File Structure
@@ -282,13 +402,11 @@ import { Job, Worker } from './types';
 3. Prefer extending existing files over creating new ones
 
 ### Naming Conventions to Avoid Confusion
-- Use **plural** for collection stores: `jobsStore.ts` (not `jobStore.ts`)
-- Use **consistent** naming: if API is `jobsApi.ts`, store should be `jobsStore.ts`
+- Use **plural** for collection stores: `tasksStore.ts` (not `taskStore.ts`)
+- Use **consistent** naming: if API is `tasksApi.ts`, store should be `tasksStore.ts`
 - Don't create parallel implementations (React Query hooks AND Zustand stores)
 
 ### When to Delete Files
-
-⚠️ **CRITICAL WARNING:** A previous agent (2026-02-12) incorrectly identified files as dead code by only checking some directories. This would have broken the app.
 
 **Required Verification Process:**
 ```bash
@@ -301,11 +419,6 @@ A file is dead code ONLY when:
 1. It exports functions/components
 2. **BOTH grep commands above return ZERO matches**
 3. It's not the entry point (`main.tsx`, `index.html`)
-
-**Common Mistake:** Checking only `src/store/` and assuming that's representative. In this codebase:
-- Stores use Edge Functions
-- BUT `src/context/AuthContext.tsx` uses the direct API layer
-- BUT `src/components/scheduler/WorkerManageModal.tsx` uses the direct API layer
 
 **Always check ALL directories:** `src/store/`, `src/api/`, `src/context/`, `src/components/`, `src/hooks/`
 
@@ -333,16 +446,158 @@ All data access must go through the Zustand stores, which use Edge Functions to 
 Component → useStore() → fetch('/functions/v1/...') → Edge Function → Database
 ```
 
+### Edge Function Naming
+| Function | Method | Purpose |
+|----------|--------|---------|
+| `get-tasks` | GET | Fetch all tasks |
+| `add-task` | POST | Create new task |
+| `update-task` | PUT | Update existing task |
+| `delete-task` | DELETE | Delete task |
+| `get-tasks-by-worker` | GET | Fetch tasks for specific worker |
+
 ### Why This Pattern?
 1.  **Security**: Edge Functions run with Service Role permissions, bypassing RLS limitations for workers.
 2.  **Consistency**: A single way to fetch/update data across the app.
 3.  **State Management**: Zustand handles local state updates optimistically.
 
-### Legacy Code Removed
-The old "Direct Supabase Client" pattern (`src/api/jobsApi.ts`, etc.) has been removed. 
-**Do NOT re-introduce direct `supabase.from('table')` calls in components.**
-
 ### Rules for New Code
-- **Always** use `useJobsStore` or `useWorkerStore`.
+- **Always** use `useTasksStore` or `useTeamStore`.
 - **Never** make direct API calls in components.
 - **Never** add React Query hooks (we use Zustand).
+- **Never** use `supabase.from('table')` directly in components.
+
+---
+
+## Performance Patterns
+
+See [Performance Guide](./performance.md) for comprehensive documentation.
+
+### Use Zustand Selectors (Not Destructuring)
+
+**Bad** - Re-renders on any store change:
+```typescript
+const { tasks, loading, error, fetchTasks } = useTasksStore();
+```
+
+**Good** - Only re-renders when specific state changes:
+```typescript
+import { useTasks, useTasksLoading, useTaskActions } from '../store/tasksStore';
+
+const tasks = useTasks();
+const loading = useTasksLoading();
+const { fetchTasks, addTask } = useTaskActions();
+```
+
+### React.memo for Calendar Components
+Large components with many children should be memoized:
+
+```typescript
+const WorkerRow = React.memo(function WorkerRow({
+  workerId,
+  workerName,
+  // ... props
+}: WorkerRowProps) {
+  // Component body
+}, (prevProps, nextProps) => {
+  // Return true if props are equal (no re-render needed)
+  if (prevProps.workerId !== nextProps.workerId) return false;
+  if (prevProps.readOnly !== nextProps.readOnly) return false;
+  return true;
+});
+```
+
+### Use Pre-computed Maps for O(1) Lookups
+Instead of filtering arrays on every callback:
+
+```typescript
+// Pre-compute once per render
+const workerDayTasksMap = React.useMemo(() => {
+  const map = new Map<string, Task[]>();
+  tasks.forEach(task => {
+    const key = `${task.worker_id}-${dayKey}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(task);
+  });
+  return map;
+}, [tasks]);
+
+// O(1) lookup
+const getTasks = (workerId: string, day: Date) => {
+  return workerDayTasksMap.get(`${workerId}-${format(day, 'yyyy-MM-dd')}`) || [];
+};
+```
+
+### Real-time Instead of Polling
+Use Supabase Realtime subscriptions instead of polling:
+
+```typescript
+// In App.tsx
+import { useRealtimeTasks } from './hooks/useRealtimeTasks';
+import { useRealtimeTeam } from './hooks/useRealtimeTeam';
+
+function App() {
+  useRealtimeTasks();  // Subscribes to tasks table
+  useRealtimeTeam();   // Subscribes to workers table
+  // ...
+}
+```
+
+**Never** re-add polling intervals. The app uses realtime subscriptions + visibility API refresh.
+
+---
+
+## Drag and Drop
+
+### DnD Type Constants
+Use `'TASK'` as the drag type for all task-related drag operations:
+
+```typescript
+const [{ isDragging }, drag] = useDrag({
+  type: 'TASK',  // Not 'JOB' - use 'TASK' consistently
+  item: { task },
+  // ...
+});
+
+const [{ isOver }, drop] = useDrop({
+  accept: 'TASK',
+  // ...
+});
+```
+
+---
+
+## Migration Notes
+
+### Migrating from "Job" to "Task" Terminology
+
+If you encounter legacy code using "job" terminology:
+
+1. **Check for aliases first** - The codebase provides backwards compatibility:
+   ```typescript
+   // These work but are deprecated
+   import { Job } from '../types';  // Actually Task
+   import { useJobsStore } from '../store/tasksStore';  // Actually useTasksStore
+   ```
+
+2. **Update imports** - Replace with new names:
+   ```typescript
+   // Old
+   import { Job, JobStatus } from '../types';
+
+   // New
+   import { Task, TaskStatus } from '../types';
+   ```
+
+3. **Update component props** - Use consistent naming:
+   ```typescript
+   // Old
+   interface Props { job: Job; onJobClick: (job: Job) => void; }
+
+   // New
+   interface Props { task: Task; onTaskClick: (task: Task) => void; }
+   ```
+
+4. **Update log messages** - Use "task" in logs:
+   ```typescript
+   logger.debug('tasksStore: Task created successfully:', task.id);
+   ```

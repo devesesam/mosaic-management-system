@@ -1,39 +1,32 @@
-export enum JobStatus {
-  AwaitingOrder = 'Awaiting Order',
-  Ordered = 'Ordered',
+export enum TaskStatus {
+  NotStarted = 'Not Started',
   InProgress = 'In Progress',
-  HeldUp = 'Held Up',
-  Complete = 'Complete',
-  Invoiced = 'Invoiced',
-  Closed = 'Closed',
-  Urgent = 'Urgent'
+  OnHold = 'On Hold',
+  Completed = 'Completed'
 }
+
+// Backwards compatibility alias
+export const JobStatus = TaskStatus;
+export type JobStatus = TaskStatus;
 
 // All users are admins
 export type TeamMemberRole = 'admin';
 
-export interface Job {
+export interface Task {
   id: string;
-  address: string;
-  customer_name: string | null;
-  quote_number: string | null;
-  fascia_colour: string | null;
-  spouting_colour: string | null;
-  spouting_profile: string | null;
-  roof_colour: string | null;
-  roof_profile: string | null;
-  downpipe_size: string | null;
-  downpipe_colour: string | null;
+  name: string;
   notes: string | null;
-  // Note: Database field names kept as worker_id for Supabase compatibility
   worker_id: string | null;
   secondary_worker_ids?: string[];
   start_date: string | null;
   end_date: string | null;
-  status: JobStatus;
+  status: TaskStatus;
   tile_color: string | null;
   created_at: string;
 }
+
+// Backwards compatibility alias
+export type Job = Task;
 
 export interface TeamMember {
   id: string;

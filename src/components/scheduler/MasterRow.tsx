@@ -1,21 +1,21 @@
 import React from 'react';
 import { format, isToday, isSameDay, parseISO } from 'date-fns';
-import { Job, TeamMember } from '../../types';
-import DraggableJob from './DraggableJob';
+import { Task, TeamMember } from '../../types';
+import DraggableTask from './DraggableTask';
 import { Eye } from 'lucide-react';
 
 interface MasterRowProps {
   days: Date[];
-  allJobs: Job[];
+  allTasks: Task[];
   teamMembers: TeamMember[];
-  onJobClick: (job: Job) => void;
+  onTaskClick: (task: Task) => void;
 }
 
 const MasterRow: React.FC<MasterRowProps> = ({
   days,
-  allJobs,
+  allTasks,
   teamMembers,
-  onJobClick,
+  onTaskClick,
 }) => {
   // Get team member name by ID
   const getTeamMemberName = (workerId: string | null): string => {
@@ -24,23 +24,23 @@ const MasterRow: React.FC<MasterRowProps> = ({
     return member?.name || 'Unknown';
   };
 
-  // Get all scheduled jobs (jobs with start_date)
-  const scheduledJobs = React.useMemo(() => {
-    return allJobs.filter(job => job.start_date);
-  }, [allJobs]);
+  // Get all scheduled tasks (tasks with start_date)
+  const scheduledTasks = React.useMemo(() => {
+    return allTasks.filter(task => task.start_date);
+  }, [allTasks]);
 
-  // Calculate which jobs should render on which days
+  // Calculate which tasks should render on which days
   const renderingData = React.useMemo(() => {
     const data: Array<{
-      job: Job;
+      task: Task;
       renderDay: Date;
       dayIndex: number;
       span: number;
       stackIndex: number;
     }> = [];
 
-    // Sort jobs by start date for consistent stacking
-    const sortedJobs = [...scheduledJobs].sort((a, b) => {
+    // Sort tasks by start date for consistent stacking
+    const sortedTasks = [...scheduledTasks].sort((a, b) => {
       if (!a.start_date && !b.start_date) return 0;
       if (!a.start_date) return 1;
       if (!b.start_date) return -1;
@@ -49,41 +49,41 @@ const MasterRow: React.FC<MasterRowProps> = ({
 
     // Track stack positions for each day
     const dayStacks: { [key: string]: Array<{
-      job: Job;
+      task: Task;
       span: number;
       stackIndex: number;
     }> } = {};
 
-    sortedJobs.forEach(job => {
-      if (!job.start_date) return;
+    sortedTasks.forEach(task => {
+      if (!task.start_date) return;
 
       try {
-        const jobStartDate = parseISO(job.start_date);
-        const jobEndDate = job.end_date ? parseISO(job.end_date) : jobStartDate;
+        const taskStartDate = parseISO(task.start_date);
+        const taskEndDate = task.end_date ? parseISO(task.end_date) : taskStartDate;
 
-        // Find which day this job should render on
+        // Find which day this task should render on
         let renderDay: Date | null = null;
         let renderDayIndex = -1;
 
-        // Check if job starts within this week
-        const startDayIndex = days.findIndex(day => isSameDay(day, jobStartDate));
+        // Check if task starts within this week
+        const startDayIndex = days.findIndex(day => isSameDay(day, taskStartDate));
         if (startDayIndex >= 0) {
           renderDay = days[startDayIndex];
           renderDayIndex = startDayIndex;
-        } else if (jobStartDate < days[0] && jobEndDate >= days[0]) {
-          // Job started before this week but extends into it
+        } else if (taskStartDate < days[0] && taskEndDate >= days[0]) {
+          // Task started before this week but extends into it
           renderDay = days[0];
           renderDayIndex = 0;
         }
 
         if (renderDay && renderDayIndex >= 0) {
           // Calculate span
-          const endDayIndex = days.findIndex(day => isSameDay(day, jobEndDate));
+          const endDayIndex = days.findIndex(day => isSameDay(day, taskEndDate));
           let span: number;
 
           if (endDayIndex >= 0) {
             span = endDayIndex - renderDayIndex + 1;
-          } else if (jobEndDate > days[days.length - 1]) {
+          } else if (taskEndDate > days[days.length - 1]) {
             span = days.length - renderDayIndex;
           } else {
             span = 1;
@@ -106,11 +106,11 @@ const MasterRow: React.FC<MasterRowProps> = ({
               const checkDayKey = format(days[checkDayIndex], 'yyyy-MM-dd');
               if (!dayStacks[checkDayKey]) dayStacks[checkDayKey] = [];
 
-              const conflictingJob = dayStacks[checkDayKey].find(existingJob =>
-                existingJob.stackIndex === stackIndex
+              const conflictingTask = dayStacks[checkDayKey].find(existingTask =>
+                existingTask.stackIndex === stackIndex
               );
 
-              if (conflictingJob) {
+              if (conflictingTask) {
                 foundSlot = false;
                 stackIndex++;
                 break;
@@ -127,14 +127,14 @@ const MasterRow: React.FC<MasterRowProps> = ({
             if (!dayStacks[reserveDayKey]) dayStacks[reserveDayKey] = [];
 
             dayStacks[reserveDayKey].push({
-              job,
+              task,
               span,
               stackIndex
             });
           }
 
           data.push({
-            job,
+            task,
             renderDay,
             dayIndex: renderDayIndex,
             span: Math.max(1, span),
@@ -142,19 +142,19 @@ const MasterRow: React.FC<MasterRowProps> = ({
           });
         }
       } catch (error) {
-        console.error('MasterRow: Error processing job dates:', error, job);
+        console.error('MasterRow: Error processing task dates:', error, task);
       }
     });
 
     return data;
-  }, [scheduledJobs, days]);
+  }, [scheduledTasks, days]);
 
   // Calculate row height based on maximum stack depth
   const maxStackDepth = React.useMemo(() => {
     let maxDepth = 0;
     days.forEach(day => {
-      const dayJobs = renderingData.filter(data => isSameDay(data.renderDay, day));
-      const dayMaxStack = Math.max(...dayJobs.map(data => data.stackIndex), -1) + 1;
+      const dayTasks = renderingData.filter(data => isSameDay(data.renderDay, day));
+      const dayMaxStack = Math.max(...dayTasks.map(data => data.stackIndex), -1) + 1;
       maxDepth = Math.max(maxDepth, dayMaxStack);
     });
     return Math.max(1, maxDepth);
@@ -186,28 +186,28 @@ const MasterRow: React.FC<MasterRowProps> = ({
             style={{ height: `${rowHeight}px` }}
           >
             <div className="absolute inset-0 p-1">
-              {dayRenderingData.map(({ job, span, stackIndex }) => {
-                const assignedName = getTeamMemberName(job.worker_id);
+              {dayRenderingData.map(({ task, span, stackIndex }) => {
+                const assignedName = getTeamMemberName(task.worker_id);
                 const cellWidth = 100 / 7;
                 const spanWidth = cellWidth * span;
-                const jobHeight = 72;
+                const taskHeight = 72;
 
                 return (
                   <div
-                    key={job.id}
+                    key={task.id}
                     className="absolute"
                     style={{
                       left: '4px',
-                      top: `${4 + stackIndex * (jobHeight + 6)}px`,
+                      top: `${4 + stackIndex * (taskHeight + 6)}px`,
                       width: span > 1 ? `calc(${spanWidth}% * 7 - 8px)` : 'calc(100% - 8px)',
-                      height: `${jobHeight}px`,
+                      height: `${taskHeight}px`,
                       zIndex: 10,
                     }}
                   >
                     <div className="relative h-full">
-                      <DraggableJob
-                        job={job}
-                        onClick={() => onJobClick(job)}
+                      <DraggableTask
+                        task={task}
+                        onClick={() => onTaskClick(task)}
                         isScheduled={true}
                         isWeekView={true}
                         showText={true}

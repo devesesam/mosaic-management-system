@@ -30,34 +30,36 @@ The Mosaic Scheduler is a web-based application designed to manage scheduling an
 ```
 MosaicScheduler/
 ├── src/
-│   ├── api/              # API layer (Supabase operations)
+│   ├── api/              # API layer (Supabase client initialization only)
 │   ├── components/       # React components
 │   │   ├── auth/         # Authentication (Login, etc.)
-│   │   ├── jobs/         # Job management (JobForm, JobTile)
+│   │   ├── tasks/        # Task management (TaskForm, TaskTile)
 │   │   ├── scheduler/    # Calendar views and scheduling
 │   │   │   ├── WeekView.tsx
 │   │   │   ├── MonthView.tsx
 │   │   │   ├── CalendarGrid.tsx
-│   │   │   ├── GlobalJobSearch.tsx    # Search all jobs
-│   │   │   ├── UnscheduledPanel.tsx   # Jobs to Schedule (collapsible)
-│   │   │   ├── WorkerManageModal.tsx  # Edit/delete workers
-│   │   │   └── DraggableJob.tsx
+│   │   │   ├── GlobalTaskSearch.tsx    # Search all tasks
+│   │   │   ├── UnscheduledPanel.tsx    # Tasks to Schedule (collapsible)
+│   │   │   ├── WorkerManageModal.tsx   # Edit/delete workers
+│   │   │   ├── DraggableTask.tsx
+│   │   │   └── DayTasksModal.tsx
 │   │   ├── workers/      # Worker forms
-│   │   └── layout/       # Navbar, etc.
+│   │   └── layout/       # Navbar, UserSettingsModal, etc.
 │   ├── context/          # React contexts (AuthContext)
-│   ├── store/            # Zustand stores (jobsStore, workersStore)
-│   ├── hooks/            # Custom React hooks
+│   ├── store/            # Zustand stores (tasksStore, teamStore)
+│   ├── hooks/            # Custom React hooks (useRealtimeTasks, useRealtimeTeam)
 │   ├── types/            # TypeScript type definitions
 │   └── utils/            # Utility functions (logger, validation, errors, debounce)
 ├── supabase/
 │   ├── functions/        # Edge Functions
-│   │   ├── get-jobs/
-│   │   ├── add-job/
-│   │   ├── update-job/
-│   │   ├── delete-job/
+│   │   ├── get-tasks/
+│   │   ├── add-task/
+│   │   ├── update-task/
+│   │   ├── delete-task/
+│   │   ├── get-tasks-by-worker/
 │   │   ├── get-workers/
 │   │   ├── add-worker/
-│   │   ├── update-worker/   # NEW: Update worker name/email
+│   │   ├── update-worker/
 │   │   └── delete-worker/
 │   └── migrations/       # Database migrations
 ├── directives/           # SOPs and documentation
@@ -91,24 +93,53 @@ MosaicScheduler/
 | Table | Purpose |
 |-------|---------|
 | `workers` | Worker profiles (name, email, phone, role) |
-| `jobs` | Job records (address, customer, materials, dates, status) |
-| `job_secondary_workers` | Junction table for multi-worker assignments |
+| `tasks` | Task records (name, notes, dates, status, tile_color) |
+| `task_secondary_workers` | Junction table for multi-worker assignments |
 | `admin_users` | Email-based admin role management |
 
+### Task Status Values
+
+| Status | Description |
+|--------|-------------|
+| `Not Started` | Task created but not begun |
+| `In Progress` | Task is actively being worked on |
+| `On Hold` | Task is temporarily paused |
+| `Completed` | Task is finished |
+
+### Task Data Model
+
+```typescript
+interface Task {
+  id: string;
+  name: string;           // Task name/title
+  notes: string | null;   // Additional notes
+  worker_id: string | null;  // Primary assigned team member
+  secondary_worker_ids?: string[];  // Additional team members
+  start_date: string | null;  // Scheduled start
+  end_date: string | null;    // Scheduled end
+  status: TaskStatus;     // Not Started | In Progress | On Hold | Completed
+  tile_color: string | null;  // UI color for calendar tiles
+  created_at: string;     // Creation timestamp
+}
+```
+
 ### Current Status
-- **Version**: 0.1.4
-- **Last Updated**: 2026-02-12
+- **Version**: 0.2.0
+- **Last Updated**: 2026-03-03
 - **Recent Improvements**:
-  - Full deployment to Netlify via GitHub
-  - Security hardening (RLS + Admin Table)
-  - Fixed Admin permission checks
-  ### Security & Permissions
+  - Major refactoring: Renamed "job" to "task" throughout codebase
+  - Simplified task form (removed roofing-specific fields)
+  - New edge functions: add-task, get-tasks, update-task, delete-task, get-tasks-by-worker
+  - Database migration to rename tables and columns
+  - Performance optimization (realtime subscriptions, React.memo, O(1) lookups)
+
+### Security & Permissions
 - **Authentication**: Email/Password via Supabase Auth
 - **Authorization**:
   - **Admin**: Full access (via `admin_users` table)
   - **Worker**: Read-only access to their own schedule (via `workers` table link)
   - **Public**: No access
-- **New User Flow**: 
+- **New User Flow**:
   - Admin creates worker profile first
   - Worker signs up with same email
   - System automatically links profile
@@ -120,14 +151,32 @@ After cleanup, the codebase now has:
 - **No bolt.new artifacts** - `.bolt/` directory removed
 - **Clean dependencies** - Only used packages remain
 - **Single data pattern** - Zustand stores + Edge Functions for all data access
-- **Debug modals removed** - HelloModal, RawDataModal, WorkersDebugModal deleted
+- **Consistent naming** - "Task" terminology throughout (no "job" references)
+- **Backwards compatibility** - Legacy exports maintained for gradual migration
 
-⚠️ **Architecture Note:**
+### Architecture Note
 - The "Mixed Data Pattern" has been resolved. All components now use Stores/Edge Functions.
 - `src/api/` folder is now minimal (only used for Supabase client initialization).
+- Legacy "job" terminology has backwards compatibility aliases for gradual migration.
+
+### Backwards Compatibility
+
+The codebase maintains backwards compatibility for components that may still reference "job" terminology:
+
+```typescript
+// In src/types/index.ts
+export type Job = Task;  // Alias for backwards compatibility
+
+// In src/store/tasksStore.ts
+export const useJobsStore = useTasksStore;  // Alias
+
+// In src/components/tasks/index.ts
+export { TaskForm as JobForm };  // Re-export
+```
 
 ### Related Directives
 - [Code Standards](./code_standards.md) - Coding conventions and patterns
+- [Performance Guide](./performance.md) - Realtime subscriptions, React.memo, optimization patterns
 - [Utilities Reference](./utilities.md) - Documentation for utility functions
 - [UI Features](./ui_features.md) - UI components, search, mobile optimization
 - [Changelog](./changelog.md) - History of changes and improvements

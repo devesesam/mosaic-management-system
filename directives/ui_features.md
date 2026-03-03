@@ -65,7 +65,27 @@ interface GlobalJobSearchProps {
 - **Component**: `src/components/scheduler/UnscheduledPanel.tsx`
 
 ### Purpose
-Shows unscheduled jobs (jobs without a worker or start date) that can be dragged onto the calendar.
+Shows unscheduled jobs that can be dragged onto the calendar.
+
+### What Makes a Job "Unscheduled"?
+A job appears in the "Jobs to Schedule" pane if it has **no start date** (`!job.start_date`).
+
+**Important:** Having a worker assigned does NOT affect whether a job is "unscheduled". A job with an assigned worker but no date still needs to be scheduled and will appear in this pane.
+
+```typescript
+// Filter logic (UnscheduledPanel.tsx line 42)
+const baseUnscheduledJobs = useMemo(() => {
+  return jobs.filter(job => !job.start_date);
+}, [jobs]);
+```
+
+### Common Scenarios
+| Job State | Appears in Panel? | Appears on Calendar? |
+|-----------|-------------------|---------------------|
+| No date, no worker | ✅ Yes | ❌ No |
+| No date, has worker | ✅ Yes | ❌ No |
+| Has date, no worker | ❌ No | ✅ Yes (Unassigned row) |
+| Has date, has worker | ❌ No | ✅ Yes (Worker's row) |
 
 ### Features
 - **Collapse/Expand**: Click chevron to minimize pane
@@ -223,6 +243,29 @@ Workers (non-admin users) see:
 - Navigation: Previous/Next week, Today button
 - Global search in header
 - Drag-and-drop job scheduling
+
+#### Row Ordering (CalendarGrid)
+Team member rows are displayed in a specific order for better usability:
+
+1. **Master Row** - Aggregate view of all jobs (always first, collapsible)
+2. **Logged-in User's Row** - Current user's jobs prioritized for quick access
+3. **Unassigned Row** - Jobs with dates but no worker assigned
+4. **Other Team Members** - Remaining team members sorted alphabetically by name
+
+**Implementation:** `src/components/scheduler/CalendarGrid.tsx`
+
+```typescript
+// Current user separated and others sorted alphabetically
+const { currentUserMember, otherMembers } = React.useMemo(() => {
+  const currentUser = currentWorker ? teamMembers.find(m => m.id === currentWorker.id) : null;
+  const others = teamMembers
+    .filter(m => !currentWorker || m.id !== currentWorker.id)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { currentUserMember: currentUser, otherMembers: others };
+}, [teamMembers, currentWorker]);
+```
+
+**Note:** When filtering to a specific team member via the dropdown, only that member's row is shown (with the Unassigned row).
 
 ### Month View
 - **Component**: `src/components/scheduler/MonthView.tsx`
