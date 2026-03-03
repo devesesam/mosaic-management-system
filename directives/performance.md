@@ -32,92 +32,28 @@ const queryClient = new QueryClient({
 });
 ```
 
-### Real-time: Cache Invalidation vs Direct Updates
+### Real-time Updates
 
-The app uses **Supabase Realtime** to sync changes across clients.
+**Tasks: Disabled (v0.3.2)**
+Real-time subscriptions for tasks are intentionally disabled for simplicity:
+- Your own changes are instant via optimistic updates
+- Other users' changes appear when you refresh or switch tabs
+- The tab visibility handler in `App.tsx` refetches data automatically
 
-**Two Patterns Available:**
-
-1. **Direct Cache Update (O(1))** - Best when query key is simple/fixed:
+**Team Members: Enabled**
+Team member changes sync in real-time via `useRealtimeTeam.ts`:
 ```typescript
-// Team members use this - single query key, no filters
 queryClient.setQueryData<TeamMember[]>(teamKeys.list(), (old) => {
   if (!old) return [newMember];
   return [...old, newMember];
 });
 ```
 
-2. **Cache Invalidation (causes refetch)** - Required when queries have variable keys:
-```typescript
-// Tasks use this - queries can have workerId/isAdmin filters
-// We don't know which specific cache keys exist, so invalidate all
-queryClient.invalidateQueries({ queryKey: taskKeys.all });
-// This invalidates ALL queries starting with ['tasks']
-```
-
-**Why Tasks Use Invalidation (v0.3.1):**
-- `useTasksQuery(workerId, isAdmin)` creates different cache keys like `['tasks', { workerId: '123', isAdmin: false }]`
-- Real-time events don't tell us which workerId/isAdmin combinations to update
-- Using `setQueryData(taskKeys.all)` targets `['tasks']` which is a different key
-- Invalidation ensures ALL task queries get refreshed regardless of filters
-
-**Key Files:**
-- `src/hooks/useRealtimeTasks.ts` - Task updates via cache invalidation
-- `src/hooks/useRealtimeTeam.ts` - Team updates via direct cache update
-- `src/App.tsx` - Initializes realtime hooks
-
-**Usage:**
-```typescript
-// In App.tsx (already implemented)
-import { useRealtimeTasks } from './hooks/useRealtimeTasks';
-import { useRealtimeTeam } from './hooks/useRealtimeTeam';
-
-function App() {
-  // Subscribe to real-time updates (incremental)
-  useRealtimeTasks();
-  useRealtimeTeam();
-
-  // ... rest of component
-}
-```
-
-### When to Add New Realtime Subscriptions
-
-Choose the right pattern based on your query structure:
-
-**Pattern 1: Direct Cache Update (Simple Query Keys)**
-Use when your query always uses the same cache key (no filters/parameters):
-
-```typescript
-// Example: Team members - always uses teamKeys.list()
-.on('postgres_changes', { event: 'INSERT', ... }, (payload) => {
-  const newMember = payload.new as TeamMember;
-  queryClient.setQueryData<TeamMember[]>(teamKeys.list(), (old) => {
-    if (!old) return [newMember];
-    if (old.some(m => m.id === newMember.id)) return old;
-    return [...old, newMember];
-  });
-})
-```
-
-**Pattern 2: Cache Invalidation (Variable Query Keys)**
-Use when queries have parameters that create different cache keys:
-
-```typescript
-// Example: Tasks - queries with workerId/isAdmin create different keys
-.on('postgres_changes', { event: 'INSERT', ... }, (payload) => {
-  logger.debug('INSERT event', payload.new);
-  // Invalidate ALL task queries regardless of their filter parameters
-  queryClient.invalidateQueries({ queryKey: taskKeys.all });
-})
-```
-
-**Decision Guide:**
-| Query Pattern | Cache Key Example | Use This Pattern |
-|--------------|-------------------|------------------|
-| `useDataQuery()` (no params) | `['data']` | Direct update |
-| `useDataQuery(id)` (single param) | `['data', { id }]` | Invalidation |
-| `useDataQuery(a, b)` (multi params) | `['data', { a, b }]` | Invalidation |
+**Why Tasks Don't Use Real-time:**
+1. Visibility filtering (private tasks) requires server-side filtering
+2. Cache key complexity with workerId/isAdmin parameters
+3. Optimistic updates already provide instant feedback for your own actions
+4. Tab visibility refresh handles seeing others' changes
 
 ---
 

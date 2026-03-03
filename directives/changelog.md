@@ -4,6 +4,31 @@ All notable changes to the Mosaic Scheduler project are documented in this file.
 
 ---
 
+## [0.3.2] - 2026-03-03 - Simplified Real-time Architecture
+
+### Changed
+
+#### Real-time Subscriptions Disabled for Tasks
+**Decision:** Disabled real-time subscriptions for tasks in favor of a simpler architecture.
+
+**Why:**
+1. Optimistic updates already provide instant feedback for your own actions
+2. Real-time adds complexity with visibility filtering (private tasks) and cache key management
+3. Other users' changes are a low-frequency event that doesn't require instant sync
+4. Tab visibility handler refreshes data when user returns to the app
+
+**How it works now:**
+- **Your changes**: Instant via optimistic updates (cache updated before server confirms)
+- **Others' changes**: Appear when you refresh or switch tabs (visibility API triggers refetch)
+- **Team members**: Still use real-time (simpler, no visibility filtering)
+
+**Files changed:**
+- `src/hooks/useRealtimeTasks.ts` - Now a no-op function
+- `src/hooks/useTasks.ts` - Simplified to single query key `taskKeys.all` for optimistic updates
+- `src/App.tsx` - Tab visibility handler invalidates queries on return
+
+---
+
 ## [0.3.1] - 2026-03-03 - Real-time Cache Key Fix
 
 ### Fixed
@@ -16,6 +41,8 @@ All notable changes to the Mosaic Scheduler project are documented in this file.
 **Solution:** Changed `useRealtimeTasks.ts` to use `invalidateQueries({ queryKey: taskKeys.all })` which invalidates ALL queries starting with `['tasks']`, ensuring all task queries get refreshed regardless of filter parameters.
 
 **Trade-off:** Using invalidation triggers a refetch instead of direct cache update. This is slightly less efficient but ensures correctness. Team members still use direct cache updates since they have a fixed query key.
+
+**NOTE:** This approach was superseded in v0.3.2 by disabling real-time for tasks entirely.
 
 **Files changed:**
 - `src/hooks/useRealtimeTasks.ts`
@@ -1034,4 +1061,6 @@ VITE_LOG_LEVEL=warn
 | 0.2.0 | 2026-03-03 | Major refactoring: Jobs → Tasks, simplified form, new edge functions |
 | 0.2.1 | 2026-03-03 | Bug fixes: MonthView crash, error loading data |
 | 0.2.2 | 2026-03-03 | Task visibility toggle, private tasks filtering |
-| **0.3.0** | **2026-03-03** | **Modern architecture: React Query, Zod, React Router, Error Boundaries** |
+| 0.3.0 | 2026-03-03 | Modern architecture: React Query, Zod, React Router, Error Boundaries |
+| 0.3.1 | 2026-03-03 | Cache key fix for real-time updates (superseded by v0.3.2) |
+| **0.3.2** | **2026-03-03** | **Simplified real-time: disabled for tasks, optimistic updates only** |

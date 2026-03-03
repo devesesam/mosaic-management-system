@@ -448,31 +448,51 @@ const { user, currentWorker } = useAuth();
 
 ---
 
-### Issue: Real-time Updates Not Appearing (Cache Key Mismatch) - FIXED v0.3.1
+### Issue: Real-time Updates Not Appearing (Cache Key Mismatch) - RESOLVED v0.3.2
 
-**Symptom:** Changes made by other users don't appear until manual refresh, even though real-time subscription is active.
+**Symptom:** Changes made by other users don't appear until manual refresh.
 
-**Cause:** The `useRealtimeTasks` hook was using `setQueryData(taskKeys.all, ...)` which targets the cache key `['tasks']`. But `useTasksQuery()` uses `taskKeys.list(workerId, isAdmin)` which creates `['tasks', { workerId, isAdmin }]` - a different cache key.
+**Historical Context:** In v0.3.1, we attempted to fix this by changing `setQueryData` to `invalidateQueries`. However, this introduced complexity with visibility filtering (private tasks) that couldn't be reliably handled in real-time.
 
-**Solution (Applied in v0.3.1):**
-Changed `useRealtimeTasks.ts` to use `invalidateQueries` instead of `setQueryData`:
+**Final Solution (v0.3.2):** Real-time subscriptions for tasks are now **disabled entirely**.
 
+**Why this is the right approach:**
+1. Your own changes are instant via optimistic updates
+2. Other users' changes appear when you refresh or switch tabs
+3. The tab visibility handler in `App.tsx` automatically refetches data when you return
+4. Private task filtering requires server-side processing that real-time can't replicate
+
+**Current architecture:**
 ```typescript
-// OLD (buggy) - updates wrong cache key
-queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-  // This writes to ['tasks'] but queries use ['tasks', {...}]
-  return [newTask, ...old];
-});
+// src/hooks/useRealtimeTasks.ts - Now a no-op
+export function useRealtimeTasks() {
+  // No-op - real-time disabled for simplicity
+}
 
-// NEW (fixed) - invalidates ALL task queries
-queryClient.invalidateQueries({ queryKey: taskKeys.all });
-// This invalidates any query starting with ['tasks'], triggering refetch
+// src/hooks/useTasks.ts - Single query key for optimistic updates
+export const taskKeys = {
+  all: ['tasks'] as const,
+};
+
+// src/App.tsx - Tab visibility refreshes data
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+}, [queryClient]);
 ```
 
-**Trade-off:** Using `invalidateQueries` triggers a refetch instead of direct cache update. This is slightly less efficient but ensures consistency regardless of which workerId/isAdmin filter is being used.
+**If you need real-time for tasks in the future:**
+Real-time would require either:
+1. Server-side filtering in the Edge Function for each real-time event (complex)
+2. Disabling the visibility feature (loss of functionality)
+3. Using invalidation and accepting the refetch cost (what v0.3.1 did)
 
-**Files affected:**
-- `src/hooks/useRealtimeTasks.ts`
+For now, the simpler approach of relying on tab visibility refresh is sufficient.
 
 ---
 
