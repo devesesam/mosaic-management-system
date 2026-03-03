@@ -6,7 +6,7 @@ This guide documents the deployment workflows for the Tasman Roofing Scheduler.
 
 - **Frontend**: Hosted on [Netlify](https://app.netlify.com/projects/teal-eclair-7a0089/overview)
 - **Backend/Database**: [Supabase](https://supabase.com/dashboard/project/qkclmypehdlyhwxhxyue)
-- **Repository**: [GitHub](https://github.com/devesesam/scheduler_test)
+- **Repository**: [GitHub](https://github.com/devesesam/mosaic-management-system)
 
 ---
 

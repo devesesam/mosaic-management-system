@@ -1,9 +1,9 @@
 # Project Overview
 
-## Project Name: Tasman Roofing Scheduler
+## Project Name: Mosaic Scheduler
 
 ### Purpose
-The Tasman Roofing Scheduler is a web-based application designed to manage scheduling and reporting for roofing projects. It features functionality for creating jobs, assigning workers, drag-and-drop scheduling across calendar views, and tracking project status through various stages.
+The Mosaic Scheduler is a web-based application designed to manage scheduling and task tracking for restaurant operations. It features functionality for creating tasks, assigning team members, drag-and-drop scheduling across calendar views, and tracking project status through various stages.
 
 ### Technology Stack
 - **Frontend Framework**: React (v18) with TypeScript
@@ -23,12 +23,12 @@ The Tasman Roofing Scheduler is a web-based application designed to manage sched
     - `src/utils/`: TypeScript utilities (logger, validation, errors, debounce)
     - `.tmp/`: Temporary files
 - **Hosting**: Netlify (Frontend) - [Project Link](https://app.netlify.com/projects/teal-eclair-7a0089/overview)
-- **Version Control**: GitHub (`devesesam/scheduler_test`)
+- **Version Control**: GitHub (`devesesam/mosaic-management-system`)
 
 ### Key Directories
 
 ```
-RoofingScheduler/
+MosaicScheduler/
 ├── src/
 │   ├── api/              # API layer (Supabase operations)
 │   ├── components/       # React components
@@ -69,7 +69,7 @@ RoofingScheduler/
 - **Agent Instructions**: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` - Core operating instructions for AI agents
 - **Environment Config**: `.env` (contains Supabase credentials - DO NOT COMMIT)
 - **Supabase Project**: [Dashboard](https://supabase.com/dashboard/project/qkclmypehdlyhwxhxyue)
-- **GitHub Repository**: [Repo](https://github.com/devesesam/scheduler_test)
+- **GitHub Repository**: [Repo](https://github.com/devesesam/mosaic-management-system)
 
 ### Environment Variables
 
