@@ -8,14 +8,14 @@ interface WorkerSidebarProps {
   onWorkerSelect: (workerId: string | null) => void;
 }
 
-const WorkerSidebar: React.FC<WorkerSidebarProps> = ({ 
+const WorkerSidebar: React.FC<WorkerSidebarProps> = ({
   workers,
   selectedWorkerId,
   onWorkerSelect
 }) => {
   return (
-    <div className="w-44 min-w-44 border-r border-gray-200 bg-gray-50 flex flex-col">
-      <div className="p-3 font-semibold text-gray-800 border-b border-gray-200 bg-gray-100">
+    <div className="w-44 min-w-44 border-r border-gray-200 bg-vanilla flex flex-col">
+      <div className="p-3 font-semibold text-charcoal border-b border-gray-200 bg-garlic">
         Workers
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -26,18 +26,18 @@ const WorkerSidebar: React.FC<WorkerSidebarProps> = ({
             <button
               key={worker.id}
               onClick={() => onWorkerSelect(worker.id === selectedWorkerId ? null : worker.id)}
-              className={`w-full p-3 border-b border-gray-200 text-sm font-medium text-left flex items-center gap-2 hover:bg-gray-100 transition-colors
-                ${selectedWorkerId === worker.id 
-                  ? 'bg-blue-100 text-blue-800 shadow-sm' 
-                  : 'text-gray-700'}`}
+              className={`w-full p-3 border-b border-gray-200 text-sm font-medium text-left flex items-center gap-2 hover:bg-garlic transition-colors
+                ${selectedWorkerId === worker.id
+                  ? 'bg-margaux/20 text-blueberry shadow-sm'
+                  : 'text-charcoal'}`}
             >
-              <User 
-                size={16} 
-                className={selectedWorkerId === worker.id ? 'text-blue-600' : 'text-gray-500'} 
+              <User
+                size={16}
+                className={selectedWorkerId === worker.id ? 'text-margaux' : 'text-gray-500'}
               />
               <span className="flex-1">{worker.name}</span>
               {selectedWorkerId === worker.id && (
-                <Check size={16} className="text-blue-600" />
+                <Check size={16} className="text-margaux" />
               )}
             </button>
           ))

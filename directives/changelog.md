@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Tasman Roofing Scheduler project are documented in this file.
+All notable changes to the Mosaic Scheduler project are documented in this file.
 
 ---
 
@@ -256,7 +256,7 @@ An agent initially incorrectly stated that `jobsApi.ts` and `workersApi.ts` were
 **Steps:**
 ```bash
 # Navigate to project
-cd RoofingScheduler
+cd MosaicScheduler
 
 # Link to Supabase project (if not already)
 npx supabase link --project-ref qkclmypehdlyhwxhxyue

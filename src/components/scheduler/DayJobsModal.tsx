@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Job } from '../../types';
 import { X } from 'lucide-react';
 import DraggableJob from './DraggableJob';
-import { useWorkerStore } from '../../store/workersStore';
+import { useTeamStore } from '../../store/teamStore';
 
 interface DayJobsModalProps {
   date: Date;
@@ -18,19 +18,19 @@ const DayJobsModal: React.FC<DayJobsModalProps> = ({
   onClose,
   onJobClick,
 }) => {
-  const { workers } = useWorkerStore();
+  const { teamMembers } = useTeamStore();
 
-  // Helper function to get worker names for a job
-  const getWorkerAssignments = (job: Job) => {
-    const primaryWorker = job.worker_id 
-      ? workers.find(w => w.id === job.worker_id)
+  // Helper function to get team member names for a job
+  const getTeamAssignments = (job: Job) => {
+    const primaryMember = job.worker_id
+      ? teamMembers.find(m => m.id === job.worker_id)
       : null;
-    
-    const secondaryWorkers = job.secondary_worker_ids
-      ? workers.filter(w => job.secondary_worker_ids!.includes(w.id))
+
+    const secondaryMembers = job.secondary_worker_ids
+      ? teamMembers.filter(m => job.secondary_worker_ids!.includes(m.id))
       : [];
 
-    return { primaryWorker, secondaryWorkers };
+    return { primaryMember, secondaryMembers };
   };
 
   return (
@@ -54,8 +54,8 @@ const DayJobsModal: React.FC<DayJobsModalProps> = ({
           ) : (
             <div className="space-y-3">
               {jobs.map(job => {
-                const { primaryWorker, secondaryWorkers } = getWorkerAssignments(job);
-                
+                const { primaryMember, secondaryMembers } = getTeamAssignments(job);
+
                 return (
                   <div
                     key={job.id}
@@ -77,27 +77,27 @@ const DayJobsModal: React.FC<DayJobsModalProps> = ({
                         readOnly={true}
                       />
                     </div>
-                    
-                    {/* Worker assignment information */}
+
+                    {/* Team member assignment information */}
                     <div className="text-sm text-gray-700">
                       <span className="font-medium">Assigned to: </span>
-                      {!primaryWorker && (!secondaryWorkers || secondaryWorkers.length === 0) ? (
+                      {!primaryMember && (!secondaryMembers || secondaryMembers.length === 0) ? (
                         <span className="text-gray-500 italic">Unassigned</span>
                       ) : (
                         <span>
-                          {/* Primary worker in bold */}
-                          {primaryWorker && (
-                            <span className="font-bold">{primaryWorker.name}</span>
+                          {/* Primary team member in bold */}
+                          {primaryMember && (
+                            <span className="font-bold">{primaryMember.name}</span>
                           )}
-                          
-                          {/* Secondary workers in normal font */}
-                          {secondaryWorkers && secondaryWorkers.length > 0 && (
+
+                          {/* Secondary team members in normal font */}
+                          {secondaryMembers && secondaryMembers.length > 0 && (
                             <>
-                              {primaryWorker && ', '}
-                              {secondaryWorkers.map((worker, index) => (
-                                <span key={worker.id}>
-                                  {worker.name}
-                                  {index < secondaryWorkers.length - 1 && ', '}
+                              {primaryMember && ', '}
+                              {secondaryMembers.map((member, index) => (
+                                <span key={member.id}>
+                                  {member.name}
+                                  {index < secondaryMembers.length - 1 && ', '}
                                 </span>
                               ))}
                             </>

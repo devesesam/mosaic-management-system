@@ -10,7 +10,7 @@ export enum JobStatus {
 }
 
 // All users are admins
-export type WorkerRole = 'admin';
+export type TeamMemberRole = 'admin';
 
 export interface Job {
   id: string;
@@ -25,6 +25,7 @@ export interface Job {
   downpipe_size: string | null;
   downpipe_colour: string | null;
   notes: string | null;
+  // Note: Database field names kept as worker_id for Supabase compatibility
   worker_id: string | null;
   secondary_worker_ids?: string[];
   start_date: string | null;
@@ -34,14 +35,17 @@ export interface Job {
   created_at: string;
 }
 
-export interface Worker {
+export interface TeamMember {
   id: string;
   name: string;
   email: string | null;
   phone: string | null;
-  role?: WorkerRole;
+  role?: TeamMemberRole;
   created_at: string;
 }
+
+// Alias for backwards compatibility during migration
+export type Worker = TeamMember;
 
 export interface User {
   id: string;

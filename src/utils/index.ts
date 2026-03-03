@@ -1,5 +1,5 @@
 /**
- * Utility functions for the Tasman Roofing Scheduler
+ * Utility functions for Mosaic Scheduler
  *
  * Documentation: directives/utilities.md
  */

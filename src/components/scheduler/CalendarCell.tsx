@@ -40,20 +40,20 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
 
   // Current day index in the week
   const dayIndex = days.findIndex(d => isSameDay(d, day));
-  
+
   // Sort jobs so most important shows on top
   const sortedJobs = [...jobs].sort((a, b) => {
     // Prioritize jobs with both start and end dates
     const aHasBothDates = !!(a.start_date && a.end_date);
     const bHasBothDates = !!(b.start_date && b.end_date);
-    
+
     if (aHasBothDates && !bHasBothDates) return -1;
     if (!aHasBothDates && bHasBothDates) return 1;
-    
+
     // If both have dates or both don't, sort by created date (newest first)
     return b.created_at.localeCompare(a.created_at);
   });
-  
+
   const mainJob = sortedJobs[0];
   const hasMoreJobs = sortedJobs.length > 1;
 
@@ -63,7 +63,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
         w-[calc((100%-12rem)/7)] border-r border-gray-200 relative
-        ${isOver ? 'bg-blue-50' : 'bg-white'}
+        ${isOver ? 'bg-sorbet/30' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
       style={{ height: '100px' }}
@@ -84,11 +84,11 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
             />
           </div>
         )}
-        
+
         {hasMoreJobs && (
           <button
             onClick={() => onShowMore(day)}
-            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-gray-700 hover:underline z-10"
+            className="absolute bottom-1 right-2 text-xs text-gray-500 hover:text-charcoal hover:underline z-10"
           >
             +{sortedJobs.length - 1} more
           </button>

@@ -8,7 +8,7 @@ import WeekView from './components/scheduler/WeekView';
 import MonthView from './components/scheduler/MonthView';
 import JobForm from './components/jobs/JobForm';
 import { useJobsStore } from './store/jobsStore';
-import { useWorkerStore } from './store/workersStore';
+import { useTeamStore } from './store/teamStore';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 import { Job } from './types';
@@ -19,28 +19,28 @@ function App() {
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
-  
-  const { 
-    jobs, 
-    addJob, 
-    error: jobsError, 
+
+  const {
+    jobs,
+    addJob,
+    error: jobsError,
     fetchJobs,
-    isLoading: jobsLoading 
+    isLoading: jobsLoading
   } = useJobsStore();
-  
-  const { 
-    workers, 
-    error: workersError, 
-    fetchWorkers,
-    isLoading: workersLoading 
-  } = useWorkerStore();
+
+  const {
+    teamMembers,
+    error: teamError,
+    fetchTeamMembers,
+    isLoading: teamLoading
+  } = useTeamStore();
 
   // Load data when component mounts - no auth dependency
   useEffect(() => {
     logger.debug('App: Initial data load');
     fetchJobs();
-    fetchWorkers();
-  }, [fetchJobs, fetchWorkers]);
+    fetchTeamMembers();
+  }, [fetchJobs, fetchTeamMembers]);
 
   // Set up periodic refresh without auth dependency
   useEffect(() => {
@@ -48,14 +48,14 @@ function App() {
       logger.debug('App: Periodic data refresh');
       try {
         fetchJobs();
-        fetchWorkers();
+        fetchTeamMembers();
       } catch (error) {
         logger.error('Error during periodic refresh:', error);
       }
     }, 60000); // Refresh every minute
-    
+
     return () => clearInterval(interval);
-  }, [fetchJobs, fetchWorkers]);
+  }, [fetchJobs, fetchTeamMembers]);
 
   // Log edit permission status
   useEffect(() => {
@@ -114,16 +114,16 @@ function App() {
   // Show auth error if present
   if (authError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-garlic">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
           <div className="flex justify-center text-red-500 mb-4">
             <AlertTriangle size={48} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Authentication Error</h2>
+          <h2 className="text-2xl font-bogart font-medium text-charcoal text-center mb-4">Authentication Error</h2>
           <p className="text-gray-600 mb-6 text-center">{authError}</p>
           <button
             onClick={() => signOut()}
-            className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md"
+            className="w-full py-2 px-4 bg-blueberry hover:bg-blueberry/90 text-white font-medium rounded-md"
           >
             Return to Login
           </button>
@@ -132,27 +132,27 @@ function App() {
     );
   }
 
-  // Show error if there's any problem with the jobs or workers data
-  if (jobsError || workersError) {
+  // Show error if there's any problem with the jobs or team data
+  if (jobsError || teamError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-garlic">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
           <div className="flex justify-center text-red-500 mb-4">
             <AlertTriangle size={48} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Error Loading Data</h2>
+          <h2 className="text-2xl font-bogart font-medium text-charcoal text-center mb-4">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">
-            {jobsError?.message || workersError?.message || 'Failed to load data. Please try refreshing the page.'}
+            {jobsError?.message || teamError?.message || 'Failed to load data. Please try refreshing the page.'}
           </p>
           <div className="flex flex-col space-y-3">
             <button
               onClick={() => {
                 setIsRetrying(true);
                 fetchJobs();
-                fetchWorkers();
+                fetchTeamMembers();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
-              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md flex items-center justify-center"
+              className="w-full py-2 px-4 bg-blueberry hover:bg-blueberry/90 text-white font-medium rounded-md flex items-center justify-center"
               disabled={isRetrying}
             >
               {isRetrying ? (
@@ -172,9 +172,9 @@ function App() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex flex-col h-screen bg-gray-100">
-        <Navbar 
-          onNewJob={handleNewJob} 
+      <div className="flex flex-col h-screen bg-vanilla">
+        <Navbar
+          onNewJob={handleNewJob}
           activeView={activeView}
           setActiveView={handleSetActiveView}
           isEditable={isEditable}
@@ -210,7 +210,7 @@ function App() {
           />
         )}
 
-        <Toaster 
+        <Toaster
           position="bottom-right"
           toastOptions={{
             duration: 3000,

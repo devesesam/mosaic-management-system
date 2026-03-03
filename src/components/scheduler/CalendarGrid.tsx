@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useDrop } from 'react-dnd';
 import { format, isToday, differenceInDays, isSameDay, addDays, parseISO, isWithinInterval, isBefore, isAfter } from 'date-fns';
-import { Job, Worker } from '../../types';
+import { Job, TeamMember } from '../../types';
 import DraggableJob from './DraggableJob';
 import { Plus, Minus } from 'lucide-react';
-import WorkerManageModal from './WorkerManageModal';
+import TeamManageModal from './TeamManageModal';
 import DayJobsModal from './DayJobsModal';
+import MasterRow from './MasterRow';
 import { useAuth } from '../../context/AuthContext';
 
 interface CalendarGridProps {
   days: Date[];
-  workers: Worker[];
+  teamMembers: TeamMember[];
+  allJobs: Job[];
   getWorkerDayJobs: (workerId: string | null, day: Date) => Job[];
   onJobDrop: (job: Job, workerId: string | null, date: Date) => void;
   onJobClick: (job: Job) => void;
@@ -21,7 +23,8 @@ interface CalendarGridProps {
 
 const CalendarGrid: React.FC<CalendarGridProps> = ({
   days,
-  workers,
+  teamMembers,
+  allJobs,
   getWorkerDayJobs,
   onJobDrop,
   onJobClick,
@@ -30,43 +33,43 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   readOnly = false
 }) => {
   const { user, isEditable } = useAuth();
-  const [isManageWorkersOpen, setIsManageWorkersOpen] = useState(false);
+  const [isManageTeamOpen, setIsManageTeamOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
   
-  // Log worker data without full objects
+  // Log team member data without full objects
   useEffect(() => {
-    console.log('CalendarGrid: Workers:', {
-      count: workers.length,
-      names: workers.map(w => w.name),
+    console.log('CalendarGrid: Team Members:', {
+      count: teamMembers.length,
+      names: teamMembers.map(m => m.name),
       readOnly,
       isEditable,
       userEmail: user?.email
     });
-  }, [workers, readOnly, isEditable, user?.email]);
-  
-  // Filter workers based on edit permissions and current user email
-  const displayedWorkers = React.useMemo(() => {
-    // If user has edit permissions (admin), show all workers or filtered workers
+  }, [teamMembers, readOnly, isEditable, user?.email]);
+
+  // Filter team members based on edit permissions and current user email
+  const displayedTeamMembers = React.useMemo(() => {
+    // If user has edit permissions (admin), show all team members or filtered team members
     if (isEditable) {
       if (selectedWorker === 'all') {
-        return workers;
+        return teamMembers;
       }
-      return workers.filter(w => w.id === selectedWorker);
+      return teamMembers.filter(m => m.id === selectedWorker);
     }
-    
-    // If user is in read-only mode, only show the worker with matching email
+
+    // If user is in read-only mode, only show the team member with matching email
     if (user?.email) {
       const userEmail = user.email.toLowerCase();
-      const matchingWorker = workers.find(w => 
-        w.email && w.email.toLowerCase() === userEmail
+      const matchingMember = teamMembers.find(m =>
+        m.email && m.email.toLowerCase() === userEmail
       );
-      return matchingWorker ? [matchingWorker] : [];
+      return matchingMember ? [matchingMember] : [];
     }
-    
-    // No user email or no matching worker - show nothing
+
+    // No user email or no matching team member - show nothing
     return [];
-  }, [workers, selectedWorker, isEditable, user?.email]);
+  }, [teamMembers, selectedWorker, isEditable, user?.email]);
 
   // Should show unassigned row? Only for users with edit permissions
   const showUnassignedRow = isEditable;
@@ -74,18 +77,18 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   console.log('CalendarGrid: Display logic:', {
     isEditable,
     userEmail: user?.email,
-    totalWorkers: workers.length,
-    displayedWorkers: displayedWorkers.length,
+    totalTeamMembers: teamMembers.length,
+    displayedTeamMembers: displayedTeamMembers.length,
     showUnassignedRow,
-    displayedWorkerNames: displayedWorkers.map(w => w.name),
-    displayedWorkerEmails: displayedWorkers.map(w => w.email)
+    displayedTeamMemberNames: displayedTeamMembers.map(m => m.name),
+    displayedTeamMemberEmails: displayedTeamMembers.map(m => m.email)
   });
 
   return (
     <div className="min-w-fit">
       {/* Header row with days - Increased z-index to stay above all content */}
       <div className="flex sticky top-0 z-30 bg-white">
-        {/* Worker column header - responsive width */}
+        {/* Team Member column header - responsive width */}
         <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-gray-100 flex items-center justify-between px-2 md:px-3">
           <div className="flex items-center space-x-2 flex-1">
             {isEditable ? (
@@ -94,28 +97,28 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 onChange={(e) => setSelectedWorker(e.target.value)}
                 className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 max-w-[120px]"
               >
-                <option value="all">All Workers</option>
-                {workers.map((worker) => (
-                  <option key={worker.id} value={worker.id}>
-                    {worker.name}
+                <option value="all">All Team</option>
+                {teamMembers.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
                   </option>
                 ))}
               </select>
             ) : (
               <span className="text-sm font-medium text-gray-700">
-                {displayedWorkers.length > 0 ? displayedWorkers[0].name : 'Workers'}
+                {displayedTeamMembers.length > 0 ? displayedTeamMembers[0].name : 'Team'}
               </span>
             )}
           </div>
           <div className="flex items-center space-x-1">
             <button
-              onClick={() => setIsManageWorkersOpen(true)}
+              onClick={() => setIsManageTeamOpen(true)}
               className={`p-1.5 rounded-full transition-colors ${
-                !isEditable 
-                  ? 'text-gray-400 cursor-not-allowed' 
+                !isEditable
+                  ? 'text-gray-400 cursor-not-allowed'
                   : 'hover:bg-gray-200 text-gray-600'
               }`}
-              title={!isEditable ? 'Read-only mode' : 'Manage Workers'}
+              title={!isEditable ? 'Read-only mode' : 'Manage Team'}
               disabled={!isEditable}
             >
               <Minus className="h-5 w-5" />
@@ -149,19 +152,27 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         ))}
       </div>
 
-      {/* No workers message for read-only users */}
-      {!isEditable && displayedWorkers.length === 0 && (
+      {/* No team member message for read-only users */}
+      {!isEditable && displayedTeamMembers.length === 0 && (
         <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
-          No worker profile found for your email address. Please contact your administrator.
+          No team member profile found for your email address. Please contact your administrator.
         </div>
       )}
 
-      {/* No workers message for admin users */}
-      {isEditable && workers.length === 0 && (
+      {/* No team member message for admin users */}
+      {isEditable && teamMembers.length === 0 && (
         <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
-          No workers found in the database. Add a worker to start scheduling jobs.
+          No team members found in the database. Add a team member to start scheduling jobs.
         </div>
       )}
+
+      {/* Master row - shows all jobs from all team members */}
+      <MasterRow
+        days={days}
+        allJobs={allJobs}
+        teamMembers={teamMembers}
+        onJobClick={onJobClick}
+      />
 
       {/* Grid content */}
       <div className="flex flex-col">
@@ -180,28 +191,28 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           />
         )}
 
-        {/* Worker rows */}
-        {displayedWorkers.map(worker => (
+        {/* Team member rows */}
+        {displayedTeamMembers.map(member => (
           <WorkerRow
-            key={worker.id}
-            workerId={worker.id}
-            workerName={worker.name}
+            key={member.id}
+            workerId={member.id}
+            workerName={member.name}
             days={days}
             getWorkerDayJobs={getWorkerDayJobs}
             onJobDrop={onJobDrop}
             onJobClick={onJobClick}
             onJobResize={onJobResize}
-            onShowMore={(date) => setSelectedDay({ date, workerId: worker.id })}
+            onShowMore={(date) => setSelectedDay({ date, workerId: member.id })}
             readOnly={readOnly}
           />
         ))}
       </div>
 
-      {/* Worker Management Modal */}
-      {isManageWorkersOpen && (
-        <WorkerManageModal
-          onClose={() => setIsManageWorkersOpen(false)}
-          workers={workers}
+      {/* Team Management Modal */}
+      {isManageTeamOpen && (
+        <TeamManageModal
+          onClose={() => setIsManageTeamOpen(false)}
+          teamMembers={teamMembers}
           readOnly={readOnly}
         />
       )}

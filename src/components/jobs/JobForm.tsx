@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Job, JobStatus, Worker } from '../../types';
-import { useWorkerStore } from '../../store/workersStore';
+import { Job, JobStatus, TeamMember } from '../../types';
+import { useTeamStore } from '../../store/teamStore';
 import { X, Trash2, AlertTriangle, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -16,7 +16,7 @@ interface JobFormProps {
 }
 
 const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJob, readOnly = false }) => {
-  const { workers, loading: workersLoading, fetchWorkers } = useWorkerStore();
+  const { teamMembers, loading: teamLoading, fetchTeamMembers } = useTeamStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -51,16 +51,16 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     }
   }, [initialJob]);
 
-  // Fetch workers when form opens
+  // Fetch team members when form opens
   useEffect(() => {
-    logger.debug('JobForm: Fetching workers...');
-    fetchWorkers();
-  }, [fetchWorkers]);
+    logger.debug('JobForm: Fetching team members...');
+    fetchTeamMembers();
+  }, [fetchTeamMembers]);
 
-  // Debug workers data
+  // Debug team members data
   useEffect(() => {
-    console.log(`JobForm: ${workers.length} workers available for assignment`);
-  }, [workers]);
+    console.log(`JobForm: ${teamMembers.length} team members available for assignment`);
+  }, [teamMembers]);
 
   // Show read-only warning if needed
   useEffect(() => {
@@ -203,7 +203,7 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
     }
   };
 
-  const availableSecondaryWorkers = workers.filter(w => w.id !== formData.worker_id);
+  const availableSecondaryTeamMembers = teamMembers.filter(m => m.id !== formData.worker_id);
 
   const modalTitle = readOnly 
     ? 'View Job Details' 
@@ -398,11 +398,11 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Lead Worker
+                Lead Team Member
               </label>
-              {workersLoading ? (
+              {teamLoading ? (
                 <div className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 bg-gray-100 text-gray-500">
-                  Loading workers...
+                  Loading team members...
                 </div>
               ) : (
                 <select
@@ -414,10 +414,10 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
                     isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
                   }`}
                 >
-                  <option value="">Select Worker</option>
-                  {workers.map((worker: Worker) => (
-                    <option key={worker.id} value={worker.id}>
-                      {worker.name}
+                  <option value="">Select Team Member</option>
+                  {teamMembers.map((member: TeamMember) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
                     </option>
                   ))}
                 </select>
@@ -426,50 +426,50 @@ const JobForm: React.FC<JobFormProps> = ({ onClose, onSubmit, onDelete, initialJ
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Secondary Workers
+                Secondary Team Members
                 {!formData.worker_id && (
-                  <span className="text-xs text-amber-600 ml-1">(Requires primary worker)</span>
+                  <span className="text-xs text-amber-600 ml-1">(Requires primary team member)</span>
                 )}
               </label>
               <div className="mt-1 border rounded-md divide-y max-h-48 overflow-y-auto">
-                {workersLoading ? (
+                {teamLoading ? (
                   <div className="p-3 text-sm text-gray-500 italic">
-                    Loading workers...
+                    Loading team members...
                   </div>
-                ) : workers.length === 0 ? (
+                ) : teamMembers.length === 0 ? (
                   <div className="p-3 text-sm text-gray-500 italic">
-                    No workers available. Add workers first.
+                    No team members available. Add team members first.
                   </div>
                 ) : !formData.worker_id ? (
                   <div className="p-3 text-sm text-amber-600 italic">
-                    Please select a primary worker first.
+                    Please select a primary team member first.
                   </div>
                 ) : (
-                  availableSecondaryWorkers.map((worker) => (
+                  availableSecondaryTeamMembers.map((member) => (
                     <label
-                      key={worker.id}
+                      key={member.id}
                       className={`flex items-center px-3 py-2 hover:bg-gray-50 ${
                         readOnly ? 'cursor-default' : 'cursor-pointer'
                       } ${isSubmitting || readOnly ? 'opacity-50' : ''}`}
                     >
                       <input
                         type="checkbox"
-                        checked={formData.secondary_worker_ids?.includes(worker.id) || false}
-                        onChange={() => !readOnly && !isSubmitting && handleSecondaryWorkerToggle(worker.id)}
+                        checked={formData.secondary_worker_ids?.includes(member.id) || false}
+                        onChange={() => !readOnly && !isSubmitting && handleSecondaryWorkerToggle(member.id)}
                         disabled={isSubmitting || readOnly}
                         className={`h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded ${
                           isSubmitting || readOnly ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       />
                       <span className="ml-2 text-sm text-gray-700">
-                        {worker.name}
+                        {member.name}
                       </span>
                     </label>
                   ))
                 )}
-                {availableSecondaryWorkers.length === 0 && workers.length > 0 && formData.worker_id && (
+                {availableSecondaryTeamMembers.length === 0 && teamMembers.length > 0 && formData.worker_id && (
                   <div className="px-3 py-2 text-sm text-gray-500 italic">
-                    No additional workers available
+                    No additional team members available
                   </div>
                 )}
               </div>

@@ -1,7 +1,7 @@
 # Code Standards
 
 ## Overview
-This document defines coding conventions, patterns, and best practices for the Tasman Roofing Scheduler project.
+This document defines coding conventions, patterns, and best practices for the Mosaic Scheduler project.
 
 ---
 

@@ -1,6 +1,6 @@
 # UI Features Reference
 
-Documentation for user-facing features in the Tasman Roofing Scheduler.
+Documentation for user-facing features in the Mosaic Scheduler.
 
 ---
 

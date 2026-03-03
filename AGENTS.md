@@ -1,7 +1,7 @@
-# Project Context: Tasman Roofing Scheduler
+# Project Context: Mosaic Scheduler
 
 ## Overview
-The **Tasman Roofing Scheduler** is a React + Supabase web application for managing roofing jobs, worker schedules, and customer details. It features a drag-and-drop calendar interface, role-based access control (Admin vs. Worker), and strict data security via RLS and Edge Functions.
+The **Mosaic Scheduler** is a React + Supabase web application for managing tasks, team member schedules, and customer details. It features a drag-and-drop calendar interface, role-based access control (Admin vs. Team Member), and strict data security via RLS and Edge Functions.
 
 ## 📚 Key Pointers for Agents
 All detailed project knowledge is stored in the `directives/` folder. Use these as your primary source of truth:

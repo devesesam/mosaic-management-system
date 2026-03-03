@@ -12,15 +12,15 @@ import {
   isSameDay
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Job, Worker } from '../../types';
+import { Job, TeamMember } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
 import GlobalJobSearch from './GlobalJobSearch';
 import { useJobsStore } from '../../store/jobsStore';
-import { useWorkerStore } from '../../store/workersStore';
+import { useTeamStore } from '../../store/teamStore';
 import { useAuth } from '../../context/AuthContext';
 import JobForm from '../jobs/JobForm';
-import WorkerForm from '../workers/WorkerForm';
+import TeamMemberForm from '../team/TeamMemberForm';
 import toast from 'react-hot-toast';
 
 interface WeekViewProps {
@@ -30,7 +30,7 @@ interface WeekViewProps {
 const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isJobFormOpen, setIsJobFormOpen] = useState(false);
-  const [isWorkerFormOpen, setIsWorkerFormOpen] = useState(false);
+  const [isTeamMemberFormOpen, setIsTeamMemberFormOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isJobsPaneCollapsed, setIsJobsPaneCollapsed] = useState(() => {
@@ -55,13 +55,13 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     deleteJob
   } = useJobsStore();
   
-  const { 
-    workers, 
-    loading: workersLoading, 
-    error: workersError, 
-    fetchWorkers,
-    addWorker
-  } = useWorkerStore();
+  const {
+    teamMembers,
+    loading: teamLoading,
+    error: teamError,
+    fetchTeamMembers,
+    addTeamMember
+  } = useTeamStore();
 
   const { user, currentWorker } = useAuth();
   
@@ -81,8 +81,8 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   useEffect(() => {
     console.log('WeekView: Initial data load');
     fetchJobs();
-    fetchWorkers();
-  }, [fetchJobs, fetchWorkers]);
+    fetchTeamMembers();
+  }, [fetchJobs, fetchTeamMembers]);
 
   // Show toast notifications for loading states
   useEffect(() => {
@@ -94,12 +94,12 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   }, [jobsLoading]);
 
   useEffect(() => {
-    if (workersLoading) {
-      toast.loading('Updating workers...', { id: 'workers-loading' });
+    if (teamLoading) {
+      toast.loading('Updating team members...', { id: 'team-loading' });
     } else {
-      toast.dismiss('workers-loading');
+      toast.dismiss('team-loading');
     }
-  }, [workersLoading]);
+  }, [teamLoading]);
   
   // Debug log jobs data
   useEffect(() => {
@@ -108,12 +108,12 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     }
   }, [jobs]);
   
-  // Debug log the workers data
+  // Debug log the team members data
   useEffect(() => {
-    if (workers.length > 0) {
-      console.log('WeekView: Workers loaded:', workers.length);
+    if (teamMembers.length > 0) {
+      console.log('WeekView: Team members loaded:', teamMembers.length);
     }
-  }, [workers]);
+  }, [teamMembers]);
   
   // Get unscheduled jobs - filter for read-only mode
   const unscheduledJobs = React.useMemo(() => {
@@ -223,22 +223,22 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     }
   };
 
-  const handleSubmitWorker = async (workerData: Omit<Worker, 'id' | 'created_at'>) => {
+  const handleSubmitTeamMember = async (memberData: Omit<TeamMember, 'id' | 'created_at'>) => {
     if (readOnly) {
-      toast.error('Cannot add workers in read-only mode');
+      toast.error('Cannot add team members in read-only mode');
       return;
     }
-    
+
     try {
-      console.log('WeekView: Submitting worker:', workerData);
-      
-      // Wait for the worker to be added
-      await addWorker(workerData);
-      
-      console.log('WeekView: Worker added successfully');
-      setIsWorkerFormOpen(false);
+      console.log('WeekView: Submitting team member:', memberData);
+
+      // Wait for the team member to be added
+      await addTeamMember(memberData);
+
+      console.log('WeekView: Team member added successfully');
+      setIsTeamMemberFormOpen(false);
     } catch (error) {
-      console.error('WeekView: Error adding worker:', error);
+      console.error('WeekView: Error adding team member:', error);
     }
   };
   
@@ -428,14 +428,14 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       </div>
       
       {/* Error messages - keep these but make them less prominent */}
-      {workersError && (
+      {teamError && (
         <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-red-700">Error loading workers: {workersError}</span>
+            <span className="text-red-700">Error loading team members: {teamError}</span>
             <button 
               onClick={() => {
                 setIsRetrying(true);
-                fetchWorkers();
+                fetchTeamMembers();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
               className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex items-center"
@@ -481,9 +481,9 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       )}
       
       {/* Info messages - keep these as they're informational */}
-      {!workersLoading && !workersError && workers.length === 0 && (
+      {!teamLoading && !teamError && teamMembers.length === 0 && (
         <div className="px-4 py-2 bg-yellow-50 border-b border-yellow-100 text-sm">
-          <span className="text-yellow-700">No workers found. Add a worker to start scheduling jobs.</span>
+          <span className="text-yellow-700">No team members found. Add a team member to start scheduling jobs.</span>
         </div>
       )}
       
@@ -497,9 +497,10 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       <div className="flex flex-1 overflow-hidden">
         {/* Calendar grid */}
         <div className="flex-1 overflow-auto min-w-0">
-          <CalendarGrid 
+          <CalendarGrid
             days={weekDays}
-            workers={workers}
+            teamMembers={teamMembers}
+            allJobs={jobs}
             getWorkerDayJobs={getWorkerDayJobs}
             onJobDrop={handleJobDrop}
             onJobClick={(job) => {
@@ -507,7 +508,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
               setIsJobFormOpen(true);
             }}
             onJobResize={handleJobResize}
-            onNewWorker={() => setIsWorkerFormOpen(true)}
+            onNewWorker={() => setIsTeamMemberFormOpen(true)}
             readOnly={readOnly}
           />
         </div>
@@ -542,11 +543,11 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         />
       )}
 
-      {/* Worker form modal */}
-      {isWorkerFormOpen && (
-        <WorkerForm
-          onClose={() => setIsWorkerFormOpen(false)}
-          onSubmit={handleSubmitWorker}
+      {/* Team member form modal */}
+      {isTeamMemberFormOpen && (
+        <TeamMemberForm
+          onClose={() => setIsTeamMemberFormOpen(false)}
+          onSubmit={handleSubmitTeamMember}
           readOnly={readOnly}
         />
       )}

@@ -5,7 +5,13 @@
       "Bash(cd:*)",
       "Bash(wc:*)",
       "Bash(del \"c:\\\\Users\\\\damse\\\\OneDrive\\\\Documents\\\\AntiGravity Workspaces\\\\TasmanRoofing\\\\RoofingScheduler\\\\src\\\\components\\\\HelloModal.tsx\")",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(move:*)",
+      "Bash(dir:*)",
+      "Bash(python -c:*)",
+      "Bash(pip show:*)",
+      "Bash(where:*)",
+      "Bash(pdftotext:*)"
     ]
   }
 }

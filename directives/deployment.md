@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide documents the deployment workflows for the Tasman Roofing Scheduler.
+This guide documents the deployment workflows for the Mosaic Scheduler.
 
 ## Architecture
 

@@ -25,7 +25,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'X-Client-Info': 'tasman-roofing-scheduler',
+      'X-Client-Info': 'mosaic-scheduler',
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }

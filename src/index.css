@@ -1,3 +1,50 @@
+/* Mosaic Brand Font Loading */
+@font-face {
+  font-family: 'Bogart';
+  src: url('./assets/fonts/bogart-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bogart';
+  src: url('./assets/fonts/bogart-medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Base typography styles */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bogart font-medium;
+  }
+
+  body {
+    @apply font-body text-charcoal;
+  }
+}
+
+/* Reusable brand component styles */
+@layer components {
+  .btn-primary {
+    @apply bg-blueberry hover:bg-blueberry/90 text-white font-medium rounded-md transition-colors;
+  }
+
+  .btn-accent {
+    @apply bg-saffron hover:bg-saffron/90 text-white font-medium rounded-md transition-colors;
+  }
+
+  .btn-secondary {
+    @apply bg-white border border-gray-300 hover:bg-gray-50 text-charcoal font-medium rounded-md transition-colors;
+  }
+
+  .input-focus {
+    @apply focus:border-margaux focus:ring-margaux focus:ring-1;
+  }
+}

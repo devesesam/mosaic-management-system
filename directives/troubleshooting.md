@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Common issues, their causes, and solutions for the Tasman Roofing Scheduler.
+Common issues, their causes, and solutions for the Mosaic Scheduler.
 
 ---
 
