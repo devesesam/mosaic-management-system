@@ -8,7 +8,7 @@ import { logger } from '../utils/logger';
  * When tasks are inserted, updated, or deleted by other clients,
  * this hook triggers a refresh of the tasks store.
  */
-export function useRealtimeTasks() {
+export function useRealtimeTasks(workerId?: string, isAdmin?: boolean) {
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const isSubscribedRef = useRef(false);
 
@@ -34,7 +34,7 @@ export function useRealtimeTasks() {
 
           // Refresh tasks from the store
           // We use getState() to avoid stale closure issues
-          useTasksStore.getState().fetchTasks();
+          useTasksStore.getState().fetchTasks(workerId, isAdmin);
         }
       )
       .subscribe((status) => {

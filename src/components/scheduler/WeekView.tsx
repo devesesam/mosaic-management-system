@@ -64,26 +64,18 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   } = useTeamStore();
 
   const { user, currentWorker } = useAuth();
-  
+
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-  
+
   // Generate days of week
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
-  
+
   // Handle week navigation
   const prevWeek = () => setCurrentDate(subWeeks(currentDate, 1));
   const nextWeek = () => setCurrentDate(addWeeks(currentDate, 1));
   const goToToday = () => setCurrentDate(new Date());
-  
-  // Fetch data when component mounts
-  useEffect(() => {
-    console.log('WeekView: Initial data load');
-    fetchTasks();
-    fetchTeamMembers();
-  }, [fetchTasks, fetchTeamMembers]);
-
 
   // Debug log tasks data
   useEffect(() => {
@@ -186,7 +178,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
 
     return result;
   }, [workerDayTasksMap, readOnly, currentWorker]);
-  
+
   const handleSubmitTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
     if (readOnly) {
       toast.error('Cannot modify tasks in read-only mode');
@@ -239,7 +231,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       console.error('WeekView: Error adding team member:', error);
     }
   };
-  
+
   const handleTaskDrop = async (task: Task, workerId: string | null, date: Date | null) => {
     if (readOnly) {
       toast.error('Cannot move tasks in read-only mode');
@@ -424,13 +416,13 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           </button>
         </div>
       </div>
-      
+
       {/* Error messages - keep these but make them less prominent */}
       {teamError && (
         <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-red-700">Error loading team members: {teamError}</span>
-            <button 
+            <button
               onClick={() => {
                 setIsRetrying(true);
                 fetchTeamMembers();
@@ -451,7 +443,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           </div>
         </div>
       )}
-      
+
       {tasksError && (
         <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-sm">
           <div className="flex items-center justify-between">
@@ -490,7 +482,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
           <span className="text-yellow-700">No tasks found. Add tasks to start scheduling.</span>
         </div>
       )}
-      
+
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Calendar grid */}

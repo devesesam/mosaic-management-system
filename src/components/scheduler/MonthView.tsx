@@ -103,12 +103,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     return result;
   }, [calendarDays]);
 
-  // Fetch data when component mounts
-  useEffect(() => {
-    console.log('MonthView: Initial data load');
-    fetchTasks();
-  }, [fetchTasks]);
-
   // Show toast notifications for loading states
   useEffect(() => {
     if (tasksLoading) {
@@ -120,7 +114,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
 
   // Get unscheduled tasks - filter for read-only mode
   const unscheduledTasks = useMemo(() => {
-    const baseUnscheduled = tasks.filter(task => !task.start_date && !task.worker_id);
+    const baseUnscheduled = tasks.filter(task => !task.start_date || !task.worker_id);
 
     if (readOnly && currentWorker) {
       // In read-only mode, show tasks that are either:

@@ -38,7 +38,7 @@ function App() {
   } = useTeamStore();
 
   // Subscribe to real-time updates (replaces polling)
-  useRealtimeTasks();
+  useRealtimeTasks(currentWorker?.id, false);
   useRealtimeTeam();
 
   // Load data when component mounts
