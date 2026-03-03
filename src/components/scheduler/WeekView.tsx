@@ -44,6 +44,9 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     localStorage.setItem('tasksPaneCollapsed', String(newValue));
   };
 
+  // Get auth context first (needed for queries)
+  const { user, currentWorker } = useAuth();
+
   // React Query hooks for data access
   const {
     data: tasks = [],
@@ -68,8 +71,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   // Convert query errors to strings
   const tasksError = tasksQueryError?.message || null;
   const teamError = teamQueryError?.message || null;
-
-  const { user, currentWorker } = useAuth();
 
   // Get start and end of week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });

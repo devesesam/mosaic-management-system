@@ -32,27 +32,38 @@ const queryClient = new QueryClient({
 });
 ```
 
-### Real-time: Incremental Cache Updates
-The app uses **Supabase Realtime** with **incremental cache updates** instead of full refetch.
+### Real-time: Cache Invalidation vs Direct Updates
 
-**Before (O(n) - Bad):**
-```typescript
-// OLD - Full refetch on every change
-fetchTasks(); // Refetches ALL tasks from database
-```
+The app uses **Supabase Realtime** to sync changes across clients.
 
-**After (O(1) - Good):**
+**Two Patterns Available:**
+
+1. **Direct Cache Update (O(1))** - Best when query key is simple/fixed:
 ```typescript
-// NEW - Update only the affected item in cache
-queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-  if (!old) return [newTask];
-  return [newTask, ...old]; // Just prepend the new task
+// Team members use this - single query key, no filters
+queryClient.setQueryData<TeamMember[]>(teamKeys.list(), (old) => {
+  if (!old) return [newMember];
+  return [...old, newMember];
 });
 ```
 
+2. **Cache Invalidation (causes refetch)** - Required when queries have variable keys:
+```typescript
+// Tasks use this - queries can have workerId/isAdmin filters
+// We don't know which specific cache keys exist, so invalidate all
+queryClient.invalidateQueries({ queryKey: taskKeys.all });
+// This invalidates ALL queries starting with ['tasks']
+```
+
+**Why Tasks Use Invalidation (v0.3.1):**
+- `useTasksQuery(workerId, isAdmin)` creates different cache keys like `['tasks', { workerId: '123', isAdmin: false }]`
+- Real-time events don't tell us which workerId/isAdmin combinations to update
+- Using `setQueryData(taskKeys.all)` targets `['tasks']` which is a different key
+- Invalidation ensures ALL task queries get refreshed regardless of filters
+
 **Key Files:**
-- `src/hooks/useRealtimeTasks.ts` - Incremental task updates via cache
-- `src/hooks/useRealtimeTeam.ts` - Incremental team updates via cache
+- `src/hooks/useRealtimeTasks.ts` - Task updates via cache invalidation
+- `src/hooks/useRealtimeTeam.ts` - Team updates via direct cache update
 - `src/App.tsx` - Initializes realtime hooks
 
 **Usage:**
@@ -72,77 +83,41 @@ function App() {
 
 ### When to Add New Realtime Subscriptions
 
-If you add a new table that needs real-time sync, use **incremental cache updates**:
+Choose the right pattern based on your query structure:
+
+**Pattern 1: Direct Cache Update (Simple Query Keys)**
+Use when your query always uses the same cache key (no filters/parameters):
 
 ```typescript
-// src/hooks/useRealtimeCustomers.ts
-import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../api/supabaseClient';
-import { Customer } from '../types';
-import { customerKeys } from './useCustomers';
-import { logger } from '../utils/logger';
-
-export function useRealtimeCustomers() {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const isSubscribedRef = useRef(false);
-
-  useEffect(() => {
-    if (isSubscribedRef.current) return;
-    isSubscribedRef.current = true;
-
-    subscriptionRef.current = supabase
-      .channel('customers-realtime-changes')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'customers'
-      }, (payload) => {
-        logger.debug('useRealtimeCustomers: INSERT', payload.new);
-        const newCustomer = payload.new as Customer;
-
-        // O(1) incremental update
-        queryClient.setQueryData<Customer[]>(customerKeys.list(), (old) => {
-          if (!old) return [newCustomer];
-          if (old.some(c => c.id === newCustomer.id)) return old;
-          return [newCustomer, ...old];
-        });
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'customers'
-      }, (payload) => {
-        const updated = payload.new as Customer;
-        queryClient.setQueryData<Customer[]>(customerKeys.list(), (old) => {
-          if (!old) return old;
-          return old.map(c => c.id === updated.id ? updated : c);
-        });
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'customers'
-      }, (payload) => {
-        const deletedId = (payload.old as { id: string }).id;
-        queryClient.setQueryData<Customer[]>(customerKeys.list(), (old) => {
-          if (!old) return old;
-          return old.filter(c => c.id !== deletedId);
-        });
-      })
-      .subscribe();
-
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-      isSubscribedRef.current = false;
-    };
-  }, [queryClient]);
-}
+// Example: Team members - always uses teamKeys.list()
+.on('postgres_changes', { event: 'INSERT', ... }, (payload) => {
+  const newMember = payload.new as TeamMember;
+  queryClient.setQueryData<TeamMember[]>(teamKeys.list(), (old) => {
+    if (!old) return [newMember];
+    if (old.some(m => m.id === newMember.id)) return old;
+    return [...old, newMember];
+  });
+})
 ```
+
+**Pattern 2: Cache Invalidation (Variable Query Keys)**
+Use when queries have parameters that create different cache keys:
+
+```typescript
+// Example: Tasks - queries with workerId/isAdmin create different keys
+.on('postgres_changes', { event: 'INSERT', ... }, (payload) => {
+  logger.debug('INSERT event', payload.new);
+  // Invalidate ALL task queries regardless of their filter parameters
+  queryClient.invalidateQueries({ queryKey: taskKeys.all });
+})
+```
+
+**Decision Guide:**
+| Query Pattern | Cache Key Example | Use This Pattern |
+|--------------|-------------------|------------------|
+| `useDataQuery()` (no params) | `['data']` | Direct update |
+| `useDataQuery(id)` (single param) | `['data', { id }]` | Invalidation |
+| `useDataQuery(a, b)` (multi params) | `['data', { a, b }]` | Invalidation |
 
 ---
 

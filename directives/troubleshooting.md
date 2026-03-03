@@ -423,6 +423,59 @@ Check that `src/hooks/useTasks.ts` has proper `onSuccess` handlers.
 
 ---
 
+### Issue: "Calendar Error" After Login (Hook Ordering)
+
+**Symptom:** Error Boundary shows "Calendar Error" immediately after logging in
+
+**Cause:** React hooks called in wrong order - `useAuth()` called after `useTasksQuery()`, so `currentWorker` is undefined when used in the query.
+
+**Solution:**
+In calendar view components (`WeekView.tsx`, `MonthView.tsx`), ensure `useAuth()` is called BEFORE `useTasksQuery()`:
+
+```typescript
+// CORRECT - useAuth first
+const { user, currentWorker } = useAuth();
+const { data: tasks } = useTasksQuery(currentWorker?.id, false);
+
+// WRONG - useAuth after query
+const { data: tasks } = useTasksQuery(currentWorker?.id, false); // currentWorker is undefined!
+const { user, currentWorker } = useAuth();
+```
+
+**Files to check:**
+- `src/components/scheduler/WeekView.tsx`
+- `src/components/scheduler/MonthView.tsx`
+
+---
+
+### Issue: Real-time Updates Not Appearing (Cache Key Mismatch) - FIXED v0.3.1
+
+**Symptom:** Changes made by other users don't appear until manual refresh, even though real-time subscription is active.
+
+**Cause:** The `useRealtimeTasks` hook was using `setQueryData(taskKeys.all, ...)` which targets the cache key `['tasks']`. But `useTasksQuery()` uses `taskKeys.list(workerId, isAdmin)` which creates `['tasks', { workerId, isAdmin }]` - a different cache key.
+
+**Solution (Applied in v0.3.1):**
+Changed `useRealtimeTasks.ts` to use `invalidateQueries` instead of `setQueryData`:
+
+```typescript
+// OLD (buggy) - updates wrong cache key
+queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+  // This writes to ['tasks'] but queries use ['tasks', {...}]
+  return [newTask, ...old];
+});
+
+// NEW (fixed) - invalidates ALL task queries
+queryClient.invalidateQueries({ queryKey: taskKeys.all });
+// This invalidates any query starting with ['tasks'], triggering refetch
+```
+
+**Trade-off:** Using `invalidateQueries` triggers a refetch instead of direct cache update. This is slightly less efficient but ensures consistency regardless of which workerId/isAdmin filter is being used.
+
+**Files affected:**
+- `src/hooks/useRealtimeTasks.ts`
+
+---
+
 ## Migration Issues (v0.2.0 & v0.2.1)
 
 ### Issue: Month View White Screen Crash

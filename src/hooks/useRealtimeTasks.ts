@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../api/supabaseClient';
-import { Task } from '../types';
 import { taskKeys } from './useTasks';
 import { logger } from '../utils/logger';
 
@@ -33,15 +32,10 @@ export function useRealtimeTasks() {
         },
         (payload) => {
           logger.debug('useRealtimeTasks: INSERT event', payload.new);
-          const newTask = payload.new as Task;
-
-          // Add to cache if not already present
-          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-            if (!old) return [newTask];
-            // Avoid duplicates (might be our own optimistic update)
-            if (old.some((t) => t.id === newTask.id)) return old;
-            return [newTask, ...old];
-          });
+          // Invalidate all task queries to refetch with new data
+          // We use invalidateQueries because tasks can be filtered by workerId/isAdmin,
+          // and we don't know which cache keys to update specifically
+          queryClient.invalidateQueries({ queryKey: taskKeys.all });
         }
       )
       .on(
@@ -53,13 +47,8 @@ export function useRealtimeTasks() {
         },
         (payload) => {
           logger.debug('useRealtimeTasks: UPDATE event', payload.new);
-          const updatedTask = payload.new as Task;
-
-          // Update in cache
-          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-            if (!old) return old;
-            return old.map((t) => (t.id === updatedTask.id ? updatedTask : t));
-          });
+          // Invalidate all task queries to refetch with updated data
+          queryClient.invalidateQueries({ queryKey: taskKeys.all });
         }
       )
       .on(
@@ -71,13 +60,8 @@ export function useRealtimeTasks() {
         },
         (payload) => {
           logger.debug('useRealtimeTasks: DELETE event', payload.old);
-          const deletedId = (payload.old as { id: string }).id;
-
-          // Remove from cache
-          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-            if (!old) return old;
-            return old.filter((t) => t.id !== deletedId);
-          });
+          // Invalidate all task queries to refetch without deleted task
+          queryClient.invalidateQueries({ queryKey: taskKeys.all });
         }
       )
       .subscribe((status) => {

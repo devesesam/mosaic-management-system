@@ -3,16 +3,16 @@
 ## Overview
 The **Mosaic Scheduler** is a React + Supabase web application for managing tasks, team member schedules, and customer details. It features a drag-and-drop calendar interface, role-based access control (Admin vs. Team Member), and strict data security via RLS and Edge Functions.
 
-**Current Version:** 0.3.0 (2026-03-03)
+**Current Version:** 0.3.1 (2026-03-03)
 
-## ⚠️ Critical Architecture Notes (v0.3.0)
+## ⚠️ Critical Architecture Notes (v0.3.x)
 
 ### Data Fetching: React Query (NOT Zustand)
 As of v0.3.0, data fetching uses **React Query (TanStack Query)** instead of Zustand stores:
 - Use `useTasksQuery()`, `useAddTask()`, `useUpdateTask()`, `useDeleteTask()` from `src/hooks/useTasks.ts`
 - Use `useTeamMembersQuery()`, `useAddTeamMember()` etc. from `src/hooks/useTeamMembers.ts`
 - **Zustand stores have been DELETED** - do NOT recreate them
-- Real-time updates use incremental cache updates (O(1)) via `useRealtimeTasks.ts` and `useRealtimeTeam.ts`
+- Real-time updates: Tasks use `invalidateQueries()`, Team uses direct cache updates (see v0.3.1 fix)
 
 ### Form Validation: Zod Schemas
 - Use Zod schemas from `src/schemas/task.ts` for type-safe validation

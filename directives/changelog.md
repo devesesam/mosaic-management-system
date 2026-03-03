@@ -4,6 +4,24 @@ All notable changes to the Mosaic Scheduler project are documented in this file.
 
 ---
 
+## [0.3.1] - 2026-03-03 - Real-time Cache Key Fix
+
+### Fixed
+
+#### Cache Key Mismatch in Real-time Updates
+**Issue:** Real-time updates from other users were not appearing in the UI until manual refresh.
+
+**Root Cause:** `useRealtimeTasks.ts` was using `setQueryData(taskKeys.all, ...)` which writes to cache key `['tasks']`. But `useTasksQuery(workerId, isAdmin)` queries with `taskKeys.list(workerId, isAdmin)` creating cache keys like `['tasks', { workerId: '123', isAdmin: false }]`. These are different keys in React Query.
+
+**Solution:** Changed `useRealtimeTasks.ts` to use `invalidateQueries({ queryKey: taskKeys.all })` which invalidates ALL queries starting with `['tasks']`, ensuring all task queries get refreshed regardless of filter parameters.
+
+**Trade-off:** Using invalidation triggers a refetch instead of direct cache update. This is slightly less efficient but ensures correctness. Team members still use direct cache updates since they have a fixed query key.
+
+**Files changed:**
+- `src/hooks/useRealtimeTasks.ts`
+
+---
+
 ## [0.3.0] - 2026-03-03 - Modern Architecture Overhaul
 
 ### Overview
@@ -77,20 +95,20 @@ export const taskFormSchema = z.object({
 
 ### Changed
 
-#### Real-time Updates Now Incremental
-Before (v0.2.x): Full refetch on any change - O(n)
+#### Real-time Updates Now Use React Query Cache
+Before (v0.2.x): Full refetch on any change via Zustand store
 ```typescript
 // OLD - Bad performance
-fetchTasks(); // Refetch everything
+fetchTasks(); // Refetch everything via store
 ```
 
-After (v0.3.0): Incremental cache updates - O(1)
+After (v0.3.0+): React Query cache integration
 ```typescript
-// NEW - Optimal performance
-queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
-  if (!old) return [newTask];
-  return [newTask, ...old];
-});
+// Team members: Direct cache update (fixed query key)
+queryClient.setQueryData<TeamMember[]>(teamKeys.list(), (old) => [...]);
+
+// Tasks: Cache invalidation (variable query keys - see v0.3.1)
+queryClient.invalidateQueries({ queryKey: taskKeys.all });
 ```
 
 #### Component Migration

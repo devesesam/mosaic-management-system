@@ -49,6 +49,9 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     localStorage.setItem('tasksPaneCollapsed', String(newValue));
   };
 
+  // Get auth context first (needed for queries)
+  const { user, currentWorker } = useAuth();
+
   // React Query hooks for data access
   const {
     data: tasks = [],
@@ -63,8 +66,6 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
 
   // Convert query error to string
   const tasksError = tasksQueryError?.message || null;
-
-  const { user, currentWorker } = useAuth();
 
   // Debug log the tasks data
   useEffect(() => {
