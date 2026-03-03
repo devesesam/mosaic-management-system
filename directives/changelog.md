@@ -4,6 +4,29 @@ All notable changes to the Mosaic Scheduler project are documented in this file.
 
 ---
 
+## [0.2.1] - 2026-03-03 - Post-Migration Bug Fixes
+
+### Overview
+Addressed critical bugs following the `jobs` to `tasks` database migration, specifically unhandled React runtime errors and edge function deployment issues.
+
+### Fixed
+
+#### Month View White Screen Crash
+**Problem:** Clicking the Month View or opening the Team manage modals caused a white screen crash.
+**Root Cause:** The `MonthView.tsx` and `TeamManageModal.tsx` components were missed during the `jobs` to `tasks` refactoring. They still attempted to use the deprecated `useJobsStore` and `Job` types.
+**Solution:** Refactored these components to use `useTasksStore` and `Task` types.
+
+#### Error Loading Data on App Load
+**Problem:** The app crashed on load with "Error Loading Data".
+**Root Cause:** The frontend was attempting to fetch data using Edge Functions (`get-tasks` etc.) that had not yet been fully deployed to the remote Supabase project, causing HTTP 404/500 errors.
+**Solution:** Explicitly deployed all new `*-task` edge functions to production (`--no-verify-jwt`), verified their 200 HTTP response via a custom Node script, and updated the `App.tsx` boundary to correctly parse string errors instead of objects.
+
+### Removed
+- **Deleted Obsolete Components:** `DayJobsModal.tsx`, `DraggableJob.tsx`, `GlobalJobSearch.tsx`, `WorkerManageModal.tsx`
+- **Deleted Obsolete Store:** `jobsStore.ts`
+
+---
+
 ## [0.2.0] - 2026-03-03 - Major Refactoring: Jobs to Tasks
 
 ### Overview

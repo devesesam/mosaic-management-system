@@ -124,9 +124,12 @@ interface Task {
 ```
 
 ### Current Status
-- **Version**: 0.2.0
+- **Version**: 0.2.1
 - **Last Updated**: 2026-03-03
 - **Recent Improvements**:
+  - Replaced legacy `jobs` store with `tasks` in `MonthView.tsx` and Team management modals.
+  - Resolved `App.tsx` "Error Loading Data" crashes by deploying unauthenticated Edge Functions.
+  - Deleted obsolete legacy components (`DraggableJob.tsx`, `DayJobsModal.tsx`, `GlobalJobSearch.tsx`, `WorkerManageModal.tsx`).
   - Major refactoring: Renamed "job" to "task" throughout codebase
   - Simplified task form (removed roofing-specific fields)
   - New edge functions: add-task, get-tasks, update-task, delete-task, get-tasks-by-worker

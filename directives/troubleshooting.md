@@ -325,7 +325,18 @@ Check `CalendarGrid.tsx`:
 
 ---
 
-## Migration Issues (v0.2.0)
+## Migration Issues (v0.2.0 & v0.2.1)
+
+### Issue: Month View White Screen Crash
+
+**Symptom:** Clicking the Month View or opening the Team manage modals causes a complete React app crash (white screen).
+
+**Cause:** These components were missed during the `jobs` to `tasks` migration and are still attempting to use the deprecated `useJobsStore` and `Job` types.
+
+**Solution:**
+Refactor the components to use `useTasksStore` and `Task` types. Update all variable casing (e.g., `jobsError` -> `tasksError`). Additionally, delete any leftover `*Job*.tsx` components to prevent them from being imported by accident.
+
+---
 
 ### Issue: "Table 'jobs' does not exist" Error
 
@@ -344,6 +355,24 @@ Check `CalendarGrid.tsx`:
    ```
 
 2. Update frontend to use new endpoints (check `tasksStore.ts`)
+
+---
+
+### Issue: App Shows "Error Loading Data" After Migration
+
+**Symptom:** The main app viewport immediately shows a "Error Loading Data" banner and prompts a refresh, crashing the schedule view.
+
+**Cause:** The frontend `App.tsx` boundary is catching a fetch failure from the new `tasksStore`. The edge functions like `get-tasks` were not properly deployed to Supabase after the database migration, returning 404s.
+
+**Solution:**
+Deploy the new edge functions manually, bypassing JWT if executing locally via a test environment:
+```bash
+supabase functions deploy get-tasks --no-verify-jwt
+supabase functions deploy add-task --no-verify-jwt
+supabase functions deploy update-task --no-verify-jwt
+supabase functions deploy delete-task --no-verify-jwt
+supabase functions deploy get-tasks-by-worker --no-verify-jwt
+```
 
 ---
 
