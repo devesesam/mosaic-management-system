@@ -1,15 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from '../api/supabaseClient';
-import { useWorkerStore } from '../store/workersStore';
-import { Worker } from '../types';
+import { useTeamStore } from '../store/teamStore';
+import { TeamMember } from '../types';
 import toast from 'react-hot-toast';
 import { logger } from '../utils/logger';
 
 interface AuthContextProps {
   session: Session | null;
   user: User | null;
-  currentWorker: Worker | null;
+  currentTeamMember: TeamMember | null;
+  // Backwards compatibility alias
+  currentWorker: TeamMember | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -23,69 +25,23 @@ interface AuthContextProps {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-// List of email addresses that have edit permissions (loaded from environment)
-const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || '')
-  .split(',')
-  .map((e: string) => e.trim().toLowerCase())
-  .filter(Boolean);
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
+  const [currentTeamMember, setCurrentTeamMember] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isEditable, setIsEditable] = useState(false);
 
-  // Check if user is an admin by querying the database
-  const checkAdminStatus = async (email: string) => {
-    try {
-      // First check environment variable as fallback/override
-      if (ADMIN_EMAILS.includes(email.toLowerCase())) {
-        logger.debug('Auth: User is admin (via env var)');
-        setIsEditable(true);
-        return;
-      }
-
-      // Then check database
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('email')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (error) {
-        logger.error('Auth: Error checking admin status:', error);
-        setIsEditable(false);
-        return;
-      }
-
-      const isAdmin = !!data;
-      setIsEditable(isAdmin);
-      logger.debug('Auth: Admin status check:', { email, isAdmin });
-
-    } catch (err) {
-      logger.error('Auth: Unexpected error checking admin status:', err);
-      setIsEditable(false);
-    }
-  };
-
-  // Update isEditable when user changes
-  useEffect(() => {
-    if (user?.email) {
-      checkAdminStatus(user.email);
-    } else {
-      setIsEditable(false);
-    }
-  }, [user]);
+  // All authenticated users have full edit access
+  const isEditable = !!user;
 
   // Reset all state and clear storage
   const handleSignOut = async () => {
     try {
       setSession(null);
       setUser(null);
-      setCurrentWorker(null);
+      setCurrentTeamMember(null);
       setError(null);
       setAuthError(null);
       setIsEditable(false);
@@ -113,32 +69,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setSession(data.session);
           setUser(data.session.user);
 
-          // Helper to link worker profile
+          // Try to link team member profile
           if (data.session.user.email) {
             const email = data.session.user.email.toLowerCase();
+            try {
+              await useTeamStore.getState().fetchTeamMembers();
+              const teamMembers = useTeamStore.getState().teamMembers;
+              const member = teamMembers.find(m => m.email?.toLowerCase() === email);
 
-            // Skip for admins (they don't need a worker profile to function)
-            if (ADMIN_EMAILS.includes(email)) {
-              logger.debug('AuthProvider: Admin login, skipping worker profile check');
-            } else {
-              // For workers: Try to find their existing profile via Store (Edge Function)
-              try {
-                // Note: We use the store's fetch logic which runs via Edge Function (system role)
-                // This allows us to find the profile even if RLS blocks direct read
-                await useWorkerStore.getState().fetchWorkers();
-                const workers = useWorkerStore.getState().workers;
-                const worker = workers.find(w => w.email?.toLowerCase() === email);
-
-                if (worker) {
-                  logger.debug('AuthProvider: Linked to worker profile:', worker.id);
-                  setCurrentWorker(worker);
-                } else {
-                  logger.warn('AuthProvider: No worker profile found for user:', email);
-                  setAuthError('Account not linked to a worker profile. Please contact an admin.');
-                }
-              } catch (err) {
-                logger.error('AuthProvider: Failed to link worker profile:', err);
+              if (member) {
+                logger.debug('AuthProvider: Linked to team member profile:', member.id);
+                setCurrentTeamMember(member);
+              } else {
+                logger.debug('AuthProvider: No team member profile found for user:', email);
               }
+            } catch (err) {
+              logger.error('AuthProvider: Failed to link team member profile:', err);
             }
           }
         }
@@ -161,26 +107,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         setSession(session);
 
-        // Handle worker profile for non-admin users
+        // Try to link team member profile
         const email = session.user.email?.toLowerCase();
         if (email) {
-          if (!ADMIN_EMAILS.includes(email)) {
-            // For workers: Try to find their existing profile via Store
-            try {
-              await useWorkerStore.getState().fetchWorkers();
-              const workers = useWorkerStore.getState().workers;
-              const worker = workers.find(w => w.email?.toLowerCase() === email);
+          try {
+            await useTeamStore.getState().fetchTeamMembers();
+            const teamMembers = useTeamStore.getState().teamMembers;
+            const member = teamMembers.find(m => m.email?.toLowerCase() === email);
 
-              if (worker) {
-                logger.debug('AuthState: Linked to worker profile:', worker.id);
-                setCurrentWorker(worker);
-              } else {
-                logger.warn('AuthState: No worker profile found for user:', email);
-                setAuthError('Account not linked to a worker profile. Please contact an admin.');
-              }
-            } catch (err) {
-              logger.error('AuthState: Failed to link worker profile:', err);
+            if (member) {
+              logger.debug('AuthState: Linked to team member profile:', member.id);
+              setCurrentTeamMember(member);
+            } else {
+              logger.debug('AuthState: No team member profile found for user:', email);
             }
+          } catch (err) {
+            logger.error('AuthState: Failed to link team member profile:', err);
           }
         }
       }
@@ -260,7 +202,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = {
     session,
     user,
-    currentWorker,
+    currentTeamMember,
+    currentWorker: currentTeamMember, // Backwards compatibility alias
     loading,
     signIn,
     signUp,
