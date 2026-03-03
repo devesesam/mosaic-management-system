@@ -36,7 +36,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   const [isManageTeamOpen, setIsManageTeamOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
-  
+
   // Log team member data without full objects
   useEffect(() => {
     console.log('CalendarGrid: Team Members:', {
@@ -89,13 +89,13 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       {/* Header row with days - Increased z-index to stay above all content */}
       <div className="flex sticky top-0 z-30 bg-white">
         {/* Team Member column header - responsive width */}
-        <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-gray-100 flex items-center justify-between px-2 md:px-3">
+        <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-garlic flex items-center justify-between px-2 md:px-3">
           <div className="flex items-center space-x-2 flex-1">
             {isEditable ? (
               <select
                 value={selectedWorker}
                 onChange={(e) => setSelectedWorker(e.target.value)}
-                className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 max-w-[120px]"
+                className="text-sm border-gray-300 rounded-md shadow-sm focus:border-margaux focus:ring-margaux max-w-[120px]"
               >
                 <option value="all">All Team</option>
                 {teamMembers.map((member) => (
@@ -105,7 +105,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 ))}
               </select>
             ) : (
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-charcoal">
                 {displayedTeamMembers.length > 0 ? displayedTeamMembers[0].name : 'Team'}
               </span>
             )}
@@ -116,7 +116,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
               className={`p-1.5 rounded-full transition-colors ${
                 !isEditable
                   ? 'text-gray-400 cursor-not-allowed'
-                  : 'hover:bg-gray-200 text-gray-600'
+                  : 'hover:bg-vanilla text-charcoal'
               }`}
               title={!isEditable ? 'Read-only mode' : 'Manage Team'}
               disabled={!isEditable}
@@ -126,9 +126,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             <button
               onClick={onNewWorker}
               className={`p-1.5 rounded-full transition-colors ${
-                !isEditable 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'hover:bg-gray-200 text-gray-600'
+                !isEditable
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'hover:bg-vanilla text-charcoal'
               }`}
               title={!isEditable ? 'Read-only mode' : 'Add New Worker'}
               disabled={!isEditable}
@@ -137,13 +137,13 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             </button>
           </div>
         </div>
-        
+
         {/* Day headers - responsive width calculation */}
         {days.map(day => (
           <div
             key={day.toString()}
             className={`flex-1 min-w-0 h-14 flex flex-col justify-center border-r border-b border-gray-200 ${
-              isToday(day) ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-800'
+              isToday(day) ? 'bg-margaux/20 text-blueberry' : 'bg-garlic text-charcoal'
             }`}
           >
             <div className="text-xs sm:text-sm text-center truncate px-1">{format(day, 'EEE')}</div>
@@ -259,7 +259,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
   // Get all jobs for this worker across all days
   const allWorkerJobs = React.useMemo(() => {
     const jobsMap = new Map<string, Job>();
-    
+
     // Collect unique jobs across all days
     days.forEach(day => {
       const dayJobs = getWorkerDayJobs(workerId, day);
@@ -267,7 +267,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
         jobsMap.set(job.id, job);
       });
     });
-    
+
     return Array.from(jobsMap.values());
   }, [workerId, days, getWorkerDayJobs]);
 
@@ -280,7 +280,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
       span: number;
       stackIndex: number;
     }> = [];
-    
+
     // First, sort jobs by start date to ensure consistent stacking order
     const sortedJobs = [...allWorkerJobs].sort((a, b) => {
       if (!a.start_date && !b.start_date) return 0;
@@ -288,25 +288,25 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
       if (!b.start_date) return -1;
       return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
     });
-    
+
     // Track which jobs occupy which stack positions for each day
     const dayStacks: { [key: string]: Array<{
       job: Job;
       span: number;
       stackIndex: number;
     }> } = {};
-    
+
     sortedJobs.forEach(job => {
       if (!job.start_date) return;
-      
+
       try {
         const jobStartDate = parseISO(job.start_date);
         const jobEndDate = job.end_date ? parseISO(job.end_date) : jobStartDate;
-        
+
         // Find which day this job should render on
         let renderDay: Date | null = null;
         let renderDayIndex = -1;
-        
+
         // Check if job starts within this week
         const startDayIndex = days.findIndex(day => isSameDay(day, jobStartDate));
         if (startDayIndex >= 0) {
@@ -317,12 +317,12 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
           renderDay = days[0];
           renderDayIndex = 0;
         }
-        
+
         if (renderDay && renderDayIndex >= 0) {
           // Calculate span
           const endDayIndex = days.findIndex(day => isSameDay(day, jobEndDate));
           let span: number;
-          
+
           if (endDayIndex >= 0) {
             // Job ends within this week
             span = endDayIndex - renderDayIndex + 1;
@@ -333,30 +333,30 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
             // Single day job
             span = 1;
           }
-          
+
           // Find the lowest available stack position that doesn't conflict with existing jobs
           const dayKey = format(renderDay, 'yyyy-MM-dd');
           if (!dayStacks[dayKey]) dayStacks[dayKey] = [];
-          
+
           // Find available stack position by checking for conflicts across the span
           let stackIndex = 0;
           let foundSlot = false;
-          
+
           while (!foundSlot) {
             foundSlot = true;
-            
+
             // Check if this stack position conflicts with any existing job across the span
             for (let dayOffset = 0; dayOffset < span; dayOffset++) {
               const checkDayIndex = renderDayIndex + dayOffset;
               if (checkDayIndex >= days.length) break;
-              
+
               const checkDayKey = format(days[checkDayIndex], 'yyyy-MM-dd');
               if (!dayStacks[checkDayKey]) dayStacks[checkDayKey] = [];
-              
-              const conflictingJob = dayStacks[checkDayKey].find(existingJob => 
+
+              const conflictingJob = dayStacks[checkDayKey].find(existingJob =>
                 existingJob.stackIndex === stackIndex
               );
-              
+
               if (conflictingJob) {
                 foundSlot = false;
                 stackIndex++;
@@ -364,22 +364,22 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
               }
             }
           }
-          
+
           // Reserve this stack position across all days in the span
           for (let dayOffset = 0; dayOffset < span; dayOffset++) {
             const reserveDayIndex = renderDayIndex + dayOffset;
             if (reserveDayIndex >= days.length) break;
-            
+
             const reserveDayKey = format(days[reserveDayIndex], 'yyyy-MM-dd');
             if (!dayStacks[reserveDayKey]) dayStacks[reserveDayKey] = [];
-            
+
             dayStacks[reserveDayKey].push({
               job,
               span,
               stackIndex
             });
           }
-          
+
           data.push({
             job,
             renderDay,
@@ -392,7 +392,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
         console.error('Error processing job dates:', error, job);
       }
     });
-    
+
     return data;
   }, [allWorkerJobs, days]);
 
@@ -411,7 +411,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
 
   return (
     <div className="flex border-b border-gray-200" style={{ minHeight: `${rowHeight}px` }}>
-      <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 p-2 md:p-3 border-r border-gray-200 bg-gray-50 font-medium text-gray-700 text-xs sm:text-sm md:text-base truncate">
+      <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 p-2 md:p-3 border-r border-gray-200 bg-vanilla font-medium text-charcoal text-xs sm:text-sm md:text-base truncate">
         {workerName}
       </div>
       {days.map((day, dayIndex) => (
@@ -481,7 +481,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       data-date={format(day, 'yyyy-MM-dd')}
       className={`
         flex-1 min-w-0 border-r border-gray-200 relative
-        ${isOver && !readOnly ? 'bg-blue-50' : isToday(day) ? 'bg-blue-50/30' : 'bg-white'}
+        ${isOver && !readOnly ? 'bg-sorbet/30' : isToday(day) ? 'bg-margaux/10' : 'bg-white'}
         ${readOnly ? 'cursor-default' : ''}
       `}
       style={{ height: `${rowHeight}px` }}
@@ -490,14 +490,14 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
         {/* Render jobs that should appear on this day */}
         {renderingData.map(({ job, span, stackIndex }) => {
           // Check if this is a secondary assignment
-          const isSecondaryAssignment = workerId !== null && 
+          const isSecondaryAssignment = workerId !== null &&
                          job.worker_id !== workerId &&
                          job.secondary_worker_ids?.includes(workerId);
-          
+
           const cellWidth = 100 / 7; // Each cell is 1/7th of the container
           const spanWidth = cellWidth * span;
           const jobHeight = 72;
-          
+
           return (
             <div
               key={job.id}

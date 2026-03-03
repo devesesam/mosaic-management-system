@@ -89,7 +89,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
         {/* Fixed header */}
         <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
           <div className="flex items-center space-x-2">
-            <h2 className="text-xl font-semibold text-gray-800">
+            <h2 className="text-xl font-bogart font-medium text-charcoal">
               Manage Team
             </h2>
             {readOnly && (
@@ -134,7 +134,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         placeholder="Team member name"
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-margaux focus:border-margaux"
                         autoFocus
                       />
                       <input
@@ -142,7 +142,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
                         value={editEmail}
                         onChange={(e) => setEditEmail(e.target.value)}
                         placeholder="Email (optional)"
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-margaux focus:border-margaux"
                       />
                     </div>
                   ) : (
@@ -183,7 +183,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
                           disabled={isLoading || readOnly}
                           className={`p-2 transition-colors ${readOnly
                             ? 'text-gray-400 cursor-not-allowed'
-                            : 'text-indigo-600 hover:text-indigo-700'
+                            : 'text-margaux hover:text-blueberry'
                             } disabled:opacity-50`}
                           title={readOnly ? 'Read-only mode' : 'Edit Team Member'}
                         >
@@ -241,7 +241,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
                   setSelectedMember(null);
                   setAssignedJobsCount(0);
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-margaux"
               >
                 Cancel
               </button>

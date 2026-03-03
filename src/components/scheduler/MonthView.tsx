@@ -368,7 +368,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
           <div className="flex-shrink-0">
             <button
               onClick={goToToday}
-              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap"
+              className="text-sm text-margaux hover:text-blueberry font-medium whitespace-nowrap"
             >
               Today
             </button>
@@ -416,7 +416,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
             {/* Weekday headers - fixed position */}
             <div className="grid grid-cols-7 gap-px bg-gray-200 flex-shrink-0 sticky top-0 z-10">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                <div key={day} className="text-center text-xs font-medium text-gray-700 py-2 bg-gray-100">
+                <div key={day} className="text-center text-xs font-medium text-charcoal py-2 bg-garlic">
                   {day}
                 </div>
               ))}
@@ -566,13 +566,13 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   };
 
   return (
-    <div 
+    <div
       ref={drop}
       className={`
         flex flex-col relative border-b border-r border-gray-200
-        ${!isInCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
-        ${isToday(day) ? 'bg-blue-50' : ''}
-        ${isOver && !readOnly ? 'bg-blue-100' : ''}
+        ${!isInCurrentMonth ? 'bg-vanilla text-gray-400' : 'bg-white'}
+        ${isToday(day) ? 'bg-margaux/10' : ''}
+        ${isOver && !readOnly ? 'bg-sorbet/30' : ''}
         ${readOnly ? 'cursor-default' : ''}
       `}
     >

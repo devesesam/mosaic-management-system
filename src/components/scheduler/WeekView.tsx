@@ -420,7 +420,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         <div className="flex-shrink-0">
           <button
             onClick={goToToday}
-            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium whitespace-nowrap"
+            className="text-sm text-margaux hover:text-blueberry font-medium whitespace-nowrap"
           >
             Today
           </button>

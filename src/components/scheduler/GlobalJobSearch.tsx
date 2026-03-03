@@ -101,13 +101,13 @@ const GlobalJobSearch: React.FC<GlobalJobSearchProps> = ({ jobs, onJobSelect }) 
           }}
           onFocus={() => searchTerm && setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          className="w-full pl-8 sm:pl-10 pr-8 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          className="w-full pl-8 sm:pl-10 pr-8 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-margaux focus:border-margaux"
         />
         <Search className="absolute left-2 sm:left-3 top-2 sm:top-2.5 h-4 w-4 text-gray-400" />
         {searchTerm && (
           <button
             onClick={handleClear}
-            className="absolute right-2 sm:right-3 top-2 sm:top-2.5 text-gray-400 hover:text-gray-600"
+            className="absolute right-2 sm:right-3 top-2 sm:top-2.5 text-gray-400 hover:text-charcoal"
           >
             <X className="h-4 w-4" />
           </button>
@@ -124,11 +124,11 @@ const GlobalJobSearch: React.FC<GlobalJobSearchProps> = ({ jobs, onJobSelect }) 
             <button
               key={job.id}
               onClick={() => handleSelect(job)}
-              className={`w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                index === selectedIndex ? 'bg-indigo-50' : ''
+              className={`w-full px-4 py-3 text-left hover:bg-vanilla border-b border-gray-100 last:border-b-0 ${
+                index === selectedIndex ? 'bg-margaux/10' : ''
               }`}
             >
-              <div className="font-medium text-gray-900 text-sm truncate">
+              <div className="font-medium text-charcoal text-sm truncate">
                 {job.address}
               </div>
               <div className="flex items-center gap-2 mt-1">
@@ -143,7 +143,7 @@ const GlobalJobSearch: React.FC<GlobalJobSearchProps> = ({ jobs, onJobSelect }) 
                   </span>
                 )}
                 {job.status && (
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-vanilla text-charcoal">
                     {job.status}
                   </span>
                 )}

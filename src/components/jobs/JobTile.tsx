@@ -20,7 +20,7 @@ const JobTile: React.FC<JobTileProps> = ({
 }) => {
   // Get the display color based on status
   const getTileColor = () => {
-    return job.status === JobStatus.Closed ? '#94a3b8' : (job.tile_color || '#3b82f6');
+    return job.status === JobStatus.Closed ? '#94a3b8' : (job.tile_color || '#345981');
   };
   
   return (

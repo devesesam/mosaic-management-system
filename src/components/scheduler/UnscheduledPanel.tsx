@@ -48,12 +48,12 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
       // In read-only mode, show jobs that are either:
       // 1. Completely unassigned (no worker, no date)
       // 2. Assigned to current worker but no date
-      return jobs.filter(job => 
-        (!job.start_date && !job.worker_id) || 
+      return jobs.filter(job =>
+        (!job.start_date && !job.worker_id) ||
         (!job.start_date && job.worker_id === currentWorker.id)
       );
     }
-    
+
     // For admin users, show all unscheduled jobs
     return baseUnscheduledJobs;
   }, [jobs, readOnly, currentWorker, baseUnscheduledJobs]);
@@ -67,12 +67,12 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
   // Filter jobs based on search term and selected color
   const filteredJobs = useMemo(() => {
     return unscheduledJobs.filter(job => {
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch = searchTerm === '' ||
         job.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.address.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       const matchesColor = !selectedColor || job.tile_color === selectedColor;
-      
+
       return matchesSearch && matchesColor;
     });
   }, [unscheduledJobs, searchTerm, selectedColor]);
@@ -85,17 +85,17 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
     filteredUnscheduled: unscheduledJobs.length,
     finalFiltered: filteredJobs.length
   });
-  
+
   // Collapsed state - show just a toggle button
   if (isCollapsed) {
     return (
-      <div className="hidden md:flex border-l border-gray-200 bg-gray-50 flex-col items-center py-2">
+      <div className="hidden md:flex border-l border-gray-200 bg-vanilla flex-col items-center py-2">
         <button
           onClick={onToggleCollapse}
-          className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+          className="p-2 rounded-full hover:bg-garlic transition-colors"
           title="Show Jobs to Schedule"
         >
-          <ChevronLeft className="h-5 w-5 text-gray-600" />
+          <ChevronLeft className="h-5 w-5 text-charcoal" />
         </button>
         <div className="mt-2 writing-mode-vertical text-xs text-gray-500 font-medium" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
           Jobs ({filteredJobs.length})
@@ -105,16 +105,16 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
   }
 
   return (
-    <div className="hidden md:flex w-[200px] min-w-[200px] border-l border-gray-200 bg-gray-50 flex-col">
-      <div className="p-3 font-semibold text-gray-800 border-b border-gray-200 bg-gray-100 flex items-center justify-between">
+    <div className="hidden md:flex w-[200px] min-w-[200px] border-l border-gray-200 bg-vanilla flex-col">
+      <div className="p-3 font-semibold text-charcoal border-b border-gray-200 bg-garlic flex items-center justify-between">
         <span>Jobs to Schedule ({filteredJobs.length})</span>
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="p-1 rounded hover:bg-gray-200 transition-colors"
+            className="p-1 rounded hover:bg-vanilla transition-colors"
             title="Hide Jobs to Schedule"
           >
-            <ChevronRight className="h-4 w-4 text-gray-600" />
+            <ChevronRight className="h-4 w-4 text-charcoal" />
           </button>
         )}
       </div>
@@ -129,7 +129,7 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             disabled={readOnly}
-            className={`w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${
+            className={`w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-margaux focus:border-margaux ${
               readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
             }`}
           />
@@ -137,7 +137,7 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
           {searchTerm && !readOnly && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-charcoal"
             >
               <X className="h-4 w-4" />
             </button>
@@ -147,7 +147,7 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
         {/* Color filter */}
         {uniqueColors.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-charcoal mb-1">
               Filter by color
             </label>
             <div className="flex flex-wrap gap-1">
@@ -157,8 +157,8 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
                   onClick={() => !readOnly && setSelectedColor(selectedColor === color ? null : color)}
                   disabled={readOnly}
                   className={`w-5 h-5 rounded-full transition-transform ${
-                    readOnly 
-                      ? 'cursor-not-allowed opacity-50' 
+                    readOnly
+                      ? 'cursor-not-allowed opacity-50'
                       : 'hover:scale-110 cursor-pointer'
                   } ${
                     selectedColor === color ? 'ring-2 ring-offset-1 ring-gray-400' : ''
@@ -173,9 +173,9 @@ const UnscheduledPanel: React.FC<UnscheduledPanelProps> = ({
       </div>
 
       {/* Jobs list */}
-      <div 
+      <div
         ref={drop}
-        className={`flex-1 p-2 overflow-y-auto ${isOver && !readOnly ? 'bg-blue-50' : ''}`}
+        className={`flex-1 p-2 overflow-y-auto ${isOver && !readOnly ? 'bg-sorbet/30' : ''}`}
       >
         {filteredJobs.length === 0 ? (
           <div className="p-3 text-sm text-gray-500 italic">

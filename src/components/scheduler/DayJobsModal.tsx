@@ -37,7 +37,7 @@ const DayJobsModal: React.FC<DayJobsModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
         <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
+          <h2 className="text-xl font-bogart font-medium text-charcoal">
             Jobs for {format(date, 'MMMM d, yyyy')}
           </h2>
           <button 
