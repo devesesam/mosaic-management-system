@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../api/supabaseClient';
+import { Task } from '../types';
 import { taskKeys } from './useTasks';
 import { logger } from '../utils/logger';
 
 /**
  * Hook that subscribes to real-time changes on the tasks table.
- * Uses incremental updates via React Query cache instead of full refetch.
+ * Uses instant O(1) cache updates for immediate UI response.
  */
 export function useRealtimeTasks() {
   const queryClient = useQueryClient();
@@ -32,10 +33,15 @@ export function useRealtimeTasks() {
         },
         (payload) => {
           logger.debug('useRealtimeTasks: INSERT event', payload.new);
-          // Invalidate all task queries to refetch with new data
-          // We use invalidateQueries because tasks can be filtered by workerId/isAdmin,
-          // and we don't know which cache keys to update specifically
-          queryClient.invalidateQueries({ queryKey: taskKeys.all });
+          const newTask = payload.new as Task;
+
+          // Instantly add to cache
+          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+            if (!old) return [newTask];
+            // Avoid duplicates (might be our own optimistic update)
+            if (old.some((t) => t.id === newTask.id)) return old;
+            return [newTask, ...old];
+          });
         }
       )
       .on(
@@ -47,8 +53,13 @@ export function useRealtimeTasks() {
         },
         (payload) => {
           logger.debug('useRealtimeTasks: UPDATE event', payload.new);
-          // Invalidate all task queries to refetch with updated data
-          queryClient.invalidateQueries({ queryKey: taskKeys.all });
+          const updatedTask = payload.new as Task;
+
+          // Instantly update in cache
+          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+            if (!old) return old;
+            return old.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+          });
         }
       )
       .on(
@@ -60,8 +71,13 @@ export function useRealtimeTasks() {
         },
         (payload) => {
           logger.debug('useRealtimeTasks: DELETE event', payload.old);
-          // Invalidate all task queries to refetch without deleted task
-          queryClient.invalidateQueries({ queryKey: taskKeys.all });
+          const deletedId = (payload.old as { id: string }).id;
+
+          // Instantly remove from cache
+          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+            if (!old) return old;
+            return old.filter((t) => t.id !== deletedId);
+          });
         }
       )
       .subscribe((status) => {
