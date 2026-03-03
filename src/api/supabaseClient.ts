@@ -19,9 +19,9 @@ console.log('Initializing Supabase client with URL:', supabaseUrl);
 // Create and export the Supabase client with optimal settings for this use case
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
   },
   global: {
     headers: {

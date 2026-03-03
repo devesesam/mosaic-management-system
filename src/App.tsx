@@ -15,6 +15,7 @@ import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 import { Task } from './types';
 import { logger } from './utils/logger';
+import ErrorBoundary from './components/layout/ErrorBoundary';
 
 function App() {
   const { user, authError, currentWorker, signOut, isEditable } = useAuth();
@@ -203,19 +204,29 @@ function App() {
         )}
 
         <main className="flex-1 overflow-hidden relative">
-          {activeView === 'week' ? (
-            <WeekView readOnly={!isEditable} />
-          ) : (
-            <MonthView readOnly={!isEditable} />
-          )}
+          <ErrorBoundary
+            fallbackTitle="Calendar Error"
+            fallbackMessage="The calendar view encountered an error. Try refreshing the page."
+          >
+            {activeView === 'week' ? (
+              <WeekView readOnly={!isEditable} />
+            ) : (
+              <MonthView readOnly={!isEditable} />
+            )}
+          </ErrorBoundary>
         </main>
 
         {isTaskFormOpen && (
-          <TaskForm
-            onClose={() => setIsTaskFormOpen(false)}
-            onSubmit={handleSubmitTask}
-            readOnly={!isEditable}
-          />
+          <ErrorBoundary
+            fallbackTitle="Form Error"
+            fallbackMessage="The task form encountered an error."
+          >
+            <TaskForm
+              onClose={() => setIsTaskFormOpen(false)}
+              onSubmit={handleSubmitTask}
+              readOnly={!isEditable}
+            />
+          </ErrorBoundary>
         )}
 
         <Toaster

@@ -24,7 +24,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   selectedTask: null,
   isLoading: false,
 
-  fetchTasks: async () => {
+  fetchTasks: async (workerId?: string, isAdmin?: boolean) => {
     set({ loading: true, error: null, isLoading: true });
     logger.debug('tasksStore: Fetching tasks - using edge function');
 
@@ -32,10 +32,8 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const url = new URL(`${supabaseUrl}/functions/v1/get-tasks`);
 
-      // We will pass workerId and isAdmin if available in the app state
-      // This will be provided from AuthContext or App.tsx but we can also
-      // pull it from local storage or wait for it to be passed.
-      // For now we will update fetchTasks signature.
+      if (workerId) url.searchParams.append('workerId', workerId);
+      if (isAdmin) url.searchParams.append('isAdmin', String(isAdmin));
 
       logger.debug('tasksStore: Fetching tasks from edge function:', url.toString());
 
