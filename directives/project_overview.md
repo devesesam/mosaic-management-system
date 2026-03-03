@@ -9,12 +9,16 @@ The Mosaic Scheduler is a web-based application designed to manage scheduling an
 - **Frontend Framework**: React (v18) with TypeScript
 - **Build Tool**: Vite (v5)
 - **Styling**: TailwindCSS (v3), PostCSS
-- **State Management**: Zustand (lightweight stores)
+- **Data Fetching**: React Query / TanStack Query (v5) with caching & deduplication
+- **Form Validation**: Zod schema validation
+- **Routing**: React Router (v6) with deep linking
 - **Backend / Database**: Supabase (PostgreSQL, Auth, Edge Functions)
+- **Real-time**: Supabase Realtime with incremental cache updates
 - **Drag & Drop**: React DnD
 - **Icons**: Lucide React
 - **Notifications**: React Hot Toast
 - **Date Handling**: date-fns
+- **Error Handling**: React Error Boundaries
 
 ### Architecture
 - **DOE Framework**: This workspace follows the Directives (SOPs), Orchestration (Agent), Execution (Scripts) model for AI-assisted development.
@@ -40,14 +44,19 @@ MosaicScheduler/
 │   │   │   ├── CalendarGrid.tsx
 │   │   │   ├── GlobalTaskSearch.tsx    # Search all tasks
 │   │   │   ├── UnscheduledPanel.tsx    # Tasks to Schedule (collapsible)
-│   │   │   ├── WorkerManageModal.tsx   # Edit/delete workers
+│   │   │   ├── TeamManageModal.tsx     # Edit/delete team members
 │   │   │   ├── DraggableTask.tsx
 │   │   │   └── DayTasksModal.tsx
-│   │   ├── workers/      # Worker forms
-│   │   └── layout/       # Navbar, UserSettingsModal, etc.
+│   │   ├── team/         # Team member forms
+│   │   └── layout/       # Navbar, UserSettingsModal, ErrorBoundary
 │   ├── context/          # React contexts (AuthContext)
-│   ├── store/            # Zustand stores (tasksStore, teamStore)
-│   ├── hooks/            # Custom React hooks (useRealtimeTasks, useRealtimeTeam)
+│   ├── hooks/            # React Query hooks & real-time subscriptions
+│   │   ├── useTasks.ts           # Task CRUD with React Query
+│   │   ├── useTeamMembers.ts     # Team member CRUD with React Query
+│   │   ├── useRealtimeTasks.ts   # Incremental real-time task updates
+│   │   └── useRealtimeTeam.ts    # Incremental real-time team updates
+│   ├── schemas/          # Zod validation schemas
+│   │   └── task.ts               # Task form validation schema
 │   ├── types/            # TypeScript type definitions
 │   └── utils/            # Utility functions (logger, validation, errors, debounce)
 ├── supabase/
@@ -66,6 +75,8 @@ MosaicScheduler/
 ├── execution/            # Python scripts for automation
 └── .tmp/                 # Temporary processing files
 ```
+
+**Note:** The `src/store/` directory was removed in v0.3.0. Data fetching now uses React Query hooks in `src/hooks/`.
 
 ### Key Files & Resources
 - **Agent Instructions**: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` - Core operating instructions for AI agents
@@ -124,17 +135,16 @@ interface Task {
 ```
 
 ### Current Status
-- **Version**: 0.2.1
+- **Version**: 0.3.0
 - **Last Updated**: 2026-03-03
-- **Recent Improvements**:
-  - Replaced legacy `jobs` store with `tasks` in `MonthView.tsx` and Team management modals.
-  - Resolved `App.tsx` "Error Loading Data" crashes by deploying unauthenticated Edge Functions.
-  - Deleted obsolete legacy components (`DraggableJob.tsx`, `DayJobsModal.tsx`, `GlobalJobSearch.tsx`, `WorkerManageModal.tsx`).
-  - Major refactoring: Renamed "job" to "task" throughout codebase
-  - Simplified task form (removed roofing-specific fields)
-  - New edge functions: add-task, get-tasks, update-task, delete-task, get-tasks-by-worker
-  - Database migration to rename tables and columns
-  - Performance optimization (realtime subscriptions, React.memo, O(1) lookups)
+- **Recent Improvements** (v0.3.0 - Modern Architecture Overhaul):
+  - **React Query Migration**: Replaced Zustand stores with TanStack Query for data fetching (caching, deduplication, automatic retries)
+  - **Incremental Real-time Updates**: Changed from O(n) full refetch to O(1) cache updates
+  - **React Router**: Added URL-based navigation with deep linking (`/week`, `/month`)
+  - **Zod Validation**: Type-safe form validation with clear error messages
+  - **Error Boundaries**: Prevents white screen crashes with user-friendly fallback UI
+  - **Session Persistence**: Users stay logged in on page refresh
+  - **Cleanup**: Deleted Zustand stores and legacy Edge Functions
 
 ### Security & Permissions
 - **Authentication**: Email/Password via Supabase Auth
@@ -149,33 +159,41 @@ interface Task {
   - Unauthorized signups are blocked (no profile = no access)
 
 ### Codebase Health
-After cleanup, the codebase now has:
+After v0.3.0 cleanup, the codebase now has:
 - **No dead code** - All files are actively imported
 - **No bolt.new artifacts** - `.bolt/` directory removed
 - **Clean dependencies** - Only used packages remain
-- **Single data pattern** - Zustand stores + Edge Functions for all data access
-- **Consistent naming** - "Task" terminology throughout (no "job" references)
-- **Backwards compatibility** - Legacy exports maintained for gradual migration
+- **Modern data pattern** - React Query hooks + Edge Functions for all data access
+- **Type-safe validation** - Zod schemas for form validation
+- **URL-based routing** - React Router with deep linking
+- **Error resilience** - Error Boundaries prevent crashes
+- **Consistent naming** - "Task" terminology throughout
 
-### Architecture Note
-- The "Mixed Data Pattern" has been resolved. All components now use Stores/Edge Functions.
-- `src/api/` folder is now minimal (only used for Supabase client initialization).
-- Legacy "job" terminology has backwards compatibility aliases for gradual migration.
+### Architecture Note (v0.3.0)
+- **Data Fetching**: React Query hooks in `src/hooks/` (NOT Zustand stores - they were deleted)
+- **Real-time**: Incremental cache updates via `useRealtimeTasks.ts` and `useRealtimeTeam.ts`
+- **Validation**: Zod schemas in `src/schemas/`
+- **Routing**: React Router v6 with routes in `App.tsx`
+- **API Layer**: `src/api/` is minimal (only Supabase client initialization)
 
-### Backwards Compatibility
-
-The codebase maintains backwards compatibility for components that may still reference "job" terminology:
+### Data Fetching Pattern (v0.3.0)
 
 ```typescript
-// In src/types/index.ts
-export type Job = Task;  // Alias for backwards compatibility
+// In components, use React Query hooks:
+import { useTasksQuery, useAddTask, useUpdateTask } from '../hooks/useTasks';
 
-// In src/store/tasksStore.ts
-export const useJobsStore = useTasksStore;  // Alias
+const { data: tasks = [], isLoading, error } = useTasksQuery();
+const addTaskMutation = useAddTask();
 
-// In src/components/tasks/index.ts
-export { TaskForm as JobForm };  // Re-export
+// To create a task:
+await addTaskMutation.mutateAsync(taskData);
 ```
+
+**Do NOT recreate Zustand stores.** The React Query hooks provide:
+- Automatic caching (5-minute stale time)
+- Request deduplication (multiple components = 1 request)
+- Automatic retries with exponential backoff
+- Background refetching on window focus
 
 ### Related Directives
 - [Code Standards](./code_standards.md) - Coding conventions and patterns

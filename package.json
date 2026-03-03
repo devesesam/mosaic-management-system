@@ -11,6 +11,7 @@
     "apply-migration": "node supabase/migrations/apply_migration.js"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@supabase/supabase-js": "^2.39.3",
     "@tanstack/react-query": "^5.24.1",
     "date-fns": "^3.3.1",
@@ -19,7 +20,10 @@
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.2.0",
+    "react-hook-form": "^7.71.2",
     "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^7.13.1",
+    "zod": "^4.3.6",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

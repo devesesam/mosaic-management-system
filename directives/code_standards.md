@@ -97,39 +97,60 @@ logger.error('Component: Error occurred', error);
 
 ---
 
-## State Management (Zustand)
+## Data Fetching (React Query - v0.3.0+)
 
-### Store Naming
-- Use plural for collection stores: `tasksStore.ts`, `teamStore.ts`
-- Export hook with `use` prefix: `useTasksStore`, `useTeamStore`
+### ⚠️ Important: Zustand Stores Removed
+As of v0.3.0, **Zustand stores have been deleted**. All data fetching uses React Query hooks.
+
+### React Query Hooks Location
+- Task hooks: `src/hooks/useTasks.ts`
+- Team member hooks: `src/hooks/useTeamMembers.ts`
+
+### Usage Pattern
+```typescript
+import { useTasksQuery, useAddTask, useUpdateTask, useDeleteTask } from '../hooks/useTasks';
+
+// Reading data
+const { data: tasks = [], isLoading, error, refetch } = useTasksQuery();
+
+// Mutations
+const addTaskMutation = useAddTask();
+const updateTaskMutation = useUpdateTask();
+const deleteTaskMutation = useDeleteTask();
+
+// Creating a task
+await addTaskMutation.mutateAsync(taskData);
+
+// Updating a task
+await updateTaskMutation.mutateAsync({ id: taskId, updates: { name: 'New Name' } });
+
+// Deleting a task
+await deleteTaskMutation.mutateAsync(taskId);
+```
+
+### Query Keys
+Use the exported query key factories for cache management:
+```typescript
+import { taskKeys } from '../hooks/useTasks';
+import { teamKeys } from '../hooks/useTeamMembers';
+
+// Invalidate all task queries
+queryClient.invalidateQueries({ queryKey: taskKeys.all });
+
+// Invalidate team queries
+queryClient.invalidateQueries({ queryKey: teamKeys.all });
+```
 
 ### Optimistic Updates
-Update local state immediately, don't refetch after mutations.
+React Query handles optimistic updates via `onMutate`. The hooks are pre-configured.
 
-**Bad:**
+### Error Handling
+Errors are returned via the query result. Handle them in components:
 ```typescript
-set((state) => ({ tasks: [...state.tasks, newTask] }));
-get().fetchTasks(); // Unnecessary refetch
-```
+const { error } = useTasksQuery();
 
-**Good:**
-```typescript
-set((state) => ({ tasks: [...state.tasks, newTask] }));
-// Trust the local state, no refetch needed
-```
-
-### Error Handling in Stores
-```typescript
-try {
-  // API call
-} catch (error) {
-  logger.error('storeName: Error performing action:', error);
-  const errorMessage = error instanceof Error
-    ? error.message
-    : 'Default error message';
-  set({ error: errorMessage, loading: false });
-  toast.error(errorMessage);
-  throw error; // Re-throw for caller handling
+if (error) {
+  return <ErrorDisplay message={error.message} onRetry={refetch} />;
 }
 ```
 
@@ -165,34 +186,71 @@ if (task.status === TaskStatus.Completed) {
 
 ---
 
-## Validation Standards
+## Validation Standards (v0.3.0+)
 
-### Use the Validation Utility
-All form validation should use `src/utils/validation.ts`.
+### Primary: Zod Schema Validation
+As of v0.3.0, use Zod schemas from `src/schemas/task.ts` for form validation:
 
 ```typescript
-import { validators } from '../utils/validation';
+import { validateTaskForm } from '../schemas/task';
 
-// In submit handler:
-if (!validators.required(formData.name)) {
-  toast.error('Task name is required');
-  return;
-}
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-const dateError = validators.dateRange(formData.start_date, formData.end_date);
-if (dateError) {
-  toast.error(dateError);
-  return;
+  // Validate using Zod schema
+  const validation = validateTaskForm(formData);
+  if (!validation.success) {
+    const firstError = Object.values(validation.errors)[0];
+    toast.error(firstError || 'Please fix validation errors');
+    return;
+  }
+
+  // Proceed with validated data
+  await submitTask(validation.data);
+};
+```
+
+### Zod Schema Benefits
+- **Type inference**: `TaskFormData` type is inferred from schema
+- **Custom refinements**: Cross-field validation (e.g., end_date >= start_date)
+- **Clear error messages**: Each field has descriptive error messages
+- **Automatic defaults**: Default values defined in schema
+
+### Adding New Schemas
+Create schemas in `src/schemas/` following this pattern:
+```typescript
+import { z } from 'zod';
+
+export const myFormSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email'),
+  // ... fields
+});
+
+export type MyFormData = z.infer<typeof myFormSchema>;
+
+export function validateMyForm(data: unknown) {
+  const result = myFormSchema.safeParse(data);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  // Convert Zod errors to simple key-value pairs
+  const errors: Record<string, string> = {};
+  for (const error of result.error.errors) {
+    const path = error.path.join('.');
+    if (!errors[path]) errors[path] = error.message;
+  }
+  return { success: false, errors };
 }
 ```
 
-### Available Validators
+### Legacy: Validation Utility
+The `src/utils/validation.ts` validators are still available for simple checks:
 - `validators.required(value)` - Non-empty check
 - `validators.email(value)` - Email format
-- `validators.phone(value)` - Phone format (digits, +, -, spaces, parentheses)
+- `validators.phone(value)` - Phone format
 - `validators.dateRange(start, end)` - End >= Start
 - `validators.maxLength(max)(value)` - Character limit
-- `validators.minLength(min)(value)` - Minimum length
 
 ---
 
@@ -436,14 +494,14 @@ If build succeeds, the deletion was safe.
 
 ---
 
-## Data Fetching Pattern
+## Data Fetching Pattern (v0.3.0+)
 
-### Standard: Zustand Stores + Edge Functions
-All data access must go through the Zustand stores, which use Edge Functions to interact with the database.
+### Standard: React Query Hooks + Edge Functions
+All data access uses React Query hooks, which call Edge Functions to interact with the database.
 
 **Pattern:**
 ```
-Component → useStore() → fetch('/functions/v1/...') → Edge Function → Database
+Component → useQuery/useMutation → fetch('/functions/v1/...') → Edge Function → Database
 ```
 
 ### Edge Function Naming
@@ -456,15 +514,79 @@ Component → useStore() → fetch('/functions/v1/...') → Edge Function → Da
 | `get-tasks-by-worker` | GET | Fetch tasks for specific worker |
 
 ### Why This Pattern?
-1.  **Security**: Edge Functions run with Service Role permissions, bypassing RLS limitations for workers.
-2.  **Consistency**: A single way to fetch/update data across the app.
-3.  **State Management**: Zustand handles local state updates optimistically.
+1. **Security**: Edge Functions run with Service Role permissions, bypassing RLS limitations for workers.
+2. **Caching**: React Query automatically caches responses and deduplicates requests.
+3. **Optimistic Updates**: Mutations update the cache immediately while API calls happen in background.
+4. **Consistency**: Single source of truth for data access across the app.
 
 ### Rules for New Code
-- **Always** use `useTasksStore` or `useTeamStore`.
-- **Never** make direct API calls in components.
-- **Never** add React Query hooks (we use Zustand).
-- **Never** use `supabase.from('table')` directly in components.
+- **Always** use React Query hooks from `src/hooks/useTasks.ts` or `src/hooks/useTeamMembers.ts`
+- **Never** make direct fetch calls in components
+- **Never** recreate Zustand stores (they were deleted for a reason)
+- **Never** use `supabase.from('table')` directly in components
+
+---
+
+## Routing (React Router v6)
+
+### Route Configuration
+Routes are defined in `src/App.tsx`:
+```typescript
+<Routes>
+  <Route path="/week" element={<WeekView readOnly={!isEditable} />} />
+  <Route path="/month" element={<MonthView readOnly={!isEditable} />} />
+  <Route path="/" element={<Navigate to="/week" replace />} />
+  <Route path="*" element={<Navigate to="/week" replace />} />
+</Routes>
+```
+
+### Navigation
+Use React Router hooks for navigation:
+```typescript
+import { useNavigate, useLocation } from 'react-router-dom';
+
+function MyComponent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get current view from URL
+  const activeView = location.pathname === '/month' ? 'month' : 'week';
+
+  // Navigate to a route
+  const handleViewChange = (view: 'week' | 'month') => {
+    navigate(`/${view}`);
+  };
+
+  return <button onClick={() => handleViewChange('month')}>Month View</button>;
+}
+```
+
+### Deep Linking
+URLs are shareable. Users can bookmark or share links like:
+- `https://app.example.com/week` - Week view
+- `https://app.example.com/month` - Month view
+
+---
+
+## Error Boundaries
+
+### Usage
+Wrap critical UI sections with `ErrorBoundary`:
+```typescript
+import ErrorBoundary from './components/layout/ErrorBoundary';
+
+<ErrorBoundary
+  fallbackTitle="Calendar Error"
+  fallbackMessage="The calendar view encountered an error. Try refreshing the page."
+>
+  <WeekView />
+</ErrorBoundary>
+```
+
+### When to Use
+- Wrap independent UI sections that could fail without crashing the whole app
+- Wrap components that render external/user data
+- Wrap complex interactive components (forms, calendars, modals)
 
 ---
 
@@ -472,20 +594,45 @@ Component → useStore() → fetch('/functions/v1/...') → Edge Function → Da
 
 See [Performance Guide](./performance.md) for comprehensive documentation.
 
-### Use Zustand Selectors (Not Destructuring)
+### React Query Caching (v0.3.0+)
 
-**Bad** - Re-renders on any store change:
+React Query provides automatic caching and request deduplication:
+
 ```typescript
-const { tasks, loading, error, fetchTasks } = useTasksStore();
+// Multiple components calling this = 1 network request
+const { data: tasks } = useTasksQuery();
 ```
 
-**Good** - Only re-renders when specific state changes:
+Configuration in `src/main.tsx`:
 ```typescript
-import { useTasks, useTasksLoading, useTaskActions } from '../store/tasksStore';
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+      retryDelay: 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+```
 
-const tasks = useTasks();
-const loading = useTasksLoading();
-const { fetchTasks, addTask } = useTaskActions();
+### Incremental Real-time Updates
+
+Real-time updates use O(1) cache updates instead of O(n) full refetch:
+
+```typescript
+// In useRealtimeTasks.ts
+queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+  if (!old) return [newTask];
+  return [newTask, ...old]; // O(1) - just prepend
+});
+```
+
+**Never** do this:
+```typescript
+// BAD - Full refetch on every change
+refetch(); // This is O(n)
 ```
 
 ### React.memo for Calendar Components

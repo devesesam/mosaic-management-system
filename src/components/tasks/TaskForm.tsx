@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Task, TaskStatus, TeamMember } from '../../types';
-import { useTeamStore } from '../../store/teamStore';
+import { useTeamMembersQuery } from '../../hooks/useTeamMembers';
 import { X, Trash2, AlertTriangle, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
-import { validators } from '../../utils/validation';
+import { validateTaskForm } from '../../schemas/task';
 
 interface TaskFormProps {
   onClose: () => void;
@@ -16,7 +16,7 @@ interface TaskFormProps {
 }
 
 const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initialTask, readOnly = false }) => {
-  const { teamMembers, loading: teamLoading, fetchTeamMembers } = useTeamStore();
+  const { data: teamMembers = [], isLoading: teamLoading } = useTeamMembersQuery();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -43,12 +43,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
       });
     }
   }, [initialTask]);
-
-  // Fetch team members when form opens
-  useEffect(() => {
-    logger.debug('TaskForm: Fetching team members...');
-    fetchTeamMembers();
-  }, [fetchTeamMembers]);
 
   // Debug team members data
   useEffect(() => {
@@ -130,25 +124,22 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
 
     logger.debug('TaskForm: Submitting task data:', formData);
 
-    // Validate required fields
-    if (!formData.name?.trim()) {
-      toast.error('Task name is required');
-      return;
-    }
-
-    // Validate date range
-    const dateError = validators.dateRange(formData.start_date || null, formData.end_date || null);
-    if (dateError) {
-      toast.error(dateError);
-      return;
-    }
-
     // CRITICAL: Ensure secondary workers are cleared if no primary worker
     let finalFormData = { ...formData };
     if (!finalFormData.worker_id) {
       logger.debug('TaskForm: No primary worker - ensuring secondary workers are cleared and task is public');
       finalFormData.secondary_worker_ids = [];
       finalFormData.is_visible = true;
+    }
+
+    // Validate using Zod schema
+    const validation = validateTaskForm(finalFormData);
+    if (!validation.success) {
+      // Show first validation error
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || 'Please fix validation errors');
+      logger.debug('TaskForm: Validation errors:', validation.errors);
+      return;
     }
 
     try {

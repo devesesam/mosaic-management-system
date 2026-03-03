@@ -3,12 +3,38 @@
 ## Overview
 The **Mosaic Scheduler** is a React + Supabase web application for managing tasks, team member schedules, and customer details. It features a drag-and-drop calendar interface, role-based access control (Admin vs. Team Member), and strict data security via RLS and Edge Functions.
 
-**Current Version:** 0.2.0 (2026-03-03)
+**Current Version:** 0.3.0 (2026-03-03)
 
-## ⚠️ Important Terminology
-As of v0.2.0, use **"Task"** terminology throughout the codebase:
-- Use `Task`, `TaskStatus`, `useTasksStore`, `TaskForm`
-- NOT `Job`, `JobStatus`, `useJobsStore`, `JobForm` (legacy, aliased for backwards compat)
+## ⚠️ Critical Architecture Notes (v0.3.0)
+
+### Data Fetching: React Query (NOT Zustand)
+As of v0.3.0, data fetching uses **React Query (TanStack Query)** instead of Zustand stores:
+- Use `useTasksQuery()`, `useAddTask()`, `useUpdateTask()`, `useDeleteTask()` from `src/hooks/useTasks.ts`
+- Use `useTeamMembersQuery()`, `useAddTeamMember()` etc. from `src/hooks/useTeamMembers.ts`
+- **Zustand stores have been DELETED** - do NOT recreate them
+- Real-time updates use incremental cache updates (O(1)) via `useRealtimeTasks.ts` and `useRealtimeTeam.ts`
+
+### Form Validation: Zod Schemas
+- Use Zod schemas from `src/schemas/task.ts` for type-safe validation
+- Call `validateTaskForm(data)` before submitting forms
+
+### Routing: React Router v6
+- Routes defined in `App.tsx`: `/week`, `/month`
+- Use `useNavigate()` and `useLocation()` for navigation
+- URLs are shareable (deep linking supported)
+
+### Error Handling: React Error Boundaries
+- `ErrorBoundary` component wraps critical UI sections in `App.tsx`
+- Prevents white screen crashes with user-friendly fallback UI
+
+### Session Persistence
+- Sessions persist via `localStorage` (users stay logged in)
+- Configured in `src/api/supabaseClient.ts`
+
+### Task Terminology
+Use **"Task"** terminology throughout:
+- Use `Task`, `TaskStatus`, `TaskForm`
+- NOT `Job`, `JobStatus`, `JobForm` (legacy, removed)
 - Database tables: `tasks`, `task_secondary_workers`
 - Edge functions: `get-tasks`, `add-task`, `update-task`, `delete-task`
 

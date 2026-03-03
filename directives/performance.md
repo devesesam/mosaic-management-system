@@ -3,39 +3,67 @@
 ## Overview
 This document describes the performance optimization patterns used in the Mosaic Scheduler and how to maintain them for future development.
 
+**Updated for v0.3.0:** This guide now reflects the React Query + incremental cache updates architecture.
+
 ---
 
-## Architecture: Realtime vs Polling
+## Architecture: React Query + Incremental Real-time
 
-### Problem (Historical)
-The app originally used **60-second polling** to keep data fresh. This caused:
-- Visible "auto-refresh" jank every minute
-- Unnecessary re-renders across the entire calendar
-- Loading toasts ("Updating jobs...") interrupting user workflow
-- Wasted bandwidth fetching unchanged data
+### Data Fetching (v0.3.0+)
+The app uses **React Query (TanStack Query)** for data fetching with automatic caching and deduplication.
 
-### Solution: Supabase Realtime
-The app now uses **Supabase Realtime subscriptions** instead of polling.
+**Key Benefits:**
+- Multiple components = 1 network request (automatic deduplication)
+- 5-minute stale time (cache validity)
+- Automatic retries with exponential backoff
+- Background refetching on window focus
 
-**How it works:**
-1. `useRealtimeJobs()` and `useRealtimeTeam()` hooks subscribe to database changes
-2. When ANY client modifies data, all connected clients receive the update instantly
-3. Visibility API refreshes data when a tab becomes active (handles stale tabs)
+**Configuration (src/main.tsx):**
+```typescript
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+      retryDelay: 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+```
+
+### Real-time: Incremental Cache Updates
+The app uses **Supabase Realtime** with **incremental cache updates** instead of full refetch.
+
+**Before (O(n) - Bad):**
+```typescript
+// OLD - Full refetch on every change
+fetchTasks(); // Refetches ALL tasks from database
+```
+
+**After (O(1) - Good):**
+```typescript
+// NEW - Update only the affected item in cache
+queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+  if (!old) return [newTask];
+  return [newTask, ...old]; // Just prepend the new task
+});
+```
 
 **Key Files:**
-- `src/hooks/useRealtimeJobs.ts` - Subscribes to `jobs` table changes
-- `src/hooks/useRealtimeTeam.ts` - Subscribes to `workers` table changes
-- `src/App.tsx` - Initializes realtime hooks and visibility refresh
+- `src/hooks/useRealtimeTasks.ts` - Incremental task updates via cache
+- `src/hooks/useRealtimeTeam.ts` - Incremental team updates via cache
+- `src/App.tsx` - Initializes realtime hooks
 
 **Usage:**
 ```typescript
 // In App.tsx (already implemented)
-import { useRealtimeJobs } from './hooks/useRealtimeJobs';
+import { useRealtimeTasks } from './hooks/useRealtimeTasks';
 import { useRealtimeTeam } from './hooks/useRealtimeTeam';
 
 function App() {
-  // Subscribe to real-time updates
-  useRealtimeJobs();
+  // Subscribe to real-time updates (incremental)
+  useRealtimeTasks();
   useRealtimeTeam();
 
   // ... rest of component
@@ -43,17 +71,20 @@ function App() {
 ```
 
 ### When to Add New Realtime Subscriptions
-If you add a new table that needs real-time sync:
 
-1. Create a new hook in `src/hooks/`:
+If you add a new table that needs real-time sync, use **incremental cache updates**:
+
 ```typescript
 // src/hooks/useRealtimeCustomers.ts
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../api/supabaseClient';
-import { useCustomersStore } from '../store/customersStore';
+import { Customer } from '../types';
+import { customerKeys } from './useCustomers';
 import { logger } from '../utils/logger';
 
 export function useRealtimeCustomers() {
+  const queryClient = useQueryClient();
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const isSubscribedRef = useRef(false);
 
@@ -64,12 +95,41 @@ export function useRealtimeCustomers() {
     subscriptionRef.current = supabase
       .channel('customers-realtime-changes')
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'customers'
       }, (payload) => {
-        logger.debug('useRealtimeCustomers: Received change', payload.eventType);
-        useCustomersStore.getState().fetchCustomers();
+        logger.debug('useRealtimeCustomers: INSERT', payload.new);
+        const newCustomer = payload.new as Customer;
+
+        // O(1) incremental update
+        queryClient.setQueryData<Customer[]>(customerKeys.list(), (old) => {
+          if (!old) return [newCustomer];
+          if (old.some(c => c.id === newCustomer.id)) return old;
+          return [newCustomer, ...old];
+        });
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'customers'
+      }, (payload) => {
+        const updated = payload.new as Customer;
+        queryClient.setQueryData<Customer[]>(customerKeys.list(), (old) => {
+          if (!old) return old;
+          return old.map(c => c.id === updated.id ? updated : c);
+        });
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'customers'
+      }, (payload) => {
+        const deletedId = (payload.old as { id: string }).id;
+        queryClient.setQueryData<Customer[]>(customerKeys.list(), (old) => {
+          if (!old) return old;
+          return old.filter(c => c.id !== deletedId);
+        });
       })
       .subscribe();
 
@@ -80,11 +140,9 @@ export function useRealtimeCustomers() {
       }
       isSubscribedRef.current = false;
     };
-  }, []);
+  }, [queryClient]);
 }
 ```
-
-2. Import and use in `App.tsx`
 
 ---
 
@@ -168,75 +226,78 @@ const getWorkerDayJobs = useCallback((workerId, day) => {
 
 ---
 
-## Zustand Selector Patterns
+## React Query Caching (v0.3.0+)
 
-### Problem: Over-subscription
-When components destructure the entire store, they re-render on ANY store change:
-
-```typescript
-// BAD - re-renders when jobs, loading, error, or any action changes
-const { jobs, loading, error, fetchJobs } = useJobsStore();
-```
-
-### Solution: Selectors
-Use selectors to subscribe to specific state slices:
+### Automatic Request Deduplication
+React Query automatically deduplicates requests when multiple components use the same query:
 
 ```typescript
-// GOOD - only re-renders when jobs array changes
-import { useJobs, useJobsLoading, useJobActions } from '../store/jobsStore';
+// In ComponentA
+const { data: tasks } = useTasksQuery();
 
-const jobs = useJobs();
-const loading = useJobsLoading();
-const { fetchJobs, addJob } = useJobActions();
+// In ComponentB (same query key)
+const { data: tasks } = useTasksQuery();
+
+// Result: Only 1 network request is made!
 ```
 
-### Available Selectors
-
-**jobsStore.ts:**
-```typescript
-export const useJobs = () => useJobsStore((state) => state.jobs);
-export const useJobsLoading = () => useJobsStore((state) => state.isLoading);
-export const useJobsError = () => useJobsStore((state) => state.error);
-export const useSelectedJob = () => useJobsStore((state) => state.selectedJob);
-export const useJobActions = () => useJobsStore((state) => ({
-  fetchJobs: state.fetchJobs,
-  addJob: state.addJob,
-  updateJob: state.updateJob,
-  deleteJob: state.deleteJob,
-  setSelectedJob: state.setSelectedJob,
-  unassignWorkerJobs: state.unassignWorkerJobs
-}));
-```
-
-**teamStore.ts:**
-```typescript
-export const useTeamMembers = () => useTeamStore((state) => state.teamMembers);
-export const useTeamLoading = () => useTeamStore((state) => state.isLoading);
-export const useTeamError = () => useTeamStore((state) => state.error);
-export const useTeamActions = () => useTeamStore((state) => ({
-  fetchTeamMembers: state.fetchTeamMembers,
-  addTeamMember: state.addTeamMember,
-  updateTeamMember: state.updateTeamMember,
-  deleteTeamMember: state.deleteTeamMember
-}));
-```
-
-### Adding Selectors to New Stores
-When creating a new Zustand store, always add selectors at the bottom:
+### Query Keys
+Use the exported query key factories for consistent cache management:
 
 ```typescript
-export const useMyStore = create<MyState>((set, get) => ({
-  // ... store implementation
-}));
+import { taskKeys } from '../hooks/useTasks';
+import { teamKeys } from '../hooks/useTeamMembers';
 
-// SELECTORS - Add these for optimized re-renders
-export const useMyData = () => useMyStore((state) => state.data);
-export const useMyLoading = () => useMyStore((state) => state.isLoading);
-export const useMyActions = () => useMyStore((state) => ({
-  fetchData: state.fetchData,
-  updateData: state.updateData
-}));
+// Query keys
+taskKeys.all       // ['tasks']
+taskKeys.list()    // ['tasks', { workerId, isAdmin }]
+teamKeys.all       // ['teamMembers']
+teamKeys.list()    // ['teamMembers', 'list']
 ```
+
+### Cache Invalidation After Mutations
+Mutations automatically invalidate related queries:
+
+```typescript
+// In src/hooks/useTasks.ts
+export function useAddTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: addTaskApi,
+    onSuccess: (newTask) => {
+      // Option 1: Invalidate (triggers refetch)
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+
+      // Option 2: Direct cache update (faster, no network request)
+      queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+        return old ? [newTask, ...old] : [newTask];
+      });
+    },
+  });
+}
+```
+
+### Stale Time Configuration
+Data is considered "fresh" for 5 minutes before refetching:
+
+```typescript
+// src/main.tsx
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  },
+});
+```
+
+### NOTE: Zustand Stores Removed
+As of v0.3.0, Zustand stores have been **deleted**. Do NOT recreate them. React Query provides:
+- Better caching
+- Automatic deduplication
+- Built-in loading/error states
+- DevTools for debugging
 
 ---
 
@@ -245,9 +306,10 @@ export const useMyActions = () => useMyStore((state) => ({
 ### Before Implementation
 - [ ] Will this component render frequently? → Consider React.memo
 - [ ] Does this component filter large arrays? → Consider pre-computed maps
-- [ ] Does this component use a Zustand store? → Use selectors, not destructuring
+- [ ] Does this component need data fetching? → Use existing React Query hooks
 
 ### During Implementation
+- [ ] Use React Query hooks (not direct fetch calls)
 - [ ] Avoid creating new objects/arrays in render (use useMemo/useCallback)
 - [ ] Avoid inline function definitions for event handlers passed to memoized children
 - [ ] Use stable keys for lists (not array index)
@@ -256,6 +318,7 @@ export const useMyActions = () => useMyStore((state) => ({
 - [ ] Test with React DevTools Profiler
 - [ ] Check for unnecessary re-renders
 - [ ] Verify bundle size hasn't increased significantly
+- [ ] Confirm real-time updates work correctly
 
 ---
 
@@ -276,39 +339,58 @@ export const useMyActions = () => useMyStore((state) => ({
 |---------|--------------|----------|
 | Entire calendar re-renders on any change | Missing React.memo | Add memoization with custom comparison |
 | Lag when typing in search | No debounce | Use `useDebouncedCallback` |
-| Slow initial load | Too many jobs fetched | Implement pagination |
-| Jank every N seconds | Polling interval | Use realtime subscriptions |
-| Component re-renders when unrelated data changes | Zustand over-subscription | Use selectors |
+| Slow initial load | Too many tasks fetched | Implement pagination |
+| Data not updating | Cache not invalidated | Check mutation's onSuccess handler |
+| Multiple network requests | Not using query hooks | Use `useTasksQuery()` from hooks |
 
 ### Performance Monitoring
 Check the console for these debug logs (when `VITE_LOG_LEVEL=debug`):
-- `useRealtimeJobs: Subscription status` - Realtime connection health
-- `App: Tab became visible, refreshing data` - Visibility API working
-- `WeekView: Jobs loaded: N` - Data load confirmation
+- `useRealtimeTasks: Subscription status` - Realtime connection health
+- `useRealtimeTasks: INSERT/UPDATE/DELETE event` - Cache updates
+- `App: Tab became visible, invalidating queries` - Visibility API working
+
+### React Query DevTools
+For development debugging, you can add React Query DevTools:
+```typescript
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+// In App.tsx (development only)
+{import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+```
 
 ---
 
 ## Files Reference
 
-### Realtime Hooks
+### React Query Hooks (v0.3.0+)
 | File | Purpose |
 |------|---------|
-| `src/hooks/useRealtimeJobs.ts` | Jobs table subscription |
-| `src/hooks/useRealtimeTeam.ts` | Workers table subscription |
+| `src/hooks/useTasks.ts` | Task CRUD with caching, mutations, query keys |
+| `src/hooks/useTeamMembers.ts` | Team member CRUD with caching, mutations, query keys |
+
+### Realtime Hooks (Incremental Updates)
+| File | Purpose |
+|------|---------|
+| `src/hooks/useRealtimeTasks.ts` | O(1) incremental task cache updates |
+| `src/hooks/useRealtimeTeam.ts` | O(1) incremental team cache updates |
 
 ### Memoized Components
 | File | Component | Comparison Function |
 |------|-----------|---------------------|
-| `src/components/scheduler/CalendarGrid.tsx` | `CalendarGridMemo` | Compares days, teamMembers, allJobs, readOnly |
-| `src/components/scheduler/CalendarGrid.tsx` | `WorkerRow` | Compares workerId, workerName, days, readOnly, getWorkerDayJobs |
-| `src/components/scheduler/CalendarGrid.tsx` | `CalendarCell` | Compares workerId, dayIndex, readOnly, rowHeight, day, renderingData |
+| `src/components/scheduler/CalendarGrid.tsx` | `CalendarGridMemo` | Compares days, teamMembers, allTasks, readOnly |
+| `src/components/scheduler/CalendarGrid.tsx` | `WorkerRow` | Compares workerId, workerName, days, readOnly |
+| `src/components/scheduler/CalendarGrid.tsx` | `CalendarCell` | Compares workerId, dayIndex, readOnly, rowHeight |
 
 ### Optimized Data Flows
 | File | Pattern | Description |
 |------|---------|-------------|
-| `src/components/scheduler/WeekView.tsx` | `workerDayJobsMap` | Pre-computed Map for O(1) job lookups |
-| `src/store/jobsStore.ts` | Selectors | `useJobs`, `useJobsLoading`, `useJobActions` |
-| `src/store/teamStore.ts` | Selectors | `useTeamMembers`, `useTeamLoading`, `useTeamActions` |
+| `src/components/scheduler/WeekView.tsx` | `workerDayTasksMap` | Pre-computed Map for O(1) task lookups |
+| `src/main.tsx` | QueryClient config | 5-minute stale time, retry settings |
+
+### Deleted Files (v0.3.0)
+The following files were deleted and should NOT be recreated:
+- `src/store/tasksStore.ts` - Replaced by React Query hooks
+- `src/store/teamStore.ts` - Replaced by React Query hooks
 
 ---
 
@@ -316,3 +398,4 @@ Check the console for these debug logs (when `VITE_LOG_LEVEL=debug`):
 - [Code Standards](./code_standards.md) - Coding conventions
 - [Project Overview](./project_overview.md) - Architecture overview
 - [Troubleshooting](./troubleshooting.md) - Common issues
+- [Changelog](./changelog.md) - Version history

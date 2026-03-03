@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './context/AuthContext';
 import LoginForm from './components/auth/LoginForm';
 import Navbar from './components/layout/Navbar';
 import WeekView from './components/scheduler/WeekView';
 import MonthView from './components/scheduler/MonthView';
 import { TaskForm } from './components/tasks';
-import { useTasksStore } from './store/tasksStore';
-import { useTeamStore } from './store/teamStore';
+import { useTasksQuery, useAddTask, taskKeys } from './hooks/useTasks';
+import { useTeamMembersQuery, teamKeys } from './hooks/useTeamMembers';
 import { useRealtimeTasks } from './hooks/useRealtimeTasks';
 import { useRealtimeTeam } from './hooks/useRealtimeTeam';
 import { Toaster } from 'react-hot-toast';
@@ -20,42 +22,47 @@ import ErrorBoundary from './components/layout/ErrorBoundary';
 function App() {
   const { user, authError, currentWorker, signOut, isEditable } = useAuth();
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
-  const [activeView, setActiveView] = useState<'week' | 'month'>('week');
   const [isRetrying, setIsRetrying] = useState(false);
 
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+
+  // Derive active view from current route
+  const activeView: 'week' | 'month' = location.pathname === '/month' ? 'month' : 'week';
+
+  // React Query hooks for data fetching (with caching and deduplication)
   const {
-    tasks,
-    addTask,
-    error: tasksError,
-    fetchTasks,
-    isLoading: tasksLoading
-  } = useTasksStore();
+    data: tasks = [],
+    error: tasksQueryError,
+    isLoading: tasksLoading,
+    refetch: refetchTasks,
+  } = useTasksQuery(currentWorker?.id, false);
 
   const {
-    teamMembers,
-    error: teamError,
-    fetchTeamMembers,
-    isLoading: teamLoading
-  } = useTeamStore();
+    data: teamMembers = [],
+    error: teamQueryError,
+    isLoading: teamLoading,
+    refetch: refetchTeam,
+  } = useTeamMembersQuery();
 
-  // Subscribe to real-time updates (replaces polling)
-  useRealtimeTasks(currentWorker?.id, false);
+  const addTaskMutation = useAddTask();
+
+  // Convert query errors to strings for display
+  const tasksError = tasksQueryError?.message || null;
+  const teamError = teamQueryError?.message || null;
+
+  // Subscribe to real-time updates (incremental cache updates)
+  useRealtimeTasks();
   useRealtimeTeam();
 
-  // Load data when component mounts
-  useEffect(() => {
-    logger.debug('App: Initial data load');
-    fetchTasks(currentWorker?.id, false);
-    fetchTeamMembers();
-  }, [fetchTasks, fetchTeamMembers, currentWorker]);
-
-  // Refresh data when tab becomes visible (handles stale data after tab was inactive)
+  // Refresh data when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        logger.debug('App: Tab became visible, refreshing data');
-        fetchTasks(currentWorker?.id, false);
-        fetchTeamMembers();
+        logger.debug('App: Tab became visible, invalidating queries');
+        queryClient.invalidateQueries({ queryKey: taskKeys.all });
+        queryClient.invalidateQueries({ queryKey: teamKeys.all });
       }
     };
 
@@ -64,7 +71,7 @@ function App() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchTasks, fetchTeamMembers, currentWorker]);
+  }, [queryClient]);
 
   // Log edit permission status
   useEffect(() => {
@@ -81,9 +88,9 @@ function App() {
   useEffect(() => {
     if (!isEditable && activeView !== 'week') {
       logger.debug('App: Forcing week view for read-only user');
-      setActiveView('week');
+      navigate('/week', { replace: true });
     }
-  }, [isEditable, activeView]);
+  }, [isEditable, activeView, navigate]);
 
   const handleNewTask = () => {
     if (!isEditable) {
@@ -99,7 +106,7 @@ function App() {
       return;
     }
     try {
-      await addTask(taskData);
+      await addTaskMutation.mutateAsync(taskData);
       setIsTaskFormOpen(false);
     } catch (error) {
       logger.error('Error creating task:', error);
@@ -112,7 +119,7 @@ function App() {
       logger.debug('App: View change blocked - read-only mode forces week view');
       return;
     }
-    setActiveView(view);
+    navigate(`/${view}`);
   };
 
   // Show login form if no user
@@ -157,8 +164,8 @@ function App() {
             <button
               onClick={() => {
                 setIsRetrying(true);
-                fetchTasks();
-                fetchTeamMembers();
+                refetchTasks();
+                refetchTeam();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
               className="w-full py-2 px-4 bg-blueberry hover:bg-blueberry/90 text-white font-medium rounded-md flex items-center justify-center"
@@ -208,11 +215,12 @@ function App() {
             fallbackTitle="Calendar Error"
             fallbackMessage="The calendar view encountered an error. Try refreshing the page."
           >
-            {activeView === 'week' ? (
-              <WeekView readOnly={!isEditable} />
-            ) : (
-              <MonthView readOnly={!isEditable} />
-            )}
+            <Routes>
+              <Route path="/week" element={<WeekView readOnly={!isEditable} />} />
+              <Route path="/month" element={<MonthView readOnly={!isEditable} />} />
+              <Route path="/" element={<Navigate to="/week" replace />} />
+              <Route path="*" element={<Navigate to="/week" replace />} />
+            </Routes>
           </ErrorBoundary>
         </main>
 

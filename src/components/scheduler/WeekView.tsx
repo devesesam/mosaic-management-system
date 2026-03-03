@@ -16,8 +16,8 @@ import { Task, TeamMember } from '../../types';
 import CalendarGrid from './CalendarGrid';
 import UnscheduledPanel from './UnscheduledPanel';
 import GlobalTaskSearch from './GlobalTaskSearch';
-import { useTasksStore } from '../../store/tasksStore';
-import { useTeamStore } from '../../store/teamStore';
+import { useTasksQuery, useAddTask, useUpdateTask, useDeleteTask } from '../../hooks/useTasks';
+import { useTeamMembersQuery, useAddTeamMember } from '../../hooks/useTeamMembers';
 import { useAuth } from '../../context/AuthContext';
 import { TaskForm } from '../tasks';
 import TeamMemberForm from '../team/TeamMemberForm';
@@ -44,24 +44,30 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     localStorage.setItem('tasksPaneCollapsed', String(newValue));
   };
 
-  // Use stores for data access
+  // React Query hooks for data access
   const {
-    tasks,
-    loading: tasksLoading,
-    error: tasksError,
-    fetchTasks,
-    addTask,
-    updateTask,
-    deleteTask
-  } = useTasksStore();
+    data: tasks = [],
+    isLoading: tasksLoading,
+    error: tasksQueryError,
+    refetch: refetchTasks,
+  } = useTasksQuery(currentWorker?.id, false);
 
   const {
-    teamMembers,
-    loading: teamLoading,
-    error: teamError,
-    fetchTeamMembers,
-    addTeamMember
-  } = useTeamStore();
+    data: teamMembers = [],
+    isLoading: teamLoading,
+    error: teamQueryError,
+    refetch: refetchTeamMembers,
+  } = useTeamMembersQuery();
+
+  // Mutations
+  const addTaskMutation = useAddTask();
+  const updateTaskMutation = useUpdateTask();
+  const deleteTaskMutation = useDeleteTask();
+  const addTeamMemberMutation = useAddTeamMember();
+
+  // Convert query errors to strings
+  const tasksError = tasksQueryError?.message || null;
+  const teamError = teamQueryError?.message || null;
 
   const { user, currentWorker } = useAuth();
 
@@ -187,9 +193,9 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
 
     try {
       if (selectedTask) {
-        await updateTask(selectedTask.id, taskData);
+        await updateTaskMutation.mutateAsync({ id: selectedTask.id, updates: taskData });
       } else {
-        await addTask(taskData);
+        await addTaskMutation.mutateAsync(taskData);
       }
       setIsTaskFormOpen(false);
       setSelectedTask(null);
@@ -205,7 +211,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     }
 
     try {
-      await deleteTask(id);
+      await deleteTaskMutation.mutateAsync(id);
       setIsTaskFormOpen(false);
       setSelectedTask(null);
     } catch (error) {
@@ -223,7 +229,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
       console.log('WeekView: Submitting team member:', memberData);
 
       // Wait for the team member to be added
-      await addTeamMember(memberData);
+      await addTeamMemberMutation.mutateAsync(memberData);
 
       console.log('WeekView: Team member added successfully');
       setIsTeamMemberFormOpen(false);
@@ -299,7 +305,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         updates
       });
 
-      await updateTask(task.id, updates);
+      await updateTaskMutation.mutateAsync({ id: task.id, updates });
     } catch (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to move task. Please try again.');
@@ -363,8 +369,9 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
         new_end_date: newEndDate.toISOString()
       });
 
-      await updateTask(task.id, {
-        end_date: newEndDate.toISOString()
+      await updateTaskMutation.mutateAsync({
+        id: task.id,
+        updates: { end_date: newEndDate.toISOString() }
       });
     } catch (error) {
       console.error('Error resizing task:', error);
@@ -425,7 +432,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
             <button
               onClick={() => {
                 setIsRetrying(true);
-                fetchTeamMembers();
+                refetchTeamMembers();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
               className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex items-center"
@@ -451,7 +458,7 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
             <button
               onClick={() => {
                 setIsRetrying(true);
-                fetchTasks();
+                refetchTasks();
                 setTimeout(() => setIsRetrying(false), 1000);
               }}
               className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 flex items-center"

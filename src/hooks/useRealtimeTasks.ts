@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../api/supabaseClient';
-import { useTasksStore } from '../store/tasksStore';
+import { Task } from '../types';
+import { taskKeys } from './useTasks';
 import { logger } from '../utils/logger';
 
 /**
  * Hook that subscribes to real-time changes on the tasks table.
- * When tasks are inserted, updated, or deleted by other clients,
- * this hook triggers a refresh of the tasks store.
+ * Uses incremental updates via React Query cache instead of full refetch.
  */
-export function useRealtimeTasks(workerId?: string, isAdmin?: boolean) {
+export function useRealtimeTasks() {
+  const queryClient = useQueryClient();
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const isSubscribedRef = useRef(false);
 
@@ -25,16 +27,57 @@ export function useRealtimeTasks(workerId?: string, isAdmin?: boolean) {
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
+          event: 'INSERT',
           schema: 'public',
-          table: 'tasks'
+          table: 'tasks',
         },
         (payload) => {
-          logger.debug('useRealtimeTasks: Received change event', payload.eventType);
+          logger.debug('useRealtimeTasks: INSERT event', payload.new);
+          const newTask = payload.new as Task;
 
-          // Refresh tasks from the store
-          // We use getState() to avoid stale closure issues
-          useTasksStore.getState().fetchTasks(workerId, isAdmin);
+          // Add to cache if not already present
+          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+            if (!old) return [newTask];
+            // Avoid duplicates (might be our own optimistic update)
+            if (old.some((t) => t.id === newTask.id)) return old;
+            return [newTask, ...old];
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tasks',
+        },
+        (payload) => {
+          logger.debug('useRealtimeTasks: UPDATE event', payload.new);
+          const updatedTask = payload.new as Task;
+
+          // Update in cache
+          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+            if (!old) return old;
+            return old.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'tasks',
+        },
+        (payload) => {
+          logger.debug('useRealtimeTasks: DELETE event', payload.old);
+          const deletedId = (payload.old as { id: string }).id;
+
+          // Remove from cache
+          queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+            if (!old) return old;
+            return old.filter((t) => t.id !== deletedId);
+          });
         }
       )
       .subscribe((status) => {
@@ -50,7 +93,7 @@ export function useRealtimeTasks(workerId?: string, isAdmin?: boolean) {
       }
       isSubscribedRef.current = false;
     };
-  }, []);
+  }, [queryClient]);
 }
 
 // Backwards compatibility alias

@@ -20,7 +20,7 @@ import { useDrop } from 'react-dnd';
 import { Task, Worker } from '../../types';
 import UnscheduledPanel from './UnscheduledPanel';
 import GlobalTaskSearch from './GlobalTaskSearch';
-import { useTasksStore } from '../../store/tasksStore';
+import { useTasksQuery, useAddTask, useUpdateTask, useDeleteTask } from '../../hooks/useTasks';
 import { useAuth } from '../../context/AuthContext';
 import { TaskForm } from '../tasks';
 import DayTasksModal from './DayTasksModal';
@@ -49,16 +49,20 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     localStorage.setItem('tasksPaneCollapsed', String(newValue));
   };
 
-  // Use store for data access
+  // React Query hooks for data access
   const {
-    tasks,
-    loading: tasksLoading,
-    error: tasksError,
-    fetchTasks,
-    addTask,
-    updateTask,
-    deleteTask
-  } = useTasksStore();
+    data: tasks = [],
+    isLoading: tasksLoading,
+    error: tasksQueryError,
+  } = useTasksQuery(currentWorker?.id, false);
+
+  // Mutations
+  const addTaskMutation = useAddTask();
+  const updateTaskMutation = useUpdateTask();
+  const deleteTaskMutation = useDeleteTask();
+
+  // Convert query error to string
+  const tasksError = tasksQueryError?.message || null;
 
   const { user, currentWorker } = useAuth();
 
@@ -253,7 +257,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       }
 
       console.log('MonthView: Updating task with:', updates);
-      await updateTask(task.id, updates);
+      await updateTaskMutation.mutateAsync({ id: task.id, updates });
     } catch (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to move task. Please try again.');
@@ -268,9 +272,9 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
 
     try {
       if (selectedTask) {
-        await updateTask(selectedTask.id, jobData);
+        await updateTaskMutation.mutateAsync({ id: selectedTask.id, updates: jobData });
       } else {
-        await addTask(jobData);
+        await addTaskMutation.mutateAsync(jobData);
       }
       setIsTaskFormOpen(false);
       setSelectedTask(null);
@@ -286,7 +290,7 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
     }
 
     try {
-      await deleteTask(id);
+      await deleteTaskMutation.mutateAsync(id);
       setIsTaskFormOpen(false);
       setSelectedTask(null);
     } catch (error) {
@@ -312,8 +316,9 @@ const MonthView: React.FC<MonthViewProps> = ({ readOnly = false }) => {
       const startDate = parseISO(task.start_date);
       const newEndDate = addDays(startDate, days - 1); // -1 because the start day counts as day 1
 
-      await updateTask(task.id, {
-        end_date: newEndDate.toISOString()
+      await updateTaskMutation.mutateAsync({
+        id: task.id,
+        updates: { end_date: newEndDate.toISOString() }
       });
     } catch (error) {
       console.error('Error resizing task:', error);

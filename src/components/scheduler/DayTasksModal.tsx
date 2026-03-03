@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Task } from '../../types';
 import { X } from 'lucide-react';
 import DraggableTask from './DraggableTask';
-import { useTeamStore } from '../../store/teamStore';
+import { useTeamMembersQuery } from '../../hooks/useTeamMembers';
 
 interface DayTasksModalProps {
   date: Date;
@@ -18,7 +18,7 @@ const DayTasksModal: React.FC<DayTasksModalProps> = ({
   onClose,
   onTaskClick,
 }) => {
-  const { teamMembers } = useTeamStore();
+  const { data: teamMembers = [] } = useTeamMembersQuery();
 
   // Helper function to get team member names for a task
   const getTeamAssignments = (task: Task) => {

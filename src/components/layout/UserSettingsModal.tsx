@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Settings } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useTeamStore } from '../../store/teamStore';
+import { useUpdateTeamMember } from '../../hooks/useTeamMembers';
 
 interface UserSettingsModalProps {
   onClose: () => void;
@@ -9,7 +9,7 @@ interface UserSettingsModalProps {
 
 const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose }) => {
   const { currentTeamMember, refreshCurrentTeamMember } = useAuth();
-  const { updateTeamMember } = useTeamStore();
+  const updateTeamMemberMutation = useUpdateTeamMember();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -36,9 +36,12 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose }) => {
 
     setIsLoading(true);
     try {
-      await updateTeamMember(currentTeamMember.id, {
-        name: name.trim(),
-        phone: phone.trim() || null
+      await updateTeamMemberMutation.mutateAsync({
+        id: currentTeamMember.id,
+        updates: {
+          name: name.trim(),
+          phone: phone.trim() || null
+        }
       });
       await refreshCurrentTeamMember();
       onClose();

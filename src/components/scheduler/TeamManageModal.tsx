@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { TeamMember } from '../../types';
 import { X, Trash2, AlertTriangle, Lock, Pencil, Check } from 'lucide-react';
-import { useTeamStore } from '../../store/teamStore';
-import { useTasksStore } from '../../store/tasksStore';
+import { useDeleteTeamMember, useUpdateTeamMember } from '../../hooks/useTeamMembers';
+import { useTasksQuery } from '../../hooks/useTasks';
 
 interface TeamManageModalProps {
   onClose: () => void;
@@ -18,8 +18,9 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const { deleteTeamMember, updateTeamMember } = useTeamStore();
-  const { tasks } = useTasksStore();
+  const deleteTeamMemberMutation = useDeleteTeamMember();
+  const updateTeamMemberMutation = useUpdateTeamMember();
+  const { data: tasks = [] } = useTasksQuery();
 
   const startEditing = (member: TeamMember) => {
     if (readOnly) return;
@@ -40,9 +41,12 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
 
     setIsLoading(true);
     try {
-      await updateTeamMember(editingMemberId, {
-        name: editName.trim(),
-        email: editEmail.trim() || null
+      await updateTeamMemberMutation.mutateAsync({
+        id: editingMemberId,
+        updates: {
+          name: editName.trim(),
+          email: editEmail.trim() || null
+        }
       });
       setEditingMemberId(null);
       setEditName('');
@@ -74,7 +78,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
   const handleDelete = async () => {
     if (!selectedMember || readOnly) return;
     try {
-      await deleteTeamMember(selectedMember.id);
+      await deleteTeamMemberMutation.mutateAsync(selectedMember.id);
       setShowDeleteConfirm(false);
       setSelectedMember(null);
       setAssignedTasksCount(0);

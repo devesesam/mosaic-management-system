@@ -325,6 +325,104 @@ Check `CalendarGrid.tsx`:
 
 ---
 
+## Migration Issues (v0.3.0)
+
+### Issue: Import Error for Zustand Stores
+
+**Symptom:** `Cannot find module '../store/tasksStore'` or similar
+
+**Cause:** Zustand stores were deleted in v0.3.0. The codebase now uses React Query hooks.
+
+**Solution:**
+```typescript
+// OLD (v0.2.x) - No longer works
+import { useTasksStore } from '../store/tasksStore';
+const { tasks, fetchTasks, addTask } = useTasksStore();
+
+// NEW (v0.3.0) - Use React Query hooks
+import { useTasksQuery, useAddTask } from '../hooks/useTasks';
+const { data: tasks = [], isLoading } = useTasksQuery();
+const addTaskMutation = useAddTask();
+// To add: await addTaskMutation.mutateAsync(taskData);
+```
+
+---
+
+### Issue: Form Validation Not Working
+
+**Symptom:** Form submits with invalid data, or validation errors don't show
+
+**Cause:** Not using Zod schema validation
+
+**Solution:**
+```typescript
+import { validateTaskForm } from '../schemas/task';
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const validation = validateTaskForm(formData);
+  if (!validation.success) {
+    toast.error(Object.values(validation.errors)[0]);
+    return;
+  }
+
+  await submitTask(validation.data);
+};
+```
+
+---
+
+### Issue: Routes Not Working / 404 on Refresh
+
+**Symptom:** Direct URL access shows 404, or browser back/forward doesn't work
+
+**Cause:** Server not configured for SPA routing
+
+**Solution:**
+1. **Netlify**: Add `_redirects` file with `/* /index.html 200`
+2. **Vercel**: Configure `vercel.json` with rewrite rules
+3. **Local dev**: Vite handles this automatically
+
+---
+
+### Issue: React Query Cache Stale
+
+**Symptom:** Data doesn't update after mutation
+
+**Cause:** Cache not being invalidated properly
+
+**Solution:**
+Mutations should invalidate queries:
+```typescript
+const addTaskMutation = useMutation({
+  mutationFn: addTaskApi,
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: taskKeys.all });
+  },
+});
+```
+
+Check that `src/hooks/useTasks.ts` has proper `onSuccess` handlers.
+
+---
+
+### Issue: Error Boundary Not Catching Errors
+
+**Symptom:** White screen crash instead of fallback UI
+
+**Cause:** Error occurring outside of Error Boundary, or in async code
+
+**Solution:**
+1. Ensure Error Boundary wraps the failing component
+2. Error Boundaries don't catch errors in:
+   - Event handlers (use try/catch)
+   - Async code (use try/catch)
+   - Server-side rendering
+   - Errors in the Error Boundary itself
+
+---
+
 ## Migration Issues (v0.2.0 & v0.2.1)
 
 ### Issue: Month View White Screen Crash

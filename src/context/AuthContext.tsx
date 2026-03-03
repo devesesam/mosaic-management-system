@@ -1,10 +1,33 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from '../api/supabaseClient';
-import { useTeamStore } from '../store/teamStore';
 import { TeamMember } from '../types';
 import toast from 'react-hot-toast';
 import { logger } from '../utils/logger';
+
+// Direct API call to fetch team members (used during auth initialization)
+async function fetchTeamMembersApi(): Promise<TeamMember[]> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const apiUrl = `${supabaseUrl}/functions/v1/get-workers`;
+
+  const response = await fetch(apiUrl, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  if (data.success && data.data) {
+    return data.data;
+  }
+  throw new Error(data.error || 'Failed to fetch team members');
+}
 
 interface AuthContextProps {
   session: Session | null;
@@ -73,8 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (data.session.user.email) {
             const email = data.session.user.email.toLowerCase();
             try {
-              await useTeamStore.getState().fetchTeamMembers();
-              const teamMembers = useTeamStore.getState().teamMembers;
+              const teamMembers = await fetchTeamMembersApi();
               const member = teamMembers.find(m => m.email?.toLowerCase() === email);
 
               if (member) {
@@ -111,8 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const email = session.user.email?.toLowerCase();
         if (email) {
           try {
-            await useTeamStore.getState().fetchTeamMembers();
-            const teamMembers = useTeamStore.getState().teamMembers;
+            const teamMembers = await fetchTeamMembersApi();
             const member = teamMembers.find(m => m.email?.toLowerCase() === email);
 
             if (member) {
@@ -198,8 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user?.email) return;
 
     try {
-      await useTeamStore.getState().fetchTeamMembers();
-      const teamMembers = useTeamStore.getState().teamMembers;
+      const teamMembers = await fetchTeamMembersApi();
       const email = user.email.toLowerCase();
       const member = teamMembers.find(m => m.email?.toLowerCase() === email);
 

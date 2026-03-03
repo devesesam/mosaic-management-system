@@ -4,6 +4,201 @@ All notable changes to the Mosaic Scheduler project are documented in this file.
 
 ---
 
+## [0.3.0] - 2026-03-03 - Modern Architecture Overhaul
+
+### Overview
+Major modernization of the codebase to align with 2026 best practices. Migrated from Zustand stores to React Query, added React Router for navigation, implemented Zod schema validation, added Error Boundaries, and enabled session persistence.
+
+### Breaking Changes
+
+#### Data Fetching Architecture
+- **Zustand stores DELETED**: `src/store/tasksStore.ts` and `src/store/teamStore.ts` removed
+- **React Query hooks added**: All data fetching now uses TanStack Query
+- Components must update imports from stores to hooks
+
+### Added
+
+#### React Query Hooks (`src/hooks/`)
+| Hook | Purpose |
+|------|---------|
+| `useTasksQuery()` | Fetch all tasks with caching |
+| `useAddTask()` | Create task mutation with optimistic update |
+| `useUpdateTask()` | Update task mutation with cache invalidation |
+| `useDeleteTask()` | Delete task mutation |
+| `useTeamMembersQuery()` | Fetch team members with caching |
+| `useAddTeamMember()` | Create team member mutation |
+| `useUpdateTeamMember()` | Update team member mutation |
+| `useDeleteTeamMember()` | Delete team member mutation |
+
+#### Query Key Factories
+```typescript
+// src/hooks/useTasks.ts
+export const taskKeys = {
+  all: ['tasks'] as const,
+  list: (workerId?: string, isAdmin?: boolean) => [...taskKeys.all, { workerId, isAdmin }] as const,
+};
+
+// src/hooks/useTeamMembers.ts
+export const teamKeys = {
+  all: ['teamMembers'] as const,
+  list: () => [...teamKeys.all, 'list'] as const,
+};
+```
+
+#### React Router v6 (`src/main.tsx`, `src/App.tsx`)
+- Routes: `/week`, `/month` (default redirects to `/week`)
+- Deep linking supported - URLs are shareable
+- Browser history navigation works
+
+#### Zod Schema Validation (`src/schemas/task.ts`)
+```typescript
+export const taskFormSchema = z.object({
+  name: z.string().min(1, 'Task name is required').max(200),
+  notes: z.string().max(2000).nullable().optional(),
+  worker_id: z.string().uuid().nullable().optional(),
+  secondary_worker_ids: z.array(z.string().uuid()).default([]),
+  start_date: z.string().datetime().nullable().optional(),
+  end_date: z.string().datetime().nullable().optional(),
+  status: z.nativeEnum(TaskStatus).default(TaskStatus.NotStarted),
+  tile_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default('#345981'),
+  is_visible: z.boolean().default(true),
+}).refine(/* date validation */).refine(/* secondary workers validation */);
+```
+
+#### React Error Boundaries (`src/components/layout/ErrorBoundary.tsx`)
+- Prevents white screen crashes
+- Shows user-friendly error UI with retry options
+- Wraps calendar views and task form in `App.tsx`
+
+#### Session Persistence (`src/api/supabaseClient.ts`)
+- Users stay logged in on page refresh
+- `persistSession: true`, `autoRefreshToken: true`
+- Sessions stored in localStorage
+
+### Changed
+
+#### Real-time Updates Now Incremental
+Before (v0.2.x): Full refetch on any change - O(n)
+```typescript
+// OLD - Bad performance
+fetchTasks(); // Refetch everything
+```
+
+After (v0.3.0): Incremental cache updates - O(1)
+```typescript
+// NEW - Optimal performance
+queryClient.setQueryData<Task[]>(taskKeys.all, (old) => {
+  if (!old) return [newTask];
+  return [newTask, ...old];
+});
+```
+
+#### Component Migration
+All components updated to use React Query hooks:
+- `App.tsx` - Uses `useTasksQuery()`, `useTeamMembersQuery()`
+- `WeekView.tsx` - Uses query hooks + mutations
+- `MonthView.tsx` - Uses query hooks + mutations
+- `TaskForm.tsx` - Uses `useTeamMembersQuery()` + Zod validation
+- `TeamManageModal.tsx` - Uses team query hooks
+- `DayTasksModal.tsx` - Uses mutations
+- `UserSettingsModal.tsx` - Uses mutations
+
+### Removed
+
+#### Deleted Files
+| File | Reason |
+|------|--------|
+| `src/store/tasksStore.ts` | Replaced by React Query hooks |
+| `src/store/teamStore.ts` | Replaced by React Query hooks |
+| `src/store/` directory | Empty after cleanup |
+| `supabase/functions/add-job/` | Legacy, use `add-task` |
+| `supabase/functions/delete-job/` | Legacy, use `delete-task` |
+| `supabase/functions/get-jobs/` | Legacy, use `get-tasks` |
+| `supabase/functions/get-jobs-by-worker/` | Legacy, use `get-tasks-by-worker` |
+| `supabase/functions/update-job/` | Legacy, use `update-task` |
+
+### Performance Improvements
+
+| Metric | Before (v0.2.x) | After (v0.3.0) |
+|--------|----------------|----------------|
+| Real-time update complexity | O(n) full refetch | O(1) incremental |
+| Request deduplication | None | Automatic via React Query |
+| Caching | None | 5-minute stale time |
+| Retry logic | Manual | Automatic with exponential backoff |
+| Background refetch | None | On window focus |
+
+### Migration Guide
+
+#### For Components Using Old Stores
+```typescript
+// OLD (v0.2.x)
+import { useTasksStore } from '../store/tasksStore';
+const { tasks, loading, fetchTasks, addTask } = useTasksStore();
+
+// NEW (v0.3.0)
+import { useTasksQuery, useAddTask } from '../hooks/useTasks';
+const { data: tasks = [], isLoading } = useTasksQuery();
+const addTaskMutation = useAddTask();
+// To add: await addTaskMutation.mutateAsync(taskData);
+```
+
+#### For Form Validation
+```typescript
+// OLD (v0.2.x)
+if (!formData.name?.trim()) {
+  toast.error('Task name is required');
+  return;
+}
+
+// NEW (v0.3.0)
+import { validateTaskForm } from '../schemas/task';
+const validation = validateTaskForm(formData);
+if (!validation.success) {
+  toast.error(Object.values(validation.errors)[0]);
+  return;
+}
+```
+
+#### For Navigation
+```typescript
+// OLD (v0.2.x)
+const [activeView, setActiveView] = useState<'week' | 'month'>('week');
+
+// NEW (v0.3.0)
+import { useNavigate, useLocation } from 'react-router-dom';
+const navigate = useNavigate();
+const location = useLocation();
+const activeView = location.pathname === '/month' ? 'month' : 'week';
+// To navigate: navigate('/month');
+```
+
+### Verification Checklist
+
+- [x] Build passes: `npm run build` succeeds
+- [x] No TypeScript errors
+- [x] React Query hooks work correctly
+- [x] Real-time updates propagate between browsers
+- [x] Form validation catches invalid input
+- [x] Routes work: `/week`, `/month`
+- [x] Session persists on page refresh
+- [x] Error boundaries catch crashes gracefully
+
+### Lessons Learned
+
+1. **React Query simplifies data fetching**: Automatic caching, deduplication, and retry logic reduce boilerplate significantly.
+
+2. **Incremental updates are worth the effort**: Changing from O(n) refetch to O(1) cache updates makes real-time feel instant.
+
+3. **Zod provides better DX than manual validation**: Type inference and clear error messages improve both code quality and UX.
+
+4. **Error Boundaries prevent catastrophic failures**: A single unhandled error in the calendar shouldn't crash the entire app.
+
+5. **Session persistence is table stakes**: Users expect to stay logged in. This should have been enabled from day one.
+
+6. **Clean up after migration**: Deleting old stores and legacy Edge Functions reduces confusion for future developers.
+
+---
+
 ## [0.2.2] - 2026-03-03 - Task Visibility Toggle & Bug Fixes
 
 ### Overview
@@ -818,4 +1013,7 @@ VITE_LOG_LEVEL=warn
 | 0.1.5 | 2026-03-03 | Performance optimization: realtime subscriptions, React.memo, removed polling |
 | 0.1.6 | 2026-03-03 | Mosaic brand redesign: colors, typography, ~20 component updates |
 | 0.1.7 | 2026-03-03 | Scheduler UX: fixed unscheduled tasks bug, added team member row ordering |
-| **0.2.0** | **2026-03-03** | **Major refactoring: Jobs → Tasks, simplified form, new edge functions** |
+| 0.2.0 | 2026-03-03 | Major refactoring: Jobs → Tasks, simplified form, new edge functions |
+| 0.2.1 | 2026-03-03 | Bug fixes: MonthView crash, error loading data |
+| 0.2.2 | 2026-03-03 | Task visibility toggle, private tasks filtering |
+| **0.3.0** | **2026-03-03** | **Modern architecture: React Query, Zod, React Router, Error Boundaries** |
