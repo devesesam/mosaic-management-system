@@ -122,11 +122,17 @@ async function deleteTaskApi(id: string): Promise<void> {
 
 /**
  * Hook to fetch all tasks with caching and automatic deduplication
+ *
+ * IMPORTANT: The query is disabled until workerId is provided to ensure
+ * visibility filtering works correctly. Without a workerId, private tasks
+ * would be excluded from the response and cached incorrectly.
  */
 export function useTasksQuery(workerId?: string, isAdmin?: boolean) {
   return useQuery({
     queryKey: taskKeys.all,
     queryFn: () => fetchTasks(workerId, isAdmin),
+    // Only run the query when we have a workerId to ensure visibility filtering
+    enabled: !!workerId || isAdmin === true,
   });
 }
 

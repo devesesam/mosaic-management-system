@@ -3,6 +3,7 @@ import { TeamMember } from '../../types';
 import { X, Trash2, AlertTriangle, Lock, Pencil, Check } from 'lucide-react';
 import { useDeleteTeamMember, useUpdateTeamMember } from '../../hooks/useTeamMembers';
 import { useTasksQuery } from '../../hooks/useTasks';
+import { useAuth } from '../../context/AuthContext';
 
 interface TeamManageModalProps {
   onClose: () => void;
@@ -18,9 +19,11 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const { currentWorker } = useAuth();
   const deleteTeamMemberMutation = useDeleteTeamMember();
   const updateTeamMemberMutation = useUpdateTeamMember();
-  const { data: tasks = [] } = useTasksQuery();
+  // Use the current user's context for visibility filtering
+  const { data: tasks = [] } = useTasksQuery(currentWorker?.id, false);
 
   const startEditing = (member: TeamMember) => {
     if (readOnly) return;
