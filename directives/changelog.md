@@ -4,6 +4,23 @@ All notable changes to the Mosaic Scheduler project are documented in this file.
 
 ---
 
+## [0.2.2] - 2026-03-03 - Task Visibility Toggle & Bug Fixes
+
+### Overview
+Implemented a privacy toggle allowing tasks to be hidden from the master calendar unless the user is explicitly assigned to them. Also patched critical React lifecycle bugs related to Edge Function API calls.
+
+### Added
+- **Task Visibility Toggle:** Added an `is_visible` boolean to the `tasks` table.
+- **Frontend Toggle:** Added a "Visible to everyone" toggle switch to `TaskForm.tsx`.
+- **Backend Visibility Filtering:** `get-tasks` Edge Function now securely filters out private tasks based on the requesting user's `workerId`.
+
+### Fixed
+- **Tasks Disappearing in MonthView:** Fixed an issue where private tasks vanished from MonthView. Removed rogue, anonymous `fetchTasks()` calls in `MonthView.tsx` and `WeekView.tsx` that were stripping the user's Auth context.
+- **Side-Panel Task Count Discrepancy:** Aligned `MonthView.tsx` unscheduled task filtering (`!task.start_date || !task.worker_id`) to match `WeekView.tsx`, correcting a bug where assigned-but-unscheduled tasks were hidden from the MonthView sidebar.
+- **Realtime Updates Dropping Context:** Updated `useRealtimeTasks` to preserve the user's login ID so background DB syncs don't drop the visibility context.
+
+---
+
 ## [0.2.1] - 2026-03-03 - Post-Migration Bug Fixes
 
 ### Overview

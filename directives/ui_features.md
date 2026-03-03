@@ -6,15 +6,16 @@ Documentation for user-facing features in the Mosaic Scheduler.
 
 ## Table of Contents
 
-1. [Global Job Search](#global-job-search)
-2. [Jobs to Schedule Pane](#jobs-to-schedule-pane)
+1. [Global Task Search](#global-task-search)
+2. [Tasks to Schedule Pane](#tasks-to-schedule-pane)
 3. [Worker Management](#worker-management)
 4. [Mobile Optimization](#mobile-optimization)
 5. [Calendar Views](#calendar-views)
+6. [Task Privacy & Visibility](#task-privacy--visibility)
 
 ---
 
-## Global Job Search
+## Global Task Search
 
 ### Location
 - **Component**: `src/components/scheduler/GlobalJobSearch.tsx`
@@ -59,7 +60,7 @@ interface GlobalJobSearchProps {
 
 ---
 
-## Jobs to Schedule Pane
+## Tasks to Schedule Pane
 
 ### Location
 - **Component**: `src/components/scheduler/UnscheduledPanel.tsx`
@@ -279,6 +280,24 @@ const { currentUserMember, otherMembers } = React.useMemo(() => {
 - Both integrate `UnscheduledPanel` (collapsible)
 - Both share `JobForm` modal for job editing
 - Collapsed pane state shared via localStorage
+
+---
+
+## Task Privacy & Visibility
+
+### Location
+- **Component**: `src/components/tasks/TaskForm.tsx`
+- **Store Hook**: `useTasksStore`
+
+### Purpose
+Allows tasks to be hidden from the master calendar to protect sensitive bookings or unassigned preparations.
+
+### Features
+- Tasks have an `is_visible` boolean (defaults to `true`).
+- In the task modal, the user can toggle "Visible to everyone".
+- **Rule 1:** A task *cannot* be made private unless there is a primary team member assigned to it.
+- **Rule 2:** If a private task is unassigned (the primary worker is removed), the app will force the task to become public again to prevent it from becoming an orphaned/hidden task.
+- Sub-contractors or secondary workers can see private tasks if they are explicitly assigned to them via the `secondary_worker_ids` list.
 
 ---
 

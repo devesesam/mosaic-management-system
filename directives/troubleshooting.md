@@ -338,6 +338,25 @@ Refactor the components to use `useTasksStore` and `Task` types. Update all vari
 
 ---
 
+### Issue: Private Tasks Disappearing from Master Calendar
+
+**Symptom:** A task set to "Private" correctly shows up in WeekView, but vanishes when navigating to MonthView (or vice-versa), and disappears from both upon return.
+
+**Root Cause:** The `WeekView` or `MonthView` components are making isolated, duplicate calls to `fetchTasks()` locally on mount. Because these local fetches don't pass the logged-in user's context (e.g., `workerId`), the backend Edge Function treats the request as "anonymous" and strips out all private tasks.
+
+**Solution:** Data fetching should happen globally in `App.tsx` where the `currentWorker` context is available. Remove duplicate `useEffect` fetching blocks from the individual calendar view components:
+
+```tsx
+// ❌ BAD: Don't fetch tasks inside the views without context!
+useEffect(() => {
+  fetchTasks();
+}, [fetchTasks]);
+
+// ✅ GOOD: Rely on App.tsx to fetch the global state, ensuring `fetchTasks(workerId)` preserves visibility permissions.
+```
+
+---
+
 ### Issue: "Table 'jobs' does not exist" Error
 
 **Symptom:** API calls fail with table not found errors after migration
