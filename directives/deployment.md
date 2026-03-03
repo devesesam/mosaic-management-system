@@ -5,7 +5,7 @@ This guide documents the deployment workflows for the Tasman Roofing Scheduler.
 ## Architecture
 
 - **Frontend**: Hosted on [Netlify](https://app.netlify.com/projects/teal-eclair-7a0089/overview)
-- **Backend/Database**: [Supabase](https://supabase.com/dashboard/project/psecxigbgrvwbpkndokk)
+- **Backend/Database**: [Supabase](https://supabase.com/dashboard/project/qkclmypehdlyhwxhxyue)
 - **Repository**: [GitHub](https://github.com/devesesam/scheduler_test)
 
 ---
@@ -66,7 +66,7 @@ Since we do not have direct CLI access to the production database password in th
 1.  **Locate Migration File:**
     - Check `supabase/migrations/` for new `.sql` files.
 2.  **Open Supabase Dashboard:**
-    - Go to [Supabase SQL Editor](https://supabase.com/dashboard/project/psecxigbgrvwbpkndokk/sql).
+    - Go to [Supabase SQL Editor](https://supabase.com/dashboard/project/qkclmypehdlyhwxhxyue/sql).
 3.  **Run SQL:**
     - Copy the contents of the migration file.
     - Paste into a "New Query".
@@ -81,14 +81,14 @@ Edge Functions (e.g., `update-worker`) must be deployed separately via the Supab
 ### How to Deploy
 ```bash
 # Deploy a specific function
-npx supabase functions deploy update-worker --project-ref psecxigbgrvwbpkndokk
+npx supabase functions deploy update-worker --project-ref qkclmypehdlyhwxhxyue
 
 # Deploy all functions
-npx supabase functions deploy --project-ref psecxigbgrvwbpkndokk
+npx supabase functions deploy --project-ref qkclmypehdlyhwxhxyue
 ```
 
 > **Note:** You may need to link the project first:
-> `npx supabase link --project-ref psecxigbgrvwbpkndokk`
+> `npx supabase link --project-ref qkclmypehdlyhwxhxyue`
 
 ---
 

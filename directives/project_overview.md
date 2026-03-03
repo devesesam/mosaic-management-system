@@ -68,7 +68,7 @@ RoofingScheduler/
 ### Key Files & Resources
 - **Agent Instructions**: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` - Core operating instructions for AI agents
 - **Environment Config**: `.env` (contains Supabase credentials - DO NOT COMMIT)
-- **Supabase Project**: [Dashboard](https://supabase.com/dashboard/project/psecxigbgrvwbpkndokk)
+- **Supabase Project**: [Dashboard](https://supabase.com/dashboard/project/qkclmypehdlyhwxhxyue)
 - **GitHub Repository**: [Repo](https://github.com/devesesam/scheduler_test)
 
 ### Environment Variables

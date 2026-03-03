@@ -259,7 +259,7 @@ An agent initially incorrectly stated that `jobsApi.ts` and `workersApi.ts` were
 cd RoofingScheduler
 
 # Link to Supabase project (if not already)
-npx supabase link --project-ref psecxigbgrvwbpkndokk
+npx supabase link --project-ref qkclmypehdlyhwxhxyue
 
 # Apply migration (test in staging first!)
 npx supabase db push
