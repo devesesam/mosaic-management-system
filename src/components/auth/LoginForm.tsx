@@ -15,7 +15,8 @@ const LoginForm: React.FC = () => {
   useEffect(() => {
     // Call signOut to ensure clean auth state
     signOut();
-  }, [signOut]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Display toast error notification when error state changes
   useEffect(() => {

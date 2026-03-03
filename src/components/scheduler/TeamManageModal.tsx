@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TeamMember } from '../../types';
 import { X, Trash2, AlertTriangle, Lock, Pencil, Check } from 'lucide-react';
 import { useTeamStore } from '../../store/teamStore';
-import { useJobsStore } from '../../store/jobsStore';
+import { useTasksStore } from '../../store/tasksStore';
 
 interface TeamManageModalProps {
   onClose: () => void;
@@ -14,12 +14,12 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [assignedJobsCount, setAssignedJobsCount] = useState(0);
+  const [assignedTasksCount, setAssignedTasksCount] = useState(0);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const { deleteTeamMember, updateTeamMember } = useTeamStore();
-  const { jobs } = useJobsStore();
+  const { tasks } = useTasksStore();
 
   const startEditing = (member: TeamMember) => {
     if (readOnly) return;
@@ -54,18 +54,18 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
     }
   };
 
-  const checkMemberJobs = async (member: TeamMember) => {
+  const checkMemberTasks = async (member: TeamMember) => {
     if (readOnly) return;
 
     setIsLoading(true);
     try {
-      // Use local jobs store instead of API call
-      const memberJobs = jobs.filter(job => job.worker_id === member.id);
-      setAssignedJobsCount(memberJobs.length);
+      // Use local tasks store instead of API call
+      const memberTasks = tasks.filter(task => task.worker_id === member.id);
+      setAssignedTasksCount(memberTasks.length);
       setSelectedMember(member);
       setShowDeleteConfirm(true);
     } catch (error) {
-      console.error('Error checking team member jobs:', error);
+      console.error('Error checking team member tasks:', error);
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +77,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
       await deleteTeamMember(selectedMember.id);
       setShowDeleteConfirm(false);
       setSelectedMember(null);
-      setAssignedJobsCount(0);
+      setAssignedTasksCount(0);
     } catch (error) {
       console.error('Error deleting team member:', error);
     }
@@ -190,7 +190,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
                           <Pencil size={18} />
                         </button>
                         <button
-                          onClick={() => checkMemberJobs(member)}
+                          onClick={() => checkMemberTasks(member)}
                           disabled={isLoading || readOnly}
                           className={`p-2 transition-colors ${readOnly
                             ? 'text-gray-400 cursor-not-allowed'
@@ -224,9 +224,9 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
               <p>
                 Are you sure you want to delete {selectedMember.name}?
               </p>
-              {assignedJobsCount > 0 && (
+              {assignedTasksCount > 0 && (
                 <p className="text-amber-600 font-medium">
-                  This team member has {assignedJobsCount} assigned {assignedJobsCount === 1 ? 'job' : 'jobs'} that will be unassigned.
+                  This team member has {assignedTasksCount} assigned {assignedTasksCount === 1 ? 'task' : 'tasks'} that will be unassigned.
                 </p>
               )}
               <p className="text-sm">
@@ -239,7 +239,7 @@ const TeamManageModal: React.FC<TeamManageModalProps> = ({ onClose, teamMembers,
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setSelectedMember(null);
-                  setAssignedJobsCount(0);
+                  setAssignedTasksCount(0);
                 }}
                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-margaux"
               >

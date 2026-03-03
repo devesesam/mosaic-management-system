@@ -150,7 +150,7 @@ function App() {
           </div>
           <h2 className="text-2xl font-bogart font-medium text-charcoal text-center mb-4">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">
-            {tasksError?.message || teamError?.message || 'Failed to load data. Please try refreshing the page.'}
+            {tasksError || teamError || 'Failed to load data. Please try refreshing the page.'}
           </p>
           <div className="flex flex-col space-y-3">
             <button
