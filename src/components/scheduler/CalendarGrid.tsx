@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useDrop } from 'react-dnd';
-import { format, isToday, differenceInDays, isSameDay, addDays, parseISO, isWithinInterval, isBefore, isAfter } from 'date-fns';
+import { format, isToday, isSameDay, parseISO } from 'date-fns';
 import { Job, TeamMember } from '../../types';
 import DraggableJob from './DraggableJob';
 import { Plus, Minus } from 'lucide-react';
 import TeamManageModal from './TeamManageModal';
 import DayJobsModal from './DayJobsModal';
 import MasterRow from './MasterRow';
-import { useAuth } from '../../context/AuthContext';
 
 interface CalendarGridProps {
   days: Date[];
@@ -32,7 +31,6 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   onNewWorker,
   readOnly = false
 }) => {
-  const { user, isEditable } = useAuth();
   const [isManageTeamOpen, setIsManageTeamOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<{ date: Date; workerId: string | null } | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | 'all'>('all');
@@ -41,48 +39,18 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   useEffect(() => {
     console.log('CalendarGrid: Team Members:', {
       count: teamMembers.length,
-      names: teamMembers.map(m => m.name),
-      readOnly,
-      isEditable,
-      userEmail: user?.email
+      names: teamMembers.map(m => m.name)
     });
-  }, [teamMembers, readOnly, isEditable, user?.email]);
+  }, [teamMembers]);
 
-  // Filter team members based on edit permissions and current user email
+  // Filter team members based on dropdown selection only (no role-based filtering)
+  // All authenticated users see all team members
   const displayedTeamMembers = React.useMemo(() => {
-    // If user has edit permissions (admin), show all team members or filtered team members
-    if (isEditable) {
-      if (selectedWorker === 'all') {
-        return teamMembers;
-      }
-      return teamMembers.filter(m => m.id === selectedWorker);
+    if (selectedWorker === 'all') {
+      return teamMembers;
     }
-
-    // If user is in read-only mode, only show the team member with matching email
-    if (user?.email) {
-      const userEmail = user.email.toLowerCase();
-      const matchingMember = teamMembers.find(m =>
-        m.email && m.email.toLowerCase() === userEmail
-      );
-      return matchingMember ? [matchingMember] : [];
-    }
-
-    // No user email or no matching team member - show nothing
-    return [];
-  }, [teamMembers, selectedWorker, isEditable, user?.email]);
-
-  // Should show unassigned row? Only for users with edit permissions
-  const showUnassignedRow = isEditable;
-
-  console.log('CalendarGrid: Display logic:', {
-    isEditable,
-    userEmail: user?.email,
-    totalTeamMembers: teamMembers.length,
-    displayedTeamMembers: displayedTeamMembers.length,
-    showUnassignedRow,
-    displayedTeamMemberNames: displayedTeamMembers.map(m => m.name),
-    displayedTeamMemberEmails: displayedTeamMembers.map(m => m.email)
-  });
+    return teamMembers.filter(m => m.id === selectedWorker);
+  }, [teamMembers, selectedWorker]);
 
   return (
     <div className="min-w-fit">
@@ -91,47 +59,31 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         {/* Team Member column header - responsive width */}
         <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 h-14 border-r border-b border-gray-200 bg-garlic flex items-center justify-between px-2 md:px-3">
           <div className="flex items-center space-x-2 flex-1">
-            {isEditable ? (
-              <select
-                value={selectedWorker}
-                onChange={(e) => setSelectedWorker(e.target.value)}
-                className="text-sm border-gray-300 rounded-md shadow-sm focus:border-margaux focus:ring-margaux max-w-[120px]"
-              >
-                <option value="all">All Team</option>
-                {teamMembers.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm font-medium text-charcoal">
-                {displayedTeamMembers.length > 0 ? displayedTeamMembers[0].name : 'Team'}
-              </span>
-            )}
+            <select
+              value={selectedWorker}
+              onChange={(e) => setSelectedWorker(e.target.value)}
+              className="text-sm border-gray-300 rounded-md shadow-sm focus:border-margaux focus:ring-margaux max-w-[120px]"
+            >
+              <option value="all">All Team</option>
+              {teamMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setIsManageTeamOpen(true)}
-              className={`p-1.5 rounded-full transition-colors ${
-                !isEditable
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'hover:bg-vanilla text-charcoal'
-              }`}
-              title={!isEditable ? 'Read-only mode' : 'Manage Team'}
-              disabled={!isEditable}
+              className="p-1.5 rounded-full transition-colors hover:bg-vanilla text-charcoal"
+              title="Manage Team"
             >
               <Minus className="h-5 w-5" />
             </button>
             <button
               onClick={onNewWorker}
-              className={`p-1.5 rounded-full transition-colors ${
-                !isEditable
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'hover:bg-vanilla text-charcoal'
-              }`}
-              title={!isEditable ? 'Read-only mode' : 'Add New Worker'}
-              disabled={!isEditable}
+              className="p-1.5 rounded-full transition-colors hover:bg-vanilla text-charcoal"
+              title="Add New Team Member"
             >
               <Plus className="h-5 w-5" />
             </button>
@@ -152,15 +104,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         ))}
       </div>
 
-      {/* No team member message for read-only users */}
-      {!isEditable && displayedTeamMembers.length === 0 && (
-        <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
-          No team member profile found for your email address. Please contact your administrator.
-        </div>
-      )}
-
-      {/* No team member message for admin users */}
-      {isEditable && teamMembers.length === 0 && (
+      {/* No team member message */}
+      {teamMembers.length === 0 && (
         <div className="p-4 text-amber-600 bg-amber-50 border-b border-amber-100 font-medium text-center">
           No team members found in the database. Add a team member to start scheduling jobs.
         </div>
@@ -176,20 +121,18 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
       {/* Grid content */}
       <div className="flex flex-col">
-        {/* Unassigned row - only show for users with edit permissions */}
-        {showUnassignedRow && (
-          <WorkerRow
-            workerId={null}
-            workerName="Unassigned"
-            days={days}
-            getWorkerDayJobs={getWorkerDayJobs}
-            onJobDrop={onJobDrop}
-            onJobClick={onJobClick}
-            onJobResize={onJobResize}
-            onShowMore={(date) => setSelectedDay({ date, workerId: null })}
-            readOnly={readOnly}
-          />
-        )}
+        {/* Unassigned row - always visible to all users */}
+        <WorkerRow
+          workerId={null}
+          workerName="Unassigned"
+          days={days}
+          getWorkerDayJobs={getWorkerDayJobs}
+          onJobDrop={onJobDrop}
+          onJobClick={onJobClick}
+          onJobResize={onJobResize}
+          onShowMore={(date) => setSelectedDay({ date, workerId: null })}
+          readOnly={readOnly}
+        />
 
         {/* Team member rows */}
         {displayedTeamMembers.map(member => (

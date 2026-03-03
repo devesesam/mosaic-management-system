@@ -163,11 +163,11 @@ const MasterRow: React.FC<MasterRowProps> = ({
   const rowHeight = Math.max(86, maxStackDepth * 78 + 16);
 
   return (
-    <div className="flex border-b-2 border-indigo-300" style={{ minHeight: `${rowHeight}px` }}>
+    <div className="flex border-b-2 border-margaux" style={{ minHeight: `${rowHeight}px` }}>
       {/* Master row header - darker background for distinction */}
-      <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 p-2 md:p-3 border-r border-gray-200 bg-indigo-100 flex items-center gap-2">
-        <Eye className="h-4 w-4 text-indigo-600 flex-shrink-0" />
-        <span className="font-semibold text-indigo-800 text-xs sm:text-sm md:text-base truncate">
+      <div className="w-24 sm:w-32 md:w-48 flex-shrink-0 p-2 md:p-3 border-r border-gray-200 bg-margaux/20 flex items-center gap-2">
+        <Eye className="h-4 w-4 text-blueberry flex-shrink-0" />
+        <span className="font-semibold text-blueberry text-xs sm:text-sm md:text-base truncate">
           Master View
         </span>
       </div>
@@ -181,7 +181,7 @@ const MasterRow: React.FC<MasterRowProps> = ({
             key={day.toString()}
             className={`
               flex-1 min-w-0 border-r border-gray-200 relative
-              ${isToday(day) ? 'bg-indigo-50/50' : 'bg-indigo-50/20'}
+              ${isToday(day) ? 'bg-margaux/10' : 'bg-margaux/5'}
             `}
             style={{ height: `${rowHeight}px` }}
           >

@@ -44,7 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentTeamMember(null);
       setError(null);
       setAuthError(null);
-      setIsEditable(false);
       localStorage.removeItem('supabase.auth.token');
       await supabase.auth.signOut();
     } catch (err) {
