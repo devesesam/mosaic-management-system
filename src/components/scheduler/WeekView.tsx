@@ -84,22 +84,6 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
     fetchTeamMembers();
   }, [fetchJobs, fetchTeamMembers]);
 
-  // Show toast notifications for loading states
-  useEffect(() => {
-    if (jobsLoading) {
-      toast.loading('Updating jobs...', { id: 'jobs-loading' });
-    } else {
-      toast.dismiss('jobs-loading');
-    }
-  }, [jobsLoading]);
-
-  useEffect(() => {
-    if (teamLoading) {
-      toast.loading('Updating team members...', { id: 'team-loading' });
-    } else {
-      toast.dismiss('team-loading');
-    }
-  }, [teamLoading]);
   
   // Debug log jobs data
   useEffect(() => {
@@ -118,76 +102,90 @@ const WeekView: React.FC<WeekViewProps> = ({ readOnly = false }) => {
   // Get unscheduled jobs - filter for read-only mode
   const unscheduledJobs = React.useMemo(() => {
     const baseUnscheduled = jobs.filter(job => !job.worker_id || !job.start_date);
-    
+
     if (readOnly && currentWorker) {
       // In read-only mode, show jobs that are either:
       // 1. Completely unassigned (no worker, no date)
       // 2. Assigned to current worker (primary or secondary) but no date
-      return jobs.filter(job => 
-        (!job.start_date && !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0)) || 
+      return jobs.filter(job =>
+        (!job.start_date && !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0)) ||
         (!job.start_date && (
-          job.worker_id === currentWorker.id || 
+          job.worker_id === currentWorker.id ||
           (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
         ))
       );
     }
-    
+
     return baseUnscheduled;
   }, [jobs, readOnly, currentWorker]);
-  
-  // Get jobs for a worker on a specific day - updated to include secondary workers
-  const getWorkerDayJobs = useCallback((workerId: string | null, day: Date) => {
-    const allJobs = jobs.filter(job => {
-      // Skip if no start date
-      if (!job.start_date) return false;
-      
-      // Check if the job is assigned to this worker (primary or secondary)
-      let isAssignedToWorker = false;
-      
-      if (workerId === null) {
-        // For unassigned row, only show jobs with no primary worker AND no secondary workers
-        isAssignedToWorker = !job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0);
-      } else {
-        // For specific worker rows, check both primary and secondary assignments
-        isAssignedToWorker = job.worker_id === workerId || 
-          (job.secondary_worker_ids && job.secondary_worker_ids.includes(workerId));
-      }
-      
-      if (!isAssignedToWorker) return false;
-      
+
+  // PRE-COMPUTE worker-day job assignments for O(1) lookups
+  // This replaces the O(n) filter on every getWorkerDayJobs call
+  const workerDayJobsMap = React.useMemo(() => {
+    const map = new Map<string, Job[]>();
+
+    // Pre-format day keys for the week
+    const dayKeys = weekDays.map(d => format(d, 'yyyy-MM-dd'));
+
+    jobs.forEach(job => {
+      if (!job.start_date) return;
+
       try {
         const jobStart = parseISO(job.start_date);
-        
-        // Handle jobs with end dates (multi-day jobs)
-        if (job.end_date) {
-          const jobEnd = parseISO(job.end_date);
-          
-          // Check if day is within the job's date range
-          return (
-            (day >= jobStart && day <= jobEnd) || 
-            format(day, 'yyyy-MM-dd') === format(jobStart, 'yyyy-MM-dd') || 
-            format(day, 'yyyy-MM-dd') === format(jobEnd, 'yyyy-MM-dd')
-          );
-        }
-        
-        // For single-day jobs, just check the start date
-        return format(day, 'yyyy-MM-dd') === format(jobStart, 'yyyy-MM-dd');
+        const jobEnd = job.end_date ? parseISO(job.end_date) : jobStart;
+
+        // For each day in the week, check if job spans that day
+        weekDays.forEach((day, dayIdx) => {
+          const dayKey = dayKeys[dayIdx];
+
+          // Check if job spans this day
+          const isOnDay = (day >= jobStart && day <= jobEnd) ||
+            format(jobStart, 'yyyy-MM-dd') === dayKey ||
+            format(jobEnd, 'yyyy-MM-dd') === dayKey;
+
+          if (!isOnDay) return;
+
+          // Determine which worker rows this job appears on
+          const workerIds: (string | null)[] = [];
+
+          if (!job.worker_id && (!job.secondary_worker_ids || job.secondary_worker_ids.length === 0)) {
+            workerIds.push(null); // Unassigned row
+          } else {
+            if (job.worker_id) workerIds.push(job.worker_id);
+            if (job.secondary_worker_ids) {
+              workerIds.push(...job.secondary_worker_ids);
+            }
+          }
+
+          workerIds.forEach(workerId => {
+            const key = `${workerId || 'null'}-${dayKey}`;
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(job);
+          });
+        });
       } catch (error) {
-        console.error('Error parsing job dates:', error, job);
-        return false;
+        console.error('Error processing job dates:', error, job);
       }
     });
 
+    return map;
+  }, [jobs, weekDays]);
+
+  // Fast O(1) lookup for jobs on a specific worker-day combination
+  const getWorkerDayJobs = useCallback((workerId: string | null, day: Date): Job[] => {
+    const key = `${workerId || 'null'}-${format(day, 'yyyy-MM-dd')}`;
+    const result = workerDayJobsMap.get(key) || [];
+
     // In read-only mode, filter to only show jobs where current worker is involved
     if (readOnly && currentWorker) {
-      return allJobs.filter(job => 
-        job.worker_id === currentWorker.id || 
+      return result.filter(job =>
+        job.worker_id === currentWorker.id ||
         (job.secondary_worker_ids && job.secondary_worker_ids.includes(currentWorker.id))
       );
     }
-    
-    return allJobs;
-  }, [jobs, readOnly, currentWorker]);
+
+    return result;
+  }, [workerDayJobsMap, readOnly, currentWorker]);
   
   const handleSubmitJob = async (jobData: Omit<Job, 'id' | 'created_at'>) => {
     if (readOnly) {

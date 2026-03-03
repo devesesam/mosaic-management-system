@@ -249,3 +249,25 @@ export const useTeamStore = create<TeamState>((set, get) => ({
 
 // Backwards compatibility exports - use useTeamStore instead
 export const useWorkerStore = useTeamStore;
+
+// ============================================================================
+// SELECTORS - Use these for optimized re-renders
+// Components using selectors only re-render when their specific data changes
+// ============================================================================
+
+/** Select only the team members array - prevents re-renders from loading/error changes */
+export const useTeamMembers = () => useTeamStore((state) => state.teamMembers);
+
+/** Select only the loading state */
+export const useTeamLoading = () => useTeamStore((state) => state.isLoading);
+
+/** Select only the error state */
+export const useTeamError = () => useTeamStore((state) => state.error);
+
+/** Select only the action functions - these never change, so components using this won't re-render */
+export const useTeamActions = () => useTeamStore((state) => ({
+  fetchTeamMembers: state.fetchTeamMembers,
+  addTeamMember: state.addTeamMember,
+  updateTeamMember: state.updateTeamMember,
+  deleteTeamMember: state.deleteTeamMember
+}));

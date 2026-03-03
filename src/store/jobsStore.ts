@@ -282,9 +282,9 @@ export const useJobsStore = create<JobsState>((set, get) => ({
   unassignWorkerJobs: async (workerId) => {
     const state = get();
     const jobsToUpdate = state.jobs.filter(job => job.worker_id === workerId);
-    
+
     logger.debug('jobsStore: Unassigning', jobsToUpdate.length, 'jobs from worker', workerId);
-    
+
     // Update each job to unassign the worker
     for (const job of jobsToUpdate) {
       try {
@@ -297,8 +297,35 @@ export const useJobsStore = create<JobsState>((set, get) => ({
         logger.error(`Failed to unassign job ${job.id}:`, error);
       }
     }
-    
+
     // Refresh jobs after unassigning
     await get().fetchJobs();
   }
+}));
+
+// ============================================================================
+// SELECTORS - Use these for optimized re-renders
+// Components using selectors only re-render when their specific data changes
+// ============================================================================
+
+/** Select only the jobs array - prevents re-renders from loading/error changes */
+export const useJobs = () => useJobsStore((state) => state.jobs);
+
+/** Select only the loading state */
+export const useJobsLoading = () => useJobsStore((state) => state.isLoading);
+
+/** Select only the error state */
+export const useJobsError = () => useJobsStore((state) => state.error);
+
+/** Select only the selected job */
+export const useSelectedJob = () => useJobsStore((state) => state.selectedJob);
+
+/** Select only the action functions - these never change, so components using this won't re-render */
+export const useJobActions = () => useJobsStore((state) => ({
+  fetchJobs: state.fetchJobs,
+  addJob: state.addJob,
+  updateJob: state.updateJob,
+  deleteJob: state.deleteJob,
+  setSelectedJob: state.setSelectedJob,
+  unassignWorkerJobs: state.unassignWorkerJobs
 }));

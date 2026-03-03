@@ -188,7 +188,7 @@ interface WorkerRowProps {
   readOnly?: boolean;
 }
 
-const WorkerRow: React.FC<WorkerRowProps> = ({
+const WorkerRow = React.memo(function WorkerRow({
   workerId,
   workerName,
   days,
@@ -198,7 +198,7 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
   onJobResize,
   onShowMore,
   readOnly = false
-}) => {
+}: WorkerRowProps) {
   // Get all jobs for this worker across all days
   const allWorkerJobs = React.useMemo(() => {
     const jobsMap = new Map<string, Job>();
@@ -374,7 +374,22 @@ const WorkerRow: React.FC<WorkerRowProps> = ({
       ))}
     </div>
   );
-};
+}, (prevProps: WorkerRowProps, nextProps: WorkerRowProps) => {
+  // Custom comparison for WorkerRow - only re-render when necessary
+  if (prevProps.workerId !== nextProps.workerId) return false;
+  if (prevProps.workerName !== nextProps.workerName) return false;
+  if (prevProps.readOnly !== nextProps.readOnly) return false;
+
+  // Compare days by first and last date
+  if (prevProps.days.length !== nextProps.days.length) return false;
+  if (prevProps.days[0]?.getTime() !== nextProps.days[0]?.getTime()) return false;
+  if (prevProps.days[prevProps.days.length - 1]?.getTime() !== nextProps.days[nextProps.days.length - 1]?.getTime()) return false;
+
+  // Check if getWorkerDayJobs function reference changed (it will if jobs changed)
+  if (prevProps.getWorkerDayJobs !== nextProps.getWorkerDayJobs) return false;
+
+  return true;
+});
 
 interface CalendarCellProps {
   workerId: string | null;
@@ -395,7 +410,7 @@ interface CalendarCellProps {
   rowHeight: number;
 }
 
-const CalendarCell: React.FC<CalendarCellProps> = ({
+const CalendarCell = React.memo(function CalendarCell({
   workerId,
   day,
   dayIndex,
@@ -406,7 +421,7 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
   onJobResize,
   readOnly = false,
   rowHeight
-}) => {
+}: CalendarCellProps) {
   const [{ isOver }, drop] = useDrop({
     accept: 'JOB',
     drop: (item: { job: Job }) => {
@@ -470,6 +485,55 @@ const CalendarCell: React.FC<CalendarCellProps> = ({
       </div>
     </div>
   );
-};
+}, (prevProps: CalendarCellProps, nextProps: CalendarCellProps) => {
+  // Custom comparison for CalendarCell
+  if (prevProps.workerId !== nextProps.workerId) return false;
+  if (prevProps.dayIndex !== nextProps.dayIndex) return false;
+  if (prevProps.readOnly !== nextProps.readOnly) return false;
+  if (prevProps.rowHeight !== nextProps.rowHeight) return false;
+  if (prevProps.day.getTime() !== nextProps.day.getTime()) return false;
 
-export default CalendarGrid;
+  // Compare renderingData - check length and job IDs
+  if (prevProps.renderingData.length !== nextProps.renderingData.length) return false;
+  for (let i = 0; i < prevProps.renderingData.length; i++) {
+    const prev = prevProps.renderingData[i];
+    const next = nextProps.renderingData[i];
+    if (prev.job.id !== next.job.id) return false;
+    if (prev.stackIndex !== next.stackIndex) return false;
+    if (prev.span !== next.span) return false;
+  }
+
+  return true;
+});
+
+// Memoize CalendarGrid with custom comparison
+const CalendarGridMemo = React.memo(CalendarGrid, (prevProps, nextProps) => {
+  // Compare days array
+  if (prevProps.days.length !== nextProps.days.length) return false;
+  if (prevProps.days[0]?.getTime() !== nextProps.days[0]?.getTime()) return false;
+  if (prevProps.days[prevProps.days.length - 1]?.getTime() !== nextProps.days[nextProps.days.length - 1]?.getTime()) return false;
+
+  // Compare team members by ID list
+  if (prevProps.teamMembers.length !== nextProps.teamMembers.length) return false;
+  for (let i = 0; i < prevProps.teamMembers.length; i++) {
+    if (prevProps.teamMembers[i].id !== nextProps.teamMembers[i].id) return false;
+  }
+
+  // Compare jobs - check length and key properties
+  if (prevProps.allJobs.length !== nextProps.allJobs.length) return false;
+  for (let i = 0; i < prevProps.allJobs.length; i++) {
+    const prev = prevProps.allJobs[i];
+    const next = nextProps.allJobs[i];
+    if (prev.id !== next.id) return false;
+    if (prev.start_date !== next.start_date) return false;
+    if (prev.end_date !== next.end_date) return false;
+    if (prev.worker_id !== next.worker_id) return false;
+  }
+
+  // Compare readOnly
+  if (prevProps.readOnly !== nextProps.readOnly) return false;
+
+  return true;
+});
+
+export default CalendarGridMemo;

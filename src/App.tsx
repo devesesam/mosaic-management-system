@@ -9,6 +9,8 @@ import MonthView from './components/scheduler/MonthView';
 import JobForm from './components/jobs/JobForm';
 import { useJobsStore } from './store/jobsStore';
 import { useTeamStore } from './store/teamStore';
+import { useRealtimeJobs } from './hooks/useRealtimeJobs';
+import { useRealtimeTeam } from './hooks/useRealtimeTeam';
 import { Toaster } from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 import { Job } from './types';
@@ -35,26 +37,32 @@ function App() {
     isLoading: teamLoading
   } = useTeamStore();
 
-  // Load data when component mounts - no auth dependency
+  // Subscribe to real-time updates (replaces polling)
+  useRealtimeJobs();
+  useRealtimeTeam();
+
+  // Load data when component mounts
   useEffect(() => {
     logger.debug('App: Initial data load');
     fetchJobs();
     fetchTeamMembers();
   }, [fetchJobs, fetchTeamMembers]);
 
-  // Set up periodic refresh without auth dependency
+  // Refresh data when tab becomes visible (handles stale data after tab was inactive)
   useEffect(() => {
-    const interval = setInterval(() => {
-      logger.debug('App: Periodic data refresh');
-      try {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        logger.debug('App: Tab became visible, refreshing data');
         fetchJobs();
         fetchTeamMembers();
-      } catch (error) {
-        logger.error('Error during periodic refresh:', error);
       }
-    }, 60000); // Refresh every minute
+    };
 
-    return () => clearInterval(interval);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchJobs, fetchTeamMembers]);
 
   // Log edit permission status
