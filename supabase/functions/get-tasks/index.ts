@@ -65,17 +65,44 @@ Deno.serve(async (req: Request) => {
       error: secondaryError?.message || 'none'
     });
 
+    // Extract query parameters for visibility filtering
+    const url = new URL(req.url);
+    const reqWorkerId = url.searchParams.get('workerId');
+    const isAdmin = url.searchParams.get('isAdmin') === 'true';
+
+    console.log('Edge Function: get-tasks - Filters:', { reqWorkerId, isAdmin });
+
     // Process tasks to ensure consistent format and add secondary workers
-    const processedTasks = (tasks || []).map(task => ({
-      ...task,
-      start_date: task.start_date || null,
-      end_date: task.end_date || null,
-      status: task.status || 'Not Started',
-      tile_color: task.tile_color || '#3b82f6',
-      secondary_worker_ids: (secondaryWorkers || [])
+    let processedTasks = (tasks || []).map(task => {
+      const secondaryIds = (secondaryWorkers || [])
         .filter(sw => sw.task_id === task.id)
-        .map(sw => sw.worker_id)
-    }));
+        .map(sw => sw.worker_id);
+
+      return {
+        ...task,
+        start_date: task.start_date || null,
+        end_date: task.end_date || null,
+        status: task.status || 'Not Started',
+        tile_color: task.tile_color || '#3b82f6',
+        is_visible: task.is_visible !== false, // default true
+        secondary_worker_ids: secondaryIds
+      };
+    });
+
+    // Apply visibility filtering if not an admin
+    if (!isAdmin) {
+      processedTasks = processedTasks.filter(task => {
+        if (task.is_visible) return true; // Visible to everyone
+
+        // Private task: Check if the requesting worker is assigned
+        if (reqWorkerId) {
+          if (task.worker_id === reqWorkerId) return true;
+          if (task.secondary_worker_ids.includes(reqWorkerId)) return true;
+        }
+
+        return false; // Not visible to this user
+      });
+    }
 
     // Return successful response
     const response = {

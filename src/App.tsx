@@ -44,16 +44,16 @@ function App() {
   // Load data when component mounts
   useEffect(() => {
     logger.debug('App: Initial data load');
-    fetchTasks();
+    fetchTasks(currentWorker?.id, false);
     fetchTeamMembers();
-  }, [fetchTasks, fetchTeamMembers]);
+  }, [fetchTasks, fetchTeamMembers, currentWorker]);
 
   // Refresh data when tab becomes visible (handles stale data after tab was inactive)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         logger.debug('App: Tab became visible, refreshing data');
-        fetchTasks();
+        fetchTasks(currentWorker?.id, false);
         fetchTeamMembers();
       }
     };
@@ -63,7 +63,7 @@ function App() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchTasks, fetchTeamMembers]);
+  }, [fetchTasks, fetchTeamMembers, currentWorker]);
 
   // Log edit permission status
   useEffect(() => {

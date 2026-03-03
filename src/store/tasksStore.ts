@@ -8,7 +8,7 @@ interface TasksState {
   loading: boolean;
   error: string | null;
   selectedTask: Task | null;
-  fetchTasks: () => Promise<void>;
+  fetchTasks: (workerId?: string, isAdmin?: boolean) => Promise<void>;
   addTask: (task: Omit<Task, 'id' | 'created_at'>) => Promise<Task>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
@@ -30,11 +30,16 @@ export const useTasksStore = create<TasksState>((set, get) => ({
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const apiUrl = `${supabaseUrl}/functions/v1/get-tasks`;
+      const url = new URL(`${supabaseUrl}/functions/v1/get-tasks`);
 
-      logger.debug('tasksStore: Fetching tasks from edge function:', apiUrl);
+      // We will pass workerId and isAdmin if available in the app state
+      // This will be provided from AuthContext or App.tsx but we can also
+      // pull it from local storage or wait for it to be passed.
+      // For now we will update fetchTasks signature.
 
-      const response = await fetch(apiUrl, {
+      logger.debug('tasksStore: Fetching tasks from edge function:', url.toString());
+
+      const response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,

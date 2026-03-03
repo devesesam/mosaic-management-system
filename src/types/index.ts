@@ -22,6 +22,7 @@ export interface Task {
   end_date: string | null;
   status: TaskStatus;
   tile_color: string | null;
+  is_visible?: boolean;
   created_at: string;
 }
 

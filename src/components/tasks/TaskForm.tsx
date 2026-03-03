@@ -28,7 +28,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
     start_date: null,
     end_date: null,
     status: TaskStatus.NotStarted,
-    tile_color: '#345981'
+    tile_color: '#345981',
+    is_visible: true
   });
 
   // Initialize form with initial task data
@@ -37,7 +38,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
       logger.debug('TaskForm: Initializing with task:', initialTask);
       setFormData({
         ...initialTask,
-        secondary_worker_ids: initialTask.secondary_worker_ids || []
+        secondary_worker_ids: initialTask.secondary_worker_ids || [],
+        is_visible: initialTask.is_visible !== false // default true if undefined
       });
     }
   }, [initialTask]);
@@ -68,11 +70,12 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
     // CRITICAL: If worker_id is being set to null/empty, also clear secondary workers
     if (name === 'worker_id') {
       if (!value || value === '') {
-        logger.debug('TaskForm: Primary worker cleared - clearing secondary workers');
+        logger.debug('TaskForm: Primary worker cleared - clearing secondary workers and setting public');
         setFormData(prev => ({
           ...prev,
           [name]: null,
-          secondary_worker_ids: []
+          secondary_worker_ids: [],
+          is_visible: true // Force public if unassigned
         }));
         return;
       }
@@ -143,8 +146,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
     // CRITICAL: Ensure secondary workers are cleared if no primary worker
     let finalFormData = { ...formData };
     if (!finalFormData.worker_id) {
-      logger.debug('TaskForm: No primary worker - ensuring secondary workers are cleared');
+      logger.debug('TaskForm: No primary worker - ensuring secondary workers are cleared and task is public');
       finalFormData.secondary_worker_ids = [];
+      finalFormData.is_visible = true;
     }
 
     try {
@@ -237,9 +241,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                 value={formData.name || ''}
                 onChange={handleChange}
                 disabled={isSubmitting || readOnly}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${
-                  isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
               />
             </div>
 
@@ -257,9 +260,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                   value={formData.worker_id || ''}
                   onChange={handleChange}
                   disabled={isSubmitting || readOnly}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${
-                    isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
+                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                 >
                   <option value="">Select Team Member</option>
                   {teamMembers.map((member: TeamMember) => (
@@ -280,9 +282,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                 value={formData.status || TaskStatus.NotStarted}
                 onChange={handleChange}
                 disabled={isSubmitting || readOnly}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${
-                  isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
               >
                 {Object.values(TaskStatus).map((status) => (
                   <option key={status} value={status}>
@@ -302,9 +303,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                 value={formData.start_date ? format(new Date(formData.start_date), 'yyyy-MM-dd') : ''}
                 onChange={handleDateChange}
                 disabled={isSubmitting || readOnly}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${
-                  isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
               />
             </div>
 
@@ -319,9 +319,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                 onChange={handleDateChange}
                 min={formData.start_date ? format(new Date(formData.start_date), 'yyyy-MM-dd') : undefined}
                 disabled={isSubmitting || readOnly}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${
-                  isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
               />
             </div>
 
@@ -333,13 +332,11 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                 {colorOptions.map((color) => (
                   <div
                     key={color}
-                    className={`w-8 h-8 rounded-full transition-transform ${
-                      readOnly || isSubmitting
+                    className={`w-8 h-8 rounded-full transition-transform ${readOnly || isSubmitting
                         ? 'cursor-not-allowed opacity-50'
                         : 'cursor-pointer hover:scale-110'
-                    } ${
-                      formData.tile_color === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''
-                    }`}
+                      } ${formData.tile_color === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''
+                      }`}
                     style={{ backgroundColor: color }}
                     onClick={() => !readOnly && !isSubmitting && setFormData(prev => ({ ...prev, tile_color: color }))}
                   />
@@ -371,18 +368,16 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                   availableSecondaryTeamMembers.map((member) => (
                     <label
                       key={member.id}
-                      className={`flex items-center px-3 py-2 hover:bg-gray-50 ${
-                        readOnly ? 'cursor-default' : 'cursor-pointer'
-                      } ${isSubmitting || readOnly ? 'opacity-50' : ''}`}
+                      className={`flex items-center px-3 py-2 hover:bg-gray-50 ${readOnly ? 'cursor-default' : 'cursor-pointer'
+                        } ${isSubmitting || readOnly ? 'opacity-50' : ''}`}
                     >
                       <input
                         type="checkbox"
                         checked={formData.secondary_worker_ids?.includes(member.id) || false}
                         onChange={() => !readOnly && !isSubmitting && handleSecondaryWorkerToggle(member.id)}
                         disabled={isSubmitting || readOnly}
-                        className={`h-4 w-4 text-blueberry focus:ring-margaux border-gray-300 rounded ${
-                          isSubmitting || readOnly ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                        className={`h-4 w-4 text-blueberry focus:ring-margaux border-gray-300 rounded ${isSubmitting || readOnly ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
                       />
                       <span className="ml-2 text-sm text-gray-700">
                         {member.name}
@@ -398,6 +393,31 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
               </div>
             </div>
 
+            <div className="col-span-1 md:col-span-2 flex items-center mt-2 mb-2">
+              <label className={`flex items-center cursor-pointer ${isSubmitting || readOnly || !formData.worker_id ? 'opacity-50' : ''}`}>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_visible !== false}
+                    onChange={(e) => !readOnly && !isSubmitting && formData.worker_id && setFormData(prev => ({ ...prev, is_visible: e.target.checked }))}
+                    disabled={isSubmitting || readOnly || !formData.worker_id}
+                    className="sr-only"
+                  />
+                  <div className={`block w-10 h-6 rounded-full transition-colors ${(formData.is_visible !== false) ? 'bg-blueberry' : 'bg-gray-300'}`}></div>
+                  <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${(formData.is_visible !== false) ? 'transform translate-x-4' : ''}`}></div>
+                </div>
+                <div className="ml-3 text-sm font-medium text-gray-700">
+                  Visible to everyone
+                  {!formData.worker_id && (
+                    <span className="text-xs text-amber-600 block font-normal">Requires a primary team member</span>
+                  )}
+                  {formData.worker_id && formData.is_visible === false && (
+                    <span className="text-xs text-margaux block font-normal">Private to assigned workers</span>
+                  )}
+                </div>
+              </label>
+            </div>
+
             <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-medium text-gray-700">
                 Notes
@@ -408,9 +428,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ onClose, onSubmit, onDelete, initia
                 value={formData.notes || ''}
                 onChange={handleChange}
                 disabled={isSubmitting || readOnly}
-                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${
-                  isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-margaux focus:ring-margaux sm:text-sm border p-2 ${isSubmitting || readOnly ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
               />
             </div>
           </div>
